@@ -132,6 +132,21 @@ create table if not exists public.order_payments (
 );
 alter table public.order_payments enable row level security;
 
+-- ---------- API PRIVILEGES ---------------------------------------------
+-- RLS still controls row-level access; these grants let authenticated app
+-- users reach the tables through the API when a policy allows it.
+grant usage on schema public to authenticated;
+grant select, insert, update, delete on public.categories to authenticated;
+grant select, insert, update, delete on public.menu_items to authenticated;
+grant select, insert, update, delete on public.inventory_items to authenticated;
+grant select, insert, update, delete on public.recipes to authenticated;
+grant select, insert on public.inventory_movements to authenticated;
+grant select, insert, update on public.daily_order_counter to authenticated;
+grant select, insert, update on public.orders to authenticated;
+grant select, insert on public.order_items to authenticated;
+grant select, insert on public.order_payments to authenticated;
+grant usage, select on all sequences in schema public to authenticated;
+
 -- ---------- 10. RLS POLICIES ------------------------------------------
 -- Read: any signed-in staff. Write menu/inventory/recipes: admin+developer.
 -- Orders/payments/movements: insert by any staff (POS); read by any staff.
