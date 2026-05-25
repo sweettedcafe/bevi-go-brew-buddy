@@ -7,6 +7,7 @@ interface AuthState {
   session: Session | null;
   user: User | null;
   roles: AppRole[];
+  roleError: string | null;
   primaryRole: AppRole | null;
   hasRole: (role: AppRole) => boolean;
   signOut: () => Promise<void>;
@@ -17,16 +18,16 @@ const AuthContext = createContext<AuthState | undefined>(undefined);
 
 const ROLE_PRIORITY: AppRole[] = ["developer", "admin", "barista"];
 
-async function fetchRoles(userId: string): Promise<AppRole[]> {
+async function fetchRoles(userId: string): Promise<{ roles: AppRole[]; error: string | null }> {
   const { data, error } = await supabase
     .from("user_roles")
     .select("role")
     .eq("user_id", userId);
   if (error) {
     console.warn("[auth] failed to load roles", error.message);
-    return [];
+    return { roles: [], error: error.message };
   }
-  return (data ?? []).map((r) => r.role as AppRole);
+  return { roles: (data ?? []).map((r) => r.role as AppRole), error: null };
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -34,15 +35,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [roles, setRoles] = useState<AppRole[]>([]);
+  const [roleError, setRoleError] = useState<string | null>(null);
 
   const applySession = async (s: Session | null) => {
     setSession(s);
     setUser(s?.user ?? null);
     if (s?.user) {
-      const r = await fetchRoles(s.user.id);
-      setRoles(r);
+      const result = await fetchRoles(s.user.id);
+      setRoles(result.roles);
+      setRoleError(result.error);
     } else {
       setRoles([]);
+      setRoleError(null);
     }
   };
 
@@ -69,13 +73,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     session,
     user,
     roles,
+    roleError,
     primaryRole,
     hasRole: (role) => roles.includes(role),
     signOut: async () => {
       await supabase.auth.signOut();
     },
     refreshRoles: async () => {
-      if (user) setRoles(await fetchRoles(user.id));
+      if (user) {
+        const result = await fetchRoles(user.id);
+        setRoles(result.roles);
+        setRoleError(result.error);
+      }
     },
   };
 
