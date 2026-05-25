@@ -86,6 +86,17 @@ create table if not exists public.admin_audit_logs (
 
 alter table public.admin_audit_logs enable row level security;
 
+-- ---------- API PRIVILEGES ---------------------------------------------
+-- RLS policies decide which rows are visible, but authenticated users also
+-- need table privileges for the app/API to read and write allowed rows.
+grant usage on schema public to authenticated;
+grant select, insert, update, delete on public.user_roles to authenticated;
+grant select, insert, update on public.profiles to authenticated;
+grant select, insert on public.admin_audit_logs to authenticated;
+grant usage, select on all sequences in schema public to authenticated;
+grant execute on function public.has_role(uuid, public.app_role) to authenticated;
+grant execute on function public.is_staff(uuid) to authenticated;
+
 -- Block any UPDATE or DELETE (immutability)
 create or replace function public.block_audit_mutation()
 returns trigger language plpgsql as $$
