@@ -8,8 +8,9 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 });
 
 function Dashboard() {
-  const { user, primaryRole, roles } = useAuth();
+  const { user, primaryRole, roles, roleError } = useAuth();
   const noRole = !primaryRole;
+  const permissionIssue = roleError?.toLowerCase().includes("permission denied");
 
   return (
     <div className="p-8 max-w-6xl mx-auto">
@@ -32,14 +33,24 @@ function Dashboard() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <ShieldCheck className="h-5 w-5 text-destructive" />
-              Awaiting role assignment
+              {permissionIssue ? "Role table permission blocked" : "Awaiting role assignment"}
             </CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
-            Your account exists but has no role yet. Ask an Admin (or run the
-            seed SQL provided with this project) to assign you a role in the
-            <code className="mx-1 px-1.5 py-0.5 rounded bg-muted text-foreground">user_roles</code>
-            table. Without a role, the side navigation will be empty.
+            {permissionIssue ? (
+              <>
+                Your account is signed in, but the app cannot read the
+                <code className="mx-1 px-1.5 py-0.5 rounded bg-muted text-foreground">user_roles</code>
+                table yet. Run the permissions fix SQL, then refresh this page.
+              </>
+            ) : (
+              <>
+                Your account exists but has no role yet. Ask an Admin (or run the
+                seed SQL provided with this project) to assign you a role in the
+                <code className="mx-1 px-1.5 py-0.5 rounded bg-muted text-foreground">user_roles</code>
+                table. Without a role, the side navigation will be empty.
+              </>
+            )}
           </CardContent>
         </Card>
       )}
@@ -69,6 +80,7 @@ function Dashboard() {
 
       <div className="mt-6 text-xs text-muted-foreground">
         Active roles on this account: {roles.length ? roles.join(", ") : "none"}
+        {roleError ? <span className="block mt-1 text-destructive">Role read error: {roleError}</span> : null}
       </div>
     </div>
   );

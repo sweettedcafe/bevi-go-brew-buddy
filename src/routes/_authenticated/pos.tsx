@@ -38,7 +38,7 @@ function fmt(n: number) {
 }
 
 function POSPage() {
-  const { user, primaryRole } = useAuth();
+  const { user, primaryRole, roleError } = useAuth();
   const [cats, setCats] = useState<Category[]>([]);
   const [items, setItems] = useState<MenuItem[]>([]);
   const [activeCat, setActiveCat] = useState<string | "all">("all");
@@ -106,7 +106,9 @@ function POSPage() {
   if (!primaryRole) {
     return (
       <div className="p-10 text-center text-muted-foreground">
-        Your account has no role assigned yet. Ask an admin to grant access.
+        {roleError?.toLowerCase().includes("permission denied")
+          ? "The app cannot read your role yet. Run the database permissions fix SQL, then refresh."
+          : "Your account has no role assigned yet. Ask an admin to grant access."}
       </div>
     );
   }
