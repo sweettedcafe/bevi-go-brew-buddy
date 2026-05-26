@@ -432,12 +432,43 @@ function POSPage() {
           const { data, error } = await db.rpc("pos_create_order", { p_payload: payload });
           if (error) { toast.error(`Order failed: ${error.message}`); return false; }
           const r = data as { order_no: number };
+          const changeTotal = payments.reduce((s, p) => s + p.change_due, 0);
+          autoPrint({ orderNo: r.order_no, splits, change: changeTotal });
           toast.success(`Order #${String(r.order_no).padStart(3, "0")} completed`);
           clearAll();
           setCheckoutOpen(false);
           return true;
         }}
       />
+
+      {/* Held orders dialog */}
+      <Dialog open={holdOpen} onOpenChange={setHoldOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Held orders</DialogTitle></DialogHeader>
+          {heldOrders.length === 0 ? (
+            <div className="text-sm text-muted-foreground py-6 text-center">No orders on hold.</div>
+          ) : (
+            <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+              {heldOrders.map((h) => (
+                <button key={h.id}
+                  onClick={() => resumeHeld(h.id)}
+                  className="w-full text-left rounded-md border p-3 hover:bg-accent transition-colors">
+                  <div className="flex items-center gap-2">
+                    <div className="font-display text-lg">#{String(h.order_no).padStart(3, "0")}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium truncate">{h.customer_name || "Walk-in"}</div>
+                      <div className="text-xs text-muted-foreground">
+                        Held {new Date(h.held_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · {fmt(Number(h.total))}
+                      </div>
+                    </div>
+                    <PlayCircle className="h-4 w-4 text-primary" />
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
