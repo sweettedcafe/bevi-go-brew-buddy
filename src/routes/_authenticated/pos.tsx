@@ -66,7 +66,7 @@ function POSPage() {
     let alive = true;
     (async () => {
       const [{ data: c }, { data: m }, { data: p }] = await Promise.all([
-        db.from("categories").select("*").eq("is_active", true).order("sort_order"),
+        db.from("categories").select("id,name,sort_order,prints_label").eq("is_active", true).order("sort_order"),
         db.from("menu_items").select("*").eq("is_active", true).order("sort_order"),
         db.from("payment_methods").select("*").eq("is_active", true).order("sort_order"),
       ]);
