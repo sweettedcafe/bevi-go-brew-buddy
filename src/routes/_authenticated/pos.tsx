@@ -386,8 +386,11 @@ function POSPage() {
             <span>Total</span>
             <span className="text-primary">{fmt(total)}</span>
           </div>
-          <div className="grid grid-cols-2 gap-2 pt-1">
+          <div className="grid grid-cols-3 gap-2 pt-1">
             <Button variant="outline" onClick={clearAll} disabled={cart.length === 0}>Clear</Button>
+            <Button variant="outline" onClick={holdOrder} disabled={cart.length === 0}>
+              <Pause className="h-3 w-3 mr-1" /> Hold
+            </Button>
             <Button onClick={() => setCheckoutOpen(true)} disabled={cart.length === 0}>Charge</Button>
           </div>
           <div className="text-[10px] text-muted-foreground text-center">Cashier: {user?.email}</div>
