@@ -54,6 +54,8 @@ function POSPage() {
   const [customerName, setCustomerName] = useState("");
   const [loading, setLoading] = useState(true);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [holdOpen, setHoldOpen] = useState(false);
+  const [heldOrders, setHeldOrders] = useState<Array<{ id: string; order_no: number; customer_name: string | null; held_at: string; total: number }>>([]);
 
   // discount state
   const [promoCode, setPromoCode] = useState("");
