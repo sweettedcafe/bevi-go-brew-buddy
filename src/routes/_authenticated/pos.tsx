@@ -12,14 +12,17 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Trash2, Plus, Minus, ShoppingCart, Coffee, Search, X, Tag } from "lucide-react";
+import { Trash2, Plus, Minus, ShoppingCart, Coffee, Search, X, Tag, Pause, PlayCircle } from "lucide-react";
 import { toast } from "sonner";
+import { loadPrintSettings } from "@/lib/print-settings";
+import { printHTML } from "@/lib/print";
+import { receiptHTML, labelsHTML, type DrinkLabel } from "@/lib/print-templates";
 
 export const Route = createFileRoute("/_authenticated/pos")({
   component: POSPage,
 });
 
-type Category = { id: string; name: string; sort_order: number };
+type Category = { id: string; name: string; sort_order: number; prints_label?: boolean };
 type MenuItem = {
   id: string; category_id: string | null; name: string;
   description: string | null; price: number; is_active: boolean; sort_order: number;
@@ -51,6 +54,8 @@ function POSPage() {
   const [customerName, setCustomerName] = useState("");
   const [loading, setLoading] = useState(true);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [holdOpen, setHoldOpen] = useState(false);
+  const [heldOrders, setHeldOrders] = useState<Array<{ id: string; order_no: number; customer_name: string | null; held_at: string; total: number }>>([]);
 
   // discount state
   const [promoCode, setPromoCode] = useState("");
@@ -61,7 +66,7 @@ function POSPage() {
     let alive = true;
     (async () => {
       const [{ data: c }, { data: m }, { data: p }] = await Promise.all([
-        db.from("categories").select("*").eq("is_active", true).order("sort_order"),
+        db.from("categories").select("id,name,sort_order,prints_label").eq("is_active", true).order("sort_order"),
         db.from("menu_items").select("*").eq("is_active", true).order("sort_order"),
         db.from("payment_methods").select("*").eq("is_active", true).order("sort_order"),
       ]);
@@ -113,6 +118,98 @@ function POSPage() {
     setPromoCode(""); setAppliedPromo(null); setManual(null);
   }
 
+  async function holdOrder() {
+    if (cart.length === 0) return;
+    const { data, error } = await db.rpc("pos_hold_order", {
+      p_payload: {
+        order_type: orderType,
+        customer_name: customerName || null,
+        items: cart.map((l) => ({ menu_item_id: l.menu_item_id, qty: l.qty })),
+      },
+    });
+    if (error) { toast.error(error.message); return; }
+    toast.success(`Order #${String((data as any).order_no).padStart(3, "0")} held`);
+    clearAll();
+  }
+
+  async function openHeldList() {
+    const { data, error } = await db
+      .from("orders")
+      .select("id, order_no, customer_name, held_at, total")
+      .eq("status", "on_hold")
+      .order("held_at", { ascending: false });
+    if (error) { toast.error(error.message); return; }
+    setHeldOrders((data ?? []) as any);
+    setHoldOpen(true);
+  }
+
+  async function resumeHeld(id: string) {
+    const { data, error } = await db.rpc("pos_resume_order", { p_order_id: id });
+    if (error) { toast.error(error.message); return; }
+    const r = data as any;
+    setCart((r.items ?? []).map((it: any) => ({
+      menu_item_id: it.menu_item_id, name: it.name,
+      unit_price: Number(it.unit_price), qty: Number(it.qty),
+    })));
+    setCustomerName(r.customer_name ?? "");
+    setOrderType((r.order_type as OrderType) ?? "takeout");
+    setHoldOpen(false);
+    toast.success("Order resumed");
+  }
+
+  function autoPrint(args: {
+    orderNo: number;
+    splits: SplitLine[];
+    change: number;
+  }) {
+    const settings = loadPrintSettings();
+    const labelCatIds = new Set(cats.filter((c) => c.prints_label).map((c) => c.id));
+    const now = new Date().toISOString();
+    const pmLabel = (code: string) => pms.find((p) => p.code === code)?.label ?? code;
+
+    if (settings.autoPrintReceipt) {
+      printHTML(receiptHTML({
+        orderNo: args.orderNo,
+        businessDate: new Date().toISOString().slice(0, 10),
+        createdAt: now,
+        cashier: user?.email ?? "—",
+        orderType,
+        customerName: customerName || null,
+        lines: cart.map((l) => ({
+          name: l.name, qty: l.qty, unit_price: l.unit_price, line_total: l.unit_price * l.qty,
+        })),
+        subtotal,
+        discountLabel: appliedPromo?.label ?? manual?.label ?? null,
+        discountAmount: discountAmount,
+        total,
+        payments: args.splits.map((s) => ({ label: pmLabel(s.method_code), amount: Number(s.amount) || 0 })),
+        change: args.change,
+      }, settings), `Receipt #${args.orderNo}`);
+    }
+
+    if (settings.autoPrintLabels) {
+      const labels: DrinkLabel[] = [];
+      for (const line of cart) {
+        const item = items.find((x) => x.id === line.menu_item_id);
+        if (!item || !item.category_id || !labelCatIds.has(item.category_id)) continue;
+        for (let i = 1; i <= line.qty; i++) {
+          labels.push({
+            orderNo: args.orderNo,
+            drinkName: line.name,
+            cupIndex: i, cupTotal: line.qty,
+            customerName: customerName || null,
+            notes: null,
+            createdAt: now,
+          });
+        }
+      }
+      if (labels.length > 0) {
+        // small delay so the receipt iframe doesn't race the label iframe
+        setTimeout(() => printHTML(labelsHTML(labels, settings), `Labels #${args.orderNo}`), 700);
+      }
+    }
+  }
+
   async function applyPromo() {
     const code = promoCode.trim().toUpperCase();
     if (!code) return;
@@ -145,13 +242,16 @@ function POSPage() {
   }
 
   return (
-    <div className="h-screen flex bg-background">
+    <div className="min-h-[calc(100vh-3.5rem)] md:h-screen flex flex-col lg:flex-row bg-background">
       {/* Menu side */}
       <section className="flex-1 flex flex-col min-w-0">
-        <header className="px-6 py-4 border-b bg-card flex items-center gap-4">
+        <header className="px-4 sm:px-6 py-3 sm:py-4 border-b bg-card flex flex-wrap items-center gap-3">
           <Coffee className="h-5 w-5 text-primary" />
-          <h1 className="text-xl font-display">Point of Sale</h1>
-          <div className="ml-auto relative w-64">
+          <h1 className="text-lg sm:text-xl font-display">Point of Sale</h1>
+          <Button size="sm" variant="outline" onClick={openHeldList} className="ml-auto">
+            <PlayCircle className="h-3 w-3 mr-1" /> Held orders
+          </Button>
+          <div className="relative w-full sm:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input placeholder="Search menu…" value={query} onChange={(e) => setQuery(e.target.value)} className="pl-9" />
           </div>
@@ -189,7 +289,7 @@ function POSPage() {
       </section>
 
       {/* Cart side */}
-      <aside className="w-[400px] border-l bg-card flex flex-col">
+      <aside className="w-full lg:w-[400px] border-t lg:border-t-0 lg:border-l bg-card flex flex-col">
         <div className="p-4 border-b flex items-center gap-2">
           <ShoppingCart className="h-4 w-4" />
           <h2 className="font-display text-lg">Current Order</h2>
@@ -286,8 +386,11 @@ function POSPage() {
             <span>Total</span>
             <span className="text-primary">{fmt(total)}</span>
           </div>
-          <div className="grid grid-cols-2 gap-2 pt-1">
+          <div className="grid grid-cols-3 gap-2 pt-1">
             <Button variant="outline" onClick={clearAll} disabled={cart.length === 0}>Clear</Button>
+            <Button variant="outline" onClick={holdOrder} disabled={cart.length === 0}>
+              <Pause className="h-3 w-3 mr-1" /> Hold
+            </Button>
             <Button onClick={() => setCheckoutOpen(true)} disabled={cart.length === 0}>Charge</Button>
           </div>
           <div className="text-[10px] text-muted-foreground text-center">Cashier: {user?.email}</div>
@@ -329,12 +432,43 @@ function POSPage() {
           const { data, error } = await db.rpc("pos_create_order", { p_payload: payload });
           if (error) { toast.error(`Order failed: ${error.message}`); return false; }
           const r = data as { order_no: number };
+          const changeTotal = payments.reduce((s, p) => s + p.change_due, 0);
+          autoPrint({ orderNo: r.order_no, splits, change: changeTotal });
           toast.success(`Order #${String(r.order_no).padStart(3, "0")} completed`);
           clearAll();
           setCheckoutOpen(false);
           return true;
         }}
       />
+
+      {/* Held orders dialog */}
+      <Dialog open={holdOpen} onOpenChange={setHoldOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Held orders</DialogTitle></DialogHeader>
+          {heldOrders.length === 0 ? (
+            <div className="text-sm text-muted-foreground py-6 text-center">No orders on hold.</div>
+          ) : (
+            <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+              {heldOrders.map((h) => (
+                <button key={h.id}
+                  onClick={() => resumeHeld(h.id)}
+                  className="w-full text-left rounded-md border p-3 hover:bg-accent transition-colors">
+                  <div className="flex items-center gap-2">
+                    <div className="font-display text-lg">#{String(h.order_no).padStart(3, "0")}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium truncate">{h.customer_name || "Walk-in"}</div>
+                      <div className="text-xs text-muted-foreground">
+                        Held {new Date(h.held_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · {fmt(Number(h.total))}
+                      </div>
+                    </div>
+                    <PlayCircle className="h-4 w-4 text-primary" />
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
