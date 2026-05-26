@@ -242,13 +242,16 @@ function POSPage() {
   }
 
   return (
-    <div className="h-screen flex bg-background">
+    <div className="min-h-[calc(100vh-3.5rem)] md:h-screen flex flex-col lg:flex-row bg-background">
       {/* Menu side */}
       <section className="flex-1 flex flex-col min-w-0">
-        <header className="px-6 py-4 border-b bg-card flex items-center gap-4">
+        <header className="px-4 sm:px-6 py-3 sm:py-4 border-b bg-card flex flex-wrap items-center gap-3">
           <Coffee className="h-5 w-5 text-primary" />
-          <h1 className="text-xl font-display">Point of Sale</h1>
-          <div className="ml-auto relative w-64">
+          <h1 className="text-lg sm:text-xl font-display">Point of Sale</h1>
+          <Button size="sm" variant="outline" onClick={openHeldList} className="ml-auto">
+            <PlayCircle className="h-3 w-3 mr-1" /> Held orders
+          </Button>
+          <div className="relative w-full sm:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input placeholder="Search menu…" value={query} onChange={(e) => setQuery(e.target.value)} className="pl-9" />
           </div>
