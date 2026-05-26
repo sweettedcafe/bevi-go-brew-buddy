@@ -15,10 +15,12 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedTimeclockRouteImport } from './routes/_authenticated/timeclock'
 import { Route as AuthenticatedStaffRouteImport } from './routes/_authenticated/staff'
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
+import { Route as AuthenticatedPrintSettingsRouteImport } from './routes/_authenticated/print-settings'
 import { Route as AuthenticatedPosRouteImport } from './routes/_authenticated/pos'
 import { Route as AuthenticatedPaymentsRouteImport } from './routes/_authenticated/payments'
 import { Route as AuthenticatedMenuRouteImport } from './routes/_authenticated/menu'
 import { Route as AuthenticatedInventoryRouteImport } from './routes/_authenticated/inventory'
+import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticated/history'
 import { Route as AuthenticatedDiscountsRouteImport } from './routes/_authenticated/discounts'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCustomersRouteImport } from './routes/_authenticated/customers'
@@ -52,6 +54,12 @@ const AuthenticatedReportsRoute = AuthenticatedReportsRouteImport.update({
   path: '/reports',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedPrintSettingsRoute =
+  AuthenticatedPrintSettingsRouteImport.update({
+    id: '/print-settings',
+    path: '/print-settings',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedPosRoute = AuthenticatedPosRouteImport.update({
   id: '/pos',
   path: '/pos',
@@ -70,6 +78,11 @@ const AuthenticatedMenuRoute = AuthenticatedMenuRouteImport.update({
 const AuthenticatedInventoryRoute = AuthenticatedInventoryRouteImport.update({
   id: '/inventory',
   path: '/inventory',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedHistoryRoute = AuthenticatedHistoryRouteImport.update({
+  id: '/history',
+  path: '/history',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedDiscountsRoute = AuthenticatedDiscountsRouteImport.update({
@@ -94,10 +107,12 @@ export interface FileRoutesByFullPath {
   '/customers': typeof AuthenticatedCustomersRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/discounts': typeof AuthenticatedDiscountsRoute
+  '/history': typeof AuthenticatedHistoryRoute
   '/inventory': typeof AuthenticatedInventoryRoute
   '/menu': typeof AuthenticatedMenuRoute
   '/payments': typeof AuthenticatedPaymentsRoute
   '/pos': typeof AuthenticatedPosRoute
+  '/print-settings': typeof AuthenticatedPrintSettingsRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/staff': typeof AuthenticatedStaffRoute
   '/timeclock': typeof AuthenticatedTimeclockRoute
@@ -108,10 +123,12 @@ export interface FileRoutesByTo {
   '/customers': typeof AuthenticatedCustomersRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/discounts': typeof AuthenticatedDiscountsRoute
+  '/history': typeof AuthenticatedHistoryRoute
   '/inventory': typeof AuthenticatedInventoryRoute
   '/menu': typeof AuthenticatedMenuRoute
   '/payments': typeof AuthenticatedPaymentsRoute
   '/pos': typeof AuthenticatedPosRoute
+  '/print-settings': typeof AuthenticatedPrintSettingsRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/staff': typeof AuthenticatedStaffRoute
   '/timeclock': typeof AuthenticatedTimeclockRoute
@@ -124,10 +141,12 @@ export interface FileRoutesById {
   '/_authenticated/customers': typeof AuthenticatedCustomersRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/discounts': typeof AuthenticatedDiscountsRoute
+  '/_authenticated/history': typeof AuthenticatedHistoryRoute
   '/_authenticated/inventory': typeof AuthenticatedInventoryRoute
   '/_authenticated/menu': typeof AuthenticatedMenuRoute
   '/_authenticated/payments': typeof AuthenticatedPaymentsRoute
   '/_authenticated/pos': typeof AuthenticatedPosRoute
+  '/_authenticated/print-settings': typeof AuthenticatedPrintSettingsRoute
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
   '/_authenticated/staff': typeof AuthenticatedStaffRoute
   '/_authenticated/timeclock': typeof AuthenticatedTimeclockRoute
@@ -140,10 +159,12 @@ export interface FileRouteTypes {
     | '/customers'
     | '/dashboard'
     | '/discounts'
+    | '/history'
     | '/inventory'
     | '/menu'
     | '/payments'
     | '/pos'
+    | '/print-settings'
     | '/reports'
     | '/staff'
     | '/timeclock'
@@ -154,10 +175,12 @@ export interface FileRouteTypes {
     | '/customers'
     | '/dashboard'
     | '/discounts'
+    | '/history'
     | '/inventory'
     | '/menu'
     | '/payments'
     | '/pos'
+    | '/print-settings'
     | '/reports'
     | '/staff'
     | '/timeclock'
@@ -169,10 +192,12 @@ export interface FileRouteTypes {
     | '/_authenticated/customers'
     | '/_authenticated/dashboard'
     | '/_authenticated/discounts'
+    | '/_authenticated/history'
     | '/_authenticated/inventory'
     | '/_authenticated/menu'
     | '/_authenticated/payments'
     | '/_authenticated/pos'
+    | '/_authenticated/print-settings'
     | '/_authenticated/reports'
     | '/_authenticated/staff'
     | '/_authenticated/timeclock'
@@ -228,6 +253,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedReportsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/print-settings': {
+      id: '/_authenticated/print-settings'
+      path: '/print-settings'
+      fullPath: '/print-settings'
+      preLoaderRoute: typeof AuthenticatedPrintSettingsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/pos': {
       id: '/_authenticated/pos'
       path: '/pos'
@@ -254,6 +286,13 @@ declare module '@tanstack/react-router' {
       path: '/inventory'
       fullPath: '/inventory'
       preLoaderRoute: typeof AuthenticatedInventoryRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/history': {
+      id: '/_authenticated/history'
+      path: '/history'
+      fullPath: '/history'
+      preLoaderRoute: typeof AuthenticatedHistoryRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/discounts': {
@@ -284,10 +323,12 @@ interface AuthenticatedRouteChildren {
   AuthenticatedCustomersRoute: typeof AuthenticatedCustomersRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedDiscountsRoute: typeof AuthenticatedDiscountsRoute
+  AuthenticatedHistoryRoute: typeof AuthenticatedHistoryRoute
   AuthenticatedInventoryRoute: typeof AuthenticatedInventoryRoute
   AuthenticatedMenuRoute: typeof AuthenticatedMenuRoute
   AuthenticatedPaymentsRoute: typeof AuthenticatedPaymentsRoute
   AuthenticatedPosRoute: typeof AuthenticatedPosRoute
+  AuthenticatedPrintSettingsRoute: typeof AuthenticatedPrintSettingsRoute
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
   AuthenticatedStaffRoute: typeof AuthenticatedStaffRoute
   AuthenticatedTimeclockRoute: typeof AuthenticatedTimeclockRoute
@@ -297,10 +338,12 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedCustomersRoute: AuthenticatedCustomersRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedDiscountsRoute: AuthenticatedDiscountsRoute,
+  AuthenticatedHistoryRoute: AuthenticatedHistoryRoute,
   AuthenticatedInventoryRoute: AuthenticatedInventoryRoute,
   AuthenticatedMenuRoute: AuthenticatedMenuRoute,
   AuthenticatedPaymentsRoute: AuthenticatedPaymentsRoute,
   AuthenticatedPosRoute: AuthenticatedPosRoute,
+  AuthenticatedPrintSettingsRoute: AuthenticatedPrintSettingsRoute,
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
   AuthenticatedStaffRoute: AuthenticatedStaffRoute,
   AuthenticatedTimeclockRoute: AuthenticatedTimeclockRoute,
