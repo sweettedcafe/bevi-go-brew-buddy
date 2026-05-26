@@ -289,7 +289,7 @@ function POSPage() {
       </section>
 
       {/* Cart side */}
-      <aside className="w-[400px] border-l bg-card flex flex-col">
+      <aside className="w-full lg:w-[400px] border-t lg:border-t-0 lg:border-l bg-card flex flex-col">
         <div className="p-4 border-b flex items-center gap-2">
           <ShoppingCart className="h-4 w-4" />
           <h2 className="font-display text-lg">Current Order</h2>
