@@ -12,14 +12,17 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Trash2, Plus, Minus, ShoppingCart, Coffee, Search, X, Tag } from "lucide-react";
+import { Trash2, Plus, Minus, ShoppingCart, Coffee, Search, X, Tag, Pause, PlayCircle } from "lucide-react";
 import { toast } from "sonner";
+import { loadPrintSettings } from "@/lib/print-settings";
+import { printHTML } from "@/lib/print";
+import { receiptHTML, labelsHTML, type DrinkLabel } from "@/lib/print-templates";
 
 export const Route = createFileRoute("/_authenticated/pos")({
   component: POSPage,
 });
 
-type Category = { id: string; name: string; sort_order: number };
+type Category = { id: string; name: string; sort_order: number; prints_label?: boolean };
 type MenuItem = {
   id: string; category_id: string | null; name: string;
   description: string | null; price: number; is_active: boolean; sort_order: number;
