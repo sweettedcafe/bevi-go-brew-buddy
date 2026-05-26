@@ -118,6 +118,98 @@ function POSPage() {
     setPromoCode(""); setAppliedPromo(null); setManual(null);
   }
 
+  async function holdOrder() {
+    if (cart.length === 0) return;
+    const { data, error } = await db.rpc("pos_hold_order", {
+      p_payload: {
+        order_type: orderType,
+        customer_name: customerName || null,
+        items: cart.map((l) => ({ menu_item_id: l.menu_item_id, qty: l.qty })),
+      },
+    });
+    if (error) { toast.error(error.message); return; }
+    toast.success(`Order #${String((data as any).order_no).padStart(3, "0")} held`);
+    clearAll();
+  }
+
+  async function openHeldList() {
+    const { data, error } = await db
+      .from("orders")
+      .select("id, order_no, customer_name, held_at, total")
+      .eq("status", "on_hold")
+      .order("held_at", { ascending: false });
+    if (error) { toast.error(error.message); return; }
+    setHeldOrders((data ?? []) as any);
+    setHoldOpen(true);
+  }
+
+  async function resumeHeld(id: string) {
+    const { data, error } = await db.rpc("pos_resume_order", { p_order_id: id });
+    if (error) { toast.error(error.message); return; }
+    const r = data as any;
+    setCart((r.items ?? []).map((it: any) => ({
+      menu_item_id: it.menu_item_id, name: it.name,
+      unit_price: Number(it.unit_price), qty: Number(it.qty),
+    })));
+    setCustomerName(r.customer_name ?? "");
+    setOrderType((r.order_type as OrderType) ?? "takeout");
+    setHoldOpen(false);
+    toast.success("Order resumed");
+  }
+
+  function autoPrint(args: {
+    orderNo: number;
+    splits: SplitLine[];
+    change: number;
+  }) {
+    const settings = loadPrintSettings();
+    const labelCatIds = new Set(cats.filter((c) => c.prints_label).map((c) => c.id));
+    const now = new Date().toISOString();
+    const pmLabel = (code: string) => pms.find((p) => p.code === code)?.label ?? code;
+
+    if (settings.autoPrintReceipt) {
+      printHTML(receiptHTML({
+        orderNo: args.orderNo,
+        businessDate: new Date().toISOString().slice(0, 10),
+        createdAt: now,
+        cashier: user?.email ?? "—",
+        orderType,
+        customerName: customerName || null,
+        lines: cart.map((l) => ({
+          name: l.name, qty: l.qty, unit_price: l.unit_price, line_total: l.unit_price * l.qty,
+        })),
+        subtotal,
+        discountLabel: appliedPromo?.label ?? manual?.label ?? null,
+        discountAmount: discountAmount,
+        total,
+        payments: args.splits.map((s) => ({ label: pmLabel(s.method_code), amount: Number(s.amount) || 0 })),
+        change: args.change,
+      }, settings), `Receipt #${args.orderNo}`);
+    }
+
+    if (settings.autoPrintLabels) {
+      const labels: DrinkLabel[] = [];
+      for (const line of cart) {
+        const item = items.find((x) => x.id === line.menu_item_id);
+        if (!item || !item.category_id || !labelCatIds.has(item.category_id)) continue;
+        for (let i = 1; i <= line.qty; i++) {
+          labels.push({
+            orderNo: args.orderNo,
+            drinkName: line.name,
+            cupIndex: i, cupTotal: line.qty,
+            customerName: customerName || null,
+            notes: null,
+            createdAt: now,
+          });
+        }
+      }
+      if (labels.length > 0) {
+        // small delay so the receipt iframe doesn't race the label iframe
+        setTimeout(() => printHTML(labelsHTML(labels, settings), `Labels #${args.orderNo}`), 700);
+      }
+    }
+  }
+
   async function applyPromo() {
     const code = promoCode.trim().toUpperCase();
     if (!code) return;
