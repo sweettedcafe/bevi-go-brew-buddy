@@ -487,6 +487,31 @@ function POSPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Today's orders dialog */}
+      <Dialog open={todayOpen} onOpenChange={setTodayOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Today's orders ({todayOrders.length})</DialogTitle></DialogHeader>
+          {todayOrders.length === 0 ? (
+            <div className="text-sm text-muted-foreground py-6 text-center">No completed orders today yet.</div>
+          ) : (
+            <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+              {todayOrders.map((o) => (
+                <div key={o.id} className="rounded-md border p-3 flex items-center gap-3">
+                  <div className="font-display text-lg">#{String(o.order_no).padStart(3, "0")}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate">{o.customer_name || "Walk-in"}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {new Date(o.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · {o.order_type}
+                    </div>
+                  </div>
+                  <div className="font-medium">{fmt(Number(o.total))}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
