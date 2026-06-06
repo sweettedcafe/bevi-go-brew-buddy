@@ -7,7 +7,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import {
   LayoutDashboard, ShoppingCart, Package, BookOpen, Users, Tag,
   CreditCard, BarChart3, Clock, ShieldCheck, LogOut, Receipt, Printer, Menu,
-  ClipboardList, FileText, ChevronDown, ChevronRight, Boxes, Coffee, Wallet, Settings, Gift,
+  ClipboardList, FileText, ChevronDown, ChevronRight, Coffee, Wallet, Settings, Gift,
 } from "lucide-react";
 import type { AppRole } from "@/integrations/supabase/client";
 
