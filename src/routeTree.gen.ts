@@ -14,6 +14,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as OTokenRouteImport } from './routes/o.$token'
+import { Route as AuthenticatedTimeclockReportRouteImport } from './routes/_authenticated/timeclock-report'
 import { Route as AuthenticatedTimeclockRouteImport } from './routes/_authenticated/timeclock'
 import { Route as AuthenticatedStaffRouteImport } from './routes/_authenticated/staff'
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
@@ -52,6 +53,12 @@ const OTokenRoute = OTokenRouteImport.update({
   path: '/o/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedTimeclockReportRoute =
+  AuthenticatedTimeclockReportRouteImport.update({
+    id: '/timeclock-report',
+    path: '/timeclock-report',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedTimeclockRoute = AuthenticatedTimeclockRouteImport.update({
   id: '/timeclock',
   path: '/timeclock',
@@ -136,6 +143,7 @@ export interface FileRoutesByFullPath {
   '/reports': typeof AuthenticatedReportsRoute
   '/staff': typeof AuthenticatedStaffRoute
   '/timeclock': typeof AuthenticatedTimeclockRoute
+  '/timeclock-report': typeof AuthenticatedTimeclockReportRoute
   '/o/$token': typeof OTokenRoute
 }
 export interface FileRoutesByTo {
@@ -155,6 +163,7 @@ export interface FileRoutesByTo {
   '/reports': typeof AuthenticatedReportsRoute
   '/staff': typeof AuthenticatedStaffRoute
   '/timeclock': typeof AuthenticatedTimeclockRoute
+  '/timeclock-report': typeof AuthenticatedTimeclockReportRoute
   '/o/$token': typeof OTokenRoute
 }
 export interface FileRoutesById {
@@ -176,6 +185,7 @@ export interface FileRoutesById {
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
   '/_authenticated/staff': typeof AuthenticatedStaffRoute
   '/_authenticated/timeclock': typeof AuthenticatedTimeclockRoute
+  '/_authenticated/timeclock-report': typeof AuthenticatedTimeclockReportRoute
   '/o/$token': typeof OTokenRoute
 }
 export interface FileRouteTypes {
@@ -197,6 +207,7 @@ export interface FileRouteTypes {
     | '/reports'
     | '/staff'
     | '/timeclock'
+    | '/timeclock-report'
     | '/o/$token'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -216,6 +227,7 @@ export interface FileRouteTypes {
     | '/reports'
     | '/staff'
     | '/timeclock'
+    | '/timeclock-report'
     | '/o/$token'
   id:
     | '__root__'
@@ -236,6 +248,7 @@ export interface FileRouteTypes {
     | '/_authenticated/reports'
     | '/_authenticated/staff'
     | '/_authenticated/timeclock'
+    | '/_authenticated/timeclock-report'
     | '/o/$token'
   fileRoutesById: FileRoutesById
 }
@@ -283,6 +296,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/o/$token'
       preLoaderRoute: typeof OTokenRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/timeclock-report': {
+      id: '/_authenticated/timeclock-report'
+      path: '/timeclock-report'
+      fullPath: '/timeclock-report'
+      preLoaderRoute: typeof AuthenticatedTimeclockReportRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/timeclock': {
       id: '/_authenticated/timeclock'
@@ -392,6 +412,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
   AuthenticatedStaffRoute: typeof AuthenticatedStaffRoute
   AuthenticatedTimeclockRoute: typeof AuthenticatedTimeclockRoute
+  AuthenticatedTimeclockReportRoute: typeof AuthenticatedTimeclockReportRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
@@ -408,6 +429,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
   AuthenticatedStaffRoute: AuthenticatedStaffRoute,
   AuthenticatedTimeclockRoute: AuthenticatedTimeclockRoute,
+  AuthenticatedTimeclockReportRoute: AuthenticatedTimeclockReportRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
@@ -424,3 +446,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
