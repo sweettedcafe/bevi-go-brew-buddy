@@ -234,10 +234,18 @@ function POSPage() {
     const { data, error } = await db.rpc("pos_resume_order", { p_order_id: id });
     if (error) { toast.error(error.message); return; }
     const r = data as any;
-    setCart((r.items ?? []).map((it: any) => ({
-      menu_item_id: it.menu_item_id, name: it.name,
-      unit_price: Number(it.unit_price), qty: Number(it.qty),
-    })));
+    setCart((r.items ?? []).map((it: any) => {
+      const unit = Number(it.unit_price);
+      const addon = Number(it.addon_total ?? 0);
+      return {
+        lineId: newLineId(),
+        menu_item_id: it.menu_item_id, name: it.name,
+        base_price: unit - addon, unit_price: unit, qty: Number(it.qty),
+        customization: (it.customization ?? null) as SelectedCustom | null,
+        addon_total: addon,
+        notes: it.notes ?? null,
+      } as CartLine;
+    }));
     setCustomerName(r.customer_name ?? "");
     setOrderType((r.order_type as OrderType) ?? "takeout");
     setHoldOpen(false);
