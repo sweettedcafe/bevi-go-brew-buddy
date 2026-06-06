@@ -31,6 +31,7 @@ import { Route as AuthenticatedEndOfShiftRouteImport } from './routes/_authentic
 import { Route as AuthenticatedDiscountsRouteImport } from './routes/_authenticated/discounts'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCustomersRouteImport } from './routes/_authenticated/customers'
+import { Route as AuthenticatedBundlesRouteImport } from './routes/_authenticated/bundles'
 
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
@@ -144,11 +145,17 @@ const AuthenticatedCustomersRoute = AuthenticatedCustomersRouteImport.update({
   path: '/customers',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedBundlesRoute = AuthenticatedBundlesRouteImport.update({
+  id: '/bundles',
+  path: '/bundles',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
+  '/bundles': typeof AuthenticatedBundlesRoute
   '/customers': typeof AuthenticatedCustomersRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/discounts': typeof AuthenticatedDiscountsRoute
@@ -172,6 +179,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
+  '/bundles': typeof AuthenticatedBundlesRoute
   '/customers': typeof AuthenticatedCustomersRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/discounts': typeof AuthenticatedDiscountsRoute
@@ -197,6 +205,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
+  '/_authenticated/bundles': typeof AuthenticatedBundlesRoute
   '/_authenticated/customers': typeof AuthenticatedCustomersRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/discounts': typeof AuthenticatedDiscountsRoute
@@ -222,6 +231,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/register'
+    | '/bundles'
     | '/customers'
     | '/dashboard'
     | '/discounts'
@@ -245,6 +255,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/register'
+    | '/bundles'
     | '/customers'
     | '/dashboard'
     | '/discounts'
@@ -269,6 +280,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/login'
     | '/register'
+    | '/_authenticated/bundles'
     | '/_authenticated/customers'
     | '/_authenticated/dashboard'
     | '/_authenticated/discounts'
@@ -453,10 +465,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCustomersRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/bundles': {
+      id: '/_authenticated/bundles'
+      path: '/bundles'
+      fullPath: '/bundles'
+      preLoaderRoute: typeof AuthenticatedBundlesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
   }
 }
 
 interface AuthenticatedRouteChildren {
+  AuthenticatedBundlesRoute: typeof AuthenticatedBundlesRoute
   AuthenticatedCustomersRoute: typeof AuthenticatedCustomersRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedDiscountsRoute: typeof AuthenticatedDiscountsRoute
@@ -477,6 +497,7 @@ interface AuthenticatedRouteChildren {
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedBundlesRoute: AuthenticatedBundlesRoute,
   AuthenticatedCustomersRoute: AuthenticatedCustomersRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedDiscountsRoute: AuthenticatedDiscountsRoute,
@@ -510,3 +531,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
