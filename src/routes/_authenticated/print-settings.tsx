@@ -8,8 +8,10 @@ import { Label } from "@/components/ui/label";
 import { Printer, Save, TestTube } from "lucide-react";
 import { toast } from "sonner";
 import { loadPrintSettings, savePrintSettings, type PrintSettings } from "@/lib/print-settings";
+import { loadPosSettings, savePosSettings, type PosSettings } from "@/lib/pos-settings";
 import { printHTML } from "@/lib/print";
 import { receiptHTML, labelsHTML } from "@/lib/print-templates";
+import { ScanLine } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/print-settings")({
   component: PrintSettingsPage,
@@ -17,13 +19,18 @@ export const Route = createFileRoute("/_authenticated/print-settings")({
 
 function PrintSettingsPage() {
   const [s, setS] = useState<PrintSettings>(() => loadPrintSettings());
+  const [pos, setPos] = useState<PosSettings>(() => loadPosSettings());
 
   function save() {
     savePrintSettings(s);
-    toast.success("Print settings saved on this device");
+    savePosSettings(pos);
+    toast.success("Settings saved on this device");
   }
   function update<K extends keyof PrintSettings>(k: K, v: PrintSettings[K]) {
     setS((p) => ({ ...p, [k]: v }));
+  }
+  function updatePos<K extends keyof PosSettings>(k: K, v: PosSettings[K]) {
+    setPos((p) => ({ ...p, [k]: v }));
   }
   function testReceipt() {
     printHTML(receiptHTML({
