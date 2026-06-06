@@ -106,9 +106,16 @@ function AuthenticatedLayout() {
     );
   }
 
-  const role: AppRole = primaryRole ?? "barista";
+  const effectiveRoles: AppRole[] = roles.length > 0 ? roles : [primaryRole ?? "barista"];
   const visibleGroups = GROUPS
-    .map((g) => ({ ...g, items: g.items.filter((i) => i.roles.includes(role)) }))
+    .map((g) => ({
+      ...g,
+      items: g.items.filter((i) =>
+        i.roles.some((r) => effectiveRoles.includes(r)) &&
+        // Developer-only items require the developer role explicitly
+        (!i.roles.every((r) => r === "developer") || effectiveRoles.includes("developer"))
+      ),
+    }))
     .filter((g) => g.items.length > 0);
 
   // Auto-open the group containing the active route
