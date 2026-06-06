@@ -391,9 +391,6 @@ function POSPage() {
                     {it.description && <div className="text-xs text-muted-foreground mt-1 line-clamp-2">{it.description}</div>}
                     <div className="mt-3 flex items-end justify-between gap-2">
                       <div className="font-display text-lg text-primary">{fmt(Number(it.price))}</div>
-                      {customizable && (
-                        <span className="text-[10px] text-muted-foreground uppercase tracking-wide">Customize</span>
-                      )}
                     </div>
                   </button>
                 );
@@ -806,16 +803,29 @@ function CheckoutDialog({
           </div>
 
           {/* Quick cash tendered shortcuts (only when single cash line) */}
-          {splits.length === 1 && lastIsCash && (
-            <div className="grid grid-cols-4 gap-2">
-              {[total, Math.ceil(total / 5) * 5, Math.ceil(total / 10) * 10, Math.ceil(total / 50) * 50].map((v, i) => (
-                <Button key={i} size="sm" variant="outline"
-                  onClick={() => setSplits([{ method_code: splits[0].method_code, amount: v.toFixed(2) }])}>
-                  {v.toFixed(2)}
-                </Button>
-              ))}
-            </div>
-          )}
+          {splits.length === 1 && lastIsCash && (() => {
+            const denoms = [20, 50, 100, 200, 500, 1000];
+            const opts: Array<{ label: string; value: number }> = [
+              { label: `Exact ${total.toFixed(2)}`, value: Number(total.toFixed(2)) },
+              ...denoms.filter((d) => d >= total).map((d) => ({ label: d.toString(), value: d })),
+            ];
+            // de-dup by value
+            const seen = new Set<number>();
+            const uniq = opts.filter((o) => (seen.has(o.value) ? false : (seen.add(o.value), true)));
+            return (
+              <div>
+                <div className="text-xs text-muted-foreground mb-1">Cash given</div>
+                <div className="grid grid-cols-4 gap-2">
+                  {uniq.map((o, i) => (
+                    <Button key={i} size="sm" variant="outline"
+                      onClick={() => setSplits([{ method_code: splits[0].method_code, amount: o.value.toFixed(2) }])}>
+                      {o.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
 
           <div className="border-t pt-3 space-y-1 text-sm">
             <div className="flex justify-between"><span className="text-muted-foreground">Paid</span><span>{paid.toFixed(2)}</span></div>
