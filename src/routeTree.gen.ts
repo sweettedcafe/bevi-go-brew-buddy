@@ -13,6 +13,7 @@ import { Route as RegisterRouteImport } from './routes/register'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as OTokenRouteImport } from './routes/o.$token'
 import { Route as AuthenticatedTimeclockRouteImport } from './routes/_authenticated/timeclock'
 import { Route as AuthenticatedStaffRouteImport } from './routes/_authenticated/staff'
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
@@ -43,6 +44,11 @@ const AuthenticatedRoute = AuthenticatedRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OTokenRoute = OTokenRouteImport.update({
+  id: '/o/$token',
+  path: '/o/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedTimeclockRoute = AuthenticatedTimeclockRouteImport.update({
@@ -123,6 +129,7 @@ export interface FileRoutesByFullPath {
   '/reports': typeof AuthenticatedReportsRoute
   '/staff': typeof AuthenticatedStaffRoute
   '/timeclock': typeof AuthenticatedTimeclockRoute
+  '/o/$token': typeof OTokenRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -140,6 +147,7 @@ export interface FileRoutesByTo {
   '/reports': typeof AuthenticatedReportsRoute
   '/staff': typeof AuthenticatedStaffRoute
   '/timeclock': typeof AuthenticatedTimeclockRoute
+  '/o/$token': typeof OTokenRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -159,6 +167,7 @@ export interface FileRoutesById {
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
   '/_authenticated/staff': typeof AuthenticatedStaffRoute
   '/_authenticated/timeclock': typeof AuthenticatedTimeclockRoute
+  '/o/$token': typeof OTokenRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -178,6 +187,7 @@ export interface FileRouteTypes {
     | '/reports'
     | '/staff'
     | '/timeclock'
+    | '/o/$token'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -195,6 +205,7 @@ export interface FileRouteTypes {
     | '/reports'
     | '/staff'
     | '/timeclock'
+    | '/o/$token'
   id:
     | '__root__'
     | '/'
@@ -213,6 +224,7 @@ export interface FileRouteTypes {
     | '/_authenticated/reports'
     | '/_authenticated/staff'
     | '/_authenticated/timeclock'
+    | '/o/$token'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -220,6 +232,7 @@ export interface RootRouteChildren {
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   LoginRoute: typeof LoginRoute
   RegisterRoute: typeof RegisterRoute
+  OTokenRoute: typeof OTokenRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -250,6 +263,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/o/$token': {
+      id: '/o/$token'
+      path: '/o/$token'
+      fullPath: '/o/$token'
+      preLoaderRoute: typeof OTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/timeclock': {
@@ -378,7 +398,18 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   LoginRoute: LoginRoute,
   RegisterRoute: RegisterRoute,
+  OTokenRoute: OTokenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
