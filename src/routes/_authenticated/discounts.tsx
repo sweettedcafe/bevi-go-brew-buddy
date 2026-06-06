@@ -32,7 +32,9 @@ type Discount = {
   starts_at: string | null;
   ends_at: string | null;
   is_active: boolean;
+  applies_to_item_id: string | null;
 };
+type MenuItemLite = { id: string; name: string };
 
 const db = supabase as any;
 
