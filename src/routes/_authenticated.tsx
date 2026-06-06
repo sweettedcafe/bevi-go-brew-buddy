@@ -11,6 +11,7 @@ import {
   HelpCircle, Wrench,
 } from "lucide-react";
 import type { AppRole } from "@/integrations/supabase/client";
+import { LowStockAlert } from "@/components/LowStockAlert";
 
 export const Route = createFileRoute("/_authenticated")({
   component: AuthenticatedLayout,
