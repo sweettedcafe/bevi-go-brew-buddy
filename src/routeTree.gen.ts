@@ -23,6 +23,7 @@ import { Route as AuthenticatedPaymentsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedMenuRouteImport } from './routes/_authenticated/menu'
 import { Route as AuthenticatedInventoryRouteImport } from './routes/_authenticated/inventory'
 import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticated/history'
+import { Route as AuthenticatedEndOfShiftRouteImport } from './routes/_authenticated/end-of-shift'
 import { Route as AuthenticatedDiscountsRouteImport } from './routes/_authenticated/discounts'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCustomersRouteImport } from './routes/_authenticated/customers'
@@ -97,6 +98,11 @@ const AuthenticatedHistoryRoute = AuthenticatedHistoryRouteImport.update({
   path: '/history',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedEndOfShiftRoute = AuthenticatedEndOfShiftRouteImport.update({
+  id: '/end-of-shift',
+  path: '/end-of-shift',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedDiscountsRoute = AuthenticatedDiscountsRouteImport.update({
   id: '/discounts',
   path: '/discounts',
@@ -120,6 +126,7 @@ export interface FileRoutesByFullPath {
   '/customers': typeof AuthenticatedCustomersRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/discounts': typeof AuthenticatedDiscountsRoute
+  '/end-of-shift': typeof AuthenticatedEndOfShiftRoute
   '/history': typeof AuthenticatedHistoryRoute
   '/inventory': typeof AuthenticatedInventoryRoute
   '/menu': typeof AuthenticatedMenuRoute
@@ -138,6 +145,7 @@ export interface FileRoutesByTo {
   '/customers': typeof AuthenticatedCustomersRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/discounts': typeof AuthenticatedDiscountsRoute
+  '/end-of-shift': typeof AuthenticatedEndOfShiftRoute
   '/history': typeof AuthenticatedHistoryRoute
   '/inventory': typeof AuthenticatedInventoryRoute
   '/menu': typeof AuthenticatedMenuRoute
@@ -158,6 +166,7 @@ export interface FileRoutesById {
   '/_authenticated/customers': typeof AuthenticatedCustomersRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/discounts': typeof AuthenticatedDiscountsRoute
+  '/_authenticated/end-of-shift': typeof AuthenticatedEndOfShiftRoute
   '/_authenticated/history': typeof AuthenticatedHistoryRoute
   '/_authenticated/inventory': typeof AuthenticatedInventoryRoute
   '/_authenticated/menu': typeof AuthenticatedMenuRoute
@@ -178,6 +187,7 @@ export interface FileRouteTypes {
     | '/customers'
     | '/dashboard'
     | '/discounts'
+    | '/end-of-shift'
     | '/history'
     | '/inventory'
     | '/menu'
@@ -196,6 +206,7 @@ export interface FileRouteTypes {
     | '/customers'
     | '/dashboard'
     | '/discounts'
+    | '/end-of-shift'
     | '/history'
     | '/inventory'
     | '/menu'
@@ -215,6 +226,7 @@ export interface FileRouteTypes {
     | '/_authenticated/customers'
     | '/_authenticated/dashboard'
     | '/_authenticated/discounts'
+    | '/_authenticated/end-of-shift'
     | '/_authenticated/history'
     | '/_authenticated/inventory'
     | '/_authenticated/menu'
@@ -335,6 +347,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedHistoryRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/end-of-shift': {
+      id: '/_authenticated/end-of-shift'
+      path: '/end-of-shift'
+      fullPath: '/end-of-shift'
+      preLoaderRoute: typeof AuthenticatedEndOfShiftRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/discounts': {
       id: '/_authenticated/discounts'
       path: '/discounts'
@@ -363,6 +382,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedCustomersRoute: typeof AuthenticatedCustomersRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedDiscountsRoute: typeof AuthenticatedDiscountsRoute
+  AuthenticatedEndOfShiftRoute: typeof AuthenticatedEndOfShiftRoute
   AuthenticatedHistoryRoute: typeof AuthenticatedHistoryRoute
   AuthenticatedInventoryRoute: typeof AuthenticatedInventoryRoute
   AuthenticatedMenuRoute: typeof AuthenticatedMenuRoute
@@ -378,6 +398,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedCustomersRoute: AuthenticatedCustomersRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedDiscountsRoute: AuthenticatedDiscountsRoute,
+  AuthenticatedEndOfShiftRoute: AuthenticatedEndOfShiftRoute,
   AuthenticatedHistoryRoute: AuthenticatedHistoryRoute,
   AuthenticatedInventoryRoute: AuthenticatedInventoryRoute,
   AuthenticatedMenuRoute: AuthenticatedMenuRoute,
