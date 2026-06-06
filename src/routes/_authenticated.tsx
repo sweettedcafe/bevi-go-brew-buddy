@@ -8,6 +8,7 @@ import {
   LayoutDashboard, ShoppingCart, Package, BookOpen, Users, Tag,
   CreditCard, BarChart3, Clock, ShieldCheck, LogOut, Receipt, Printer, Menu,
   ClipboardList, FileText, ChevronDown, ChevronRight, Coffee, Wallet, Settings, Gift, History,
+  HelpCircle, Wrench,
 } from "lucide-react";
 import type { AppRole } from "@/integrations/supabase/client";
 
