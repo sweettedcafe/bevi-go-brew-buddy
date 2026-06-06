@@ -92,10 +92,6 @@ export function LowStockAlert() {
       setLow(lowItems);
 
       const dismissed = getDismissed();
-      const signature = lowItems
-        .map((i) => i.id)
-        .sort()
-        .join(",");
       const fresh = lowItems.some((i) => !dismissed.includes(i.id));
       if (lowItems.length > 0 && fresh) {
         setOpen(true);
@@ -103,16 +99,26 @@ export function LowStockAlert() {
           playBeep();
           playedRef.current = true;
         }
-        // Keep signature so we know what's currently open
-        (window as any).__lowStockSig = signature;
       }
     }
 
     void check();
-    const t = window.setInterval(check, POLL_MS);
+    const t = window.setInterval(check, 15_000);
+
+    // Realtime: react instantly to inventory changes
+    const channel = db
+      .channel("lowstock-inventory")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "inventory_items" },
+        () => void check(),
+      )
+      .subscribe();
+
     return () => {
       cancelled = true;
       window.clearInterval(t);
+      db.removeChannel(channel);
     };
   }, [enabled]);
 
