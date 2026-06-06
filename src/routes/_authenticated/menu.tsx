@@ -186,6 +186,9 @@ function EditMenuDialog({
   const [rcs, setRcs] = useState<Array<{ inventory_item_id: string; qty: string }>>(
     initialRecipes.map((r) => ({ inventory_item_id: r.inventory_item_id, qty: String(r.qty_per_unit) })),
   );
+  const [options, setOptions] = useState<MenuOptions>(
+    (item.options && typeof item.options === "object") ? item.options : emptyOptions(),
+  );
   const [saving, setSaving] = useState(false);
   const activeInvs = useMemo(() => invs.filter((i) => i.is_active), [invs]);
 
@@ -199,6 +202,7 @@ function EditMenuDialog({
       category_id: f.category_id || null,
       is_active: f.is_active,
       sort_order: Number(f.sort_order) || 0,
+      options,
     };
     let id = item.id;
     if (id) {
@@ -302,6 +306,11 @@ function EditMenuDialog({
               })}
             </div>
           )}
+        </div>
+
+        <div className="mt-4 border-t pt-3">
+          <h3 className="font-medium text-sm mb-2">Customization options</h3>
+          <MenuOptionsEditor value={options} onChange={setOptions} />
         </div>
 
         <DialogFooter>
