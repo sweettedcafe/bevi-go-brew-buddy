@@ -373,14 +373,28 @@ function POSPage() {
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-              {filtered.map((it) => (
-                <button key={it.id} onClick={() => addItem(it)}
-                  className="text-left rounded-lg border bg-card hover:bg-accent hover:border-primary/50 transition-colors p-4 shadow-sm">
-                  <div className="font-medium leading-tight">{it.name}</div>
-                  {it.description && <div className="text-xs text-muted-foreground mt-1 line-clamp-2">{it.description}</div>}
-                  <div className="mt-3 font-display text-lg text-primary">{fmt(Number(it.price))}</div>
-                </button>
-              ))}
+              {filtered.map((it) => {
+                const isPop = topSellers.has(it.id);
+                const customizable = hasAnyCustomization(it.options);
+                return (
+                  <button key={it.id} onClick={() => addItem(it)}
+                    className="relative text-left rounded-lg border bg-card hover:bg-accent hover:border-primary/50 transition-colors p-4 shadow-sm">
+                    {isPop && (
+                      <span className="absolute -top-2 -right-2 inline-flex items-center gap-1 rounded-full bg-primary text-primary-foreground text-[10px] px-2 py-0.5 shadow">
+                        <Star className="h-3 w-3 fill-current" /> Most Ordered
+                      </span>
+                    )}
+                    <div className="font-medium leading-tight">{it.name}</div>
+                    {it.description && <div className="text-xs text-muted-foreground mt-1 line-clamp-2">{it.description}</div>}
+                    <div className="mt-3 flex items-end justify-between gap-2">
+                      <div className="font-display text-lg text-primary">{fmt(Number(it.price))}</div>
+                      {customizable && (
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-wide">Customize</span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
@@ -416,22 +430,43 @@ function POSPage() {
           {cart.length === 0 ? (
             <div className="text-sm text-muted-foreground text-center py-10">Tap a menu item to add it.</div>
           ) : (
-            cart.map((l) => (
-              <Card key={l.menu_item_id} className="p-3">
-                <div className="flex items-start gap-2">
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium truncate">{l.name}</div>
-                    <div className="text-xs text-muted-foreground">{fmt(l.unit_price)} × {l.qty} = {fmt(l.unit_price * l.qty)}</div>
+            cart.map((l) => {
+              const desc = describeCustom(l.customization);
+              const itemRef = items.find((x) => x.id === l.menu_item_id);
+              const editable = hasAnyCustomization(itemRef?.options ?? null);
+              return (
+                <Card key={l.lineId} className="p-3">
+                  <div className="flex items-start gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium truncate">{l.name}</div>
+                      <div className="text-xs text-muted-foreground">{fmt(l.unit_price)} × {l.qty} = {fmt(l.unit_price * l.qty)}</div>
+                      {(desc.length > 0 || l.notes) && (
+                        <div className="mt-1 text-[11px] text-muted-foreground space-y-0.5">
+                          {desc.map((d, i) => <div key={i}>• {d}</div>)}
+                          {l.notes && <div className="italic">“{l.notes}”</div>}
+                        </div>
+                      )}
+                    </div>
+                    <Button size="icon" variant="ghost" onClick={() => removeLine(l.lineId)}><Trash2 className="h-4 w-4" /></Button>
                   </div>
-                  <Button size="icon" variant="ghost" onClick={() => removeLine(l.menu_item_id)}><Trash2 className="h-4 w-4" /></Button>
-                </div>
-                <div className="flex items-center gap-2 mt-2">
-                  <Button size="icon" variant="outline" onClick={() => changeQty(l.menu_item_id, -1)}><Minus className="h-3 w-3" /></Button>
-                  <span className="w-8 text-center font-medium">{l.qty}</span>
-                  <Button size="icon" variant="outline" onClick={() => changeQty(l.menu_item_id, 1)}><Plus className="h-3 w-3" /></Button>
-                </div>
-              </Card>
-            ))
+                  <div className="flex items-center gap-2 mt-2">
+                    <Button size="icon" variant="outline" onClick={() => changeQty(l.lineId, -1)}><Minus className="h-3 w-3" /></Button>
+                    <span className="w-8 text-center font-medium">{l.qty}</span>
+                    <Button size="icon" variant="outline" onClick={() => changeQty(l.lineId, 1)}><Plus className="h-3 w-3" /></Button>
+                    {editable && itemRef && (
+                      <Button size="sm" variant="ghost" className="ml-auto h-7 text-xs"
+                        onClick={() => setCustomizing({
+                          item: itemRef,
+                          initial: { custom: l.customization, qty: l.qty, notes: l.notes ?? "" },
+                          editingLineId: l.lineId,
+                        })}>
+                        Edit
+                      </Button>
+                    )}
+                  </div>
+                </Card>
+              );
+            })
           )}
         </div>
 
