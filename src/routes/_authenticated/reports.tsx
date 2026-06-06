@@ -396,6 +396,9 @@ function ReportsPage() {
             rows={itemRows}
             render={(row, key) => {
               if (key === "revenue") return `₱${Number(row.revenue).toFixed(2)}`;
+              if (key === "created_at") return new Date(row.created_at).toLocaleString();
+              if (key === "order_no") return `#${String(row.order_no).padStart(3, "0")}`;
+              if (key === "order_id_short") return <span className="font-mono text-xs">{row.order_id_short}</span>;
               return (row as any)[key];
             }}
             empty="No items sold in this range."
