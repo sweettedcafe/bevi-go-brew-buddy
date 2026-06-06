@@ -297,3 +297,35 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
     </div>
   );
 }
+
+function buildSummary(r: EOS, totalNet: number, cashNet: number, expectedCash: number): string {
+  const peso = (n: number | string) => `PHP ${Number(n).toFixed(2)}`;
+  const fmt = (iso: string | null) => iso
+    ? new Intl.DateTimeFormat("en-PH", { timeZone: "Asia/Manila", dateStyle: "medium", timeStyle: "short" }).format(new Date(iso))
+    : "—";
+  const lines: string[] = [];
+  lines.push("=== END OF SHIFT REPORT ===");
+  lines.push(`Barista: ${r.user_email ?? "—"}`);
+  lines.push(`Date: ${r.shift.business_date} (Manila)`);
+  lines.push(`Time in:  ${fmt(r.shift.clock_in)}`);
+  lines.push(`Time out: ${r.shift.clock_out ? fmt(r.shift.clock_out) : "in progress"}`);
+  lines.push(`Breaks:   ${(r.break_seconds / 60).toFixed(0)} min`);
+  lines.push(`Leave:    ${r.leave_hours_deducted} h (approved)`);
+  lines.push(`Worked:   ${r.net_worked_hours} h (net)`);
+  lines.push("");
+  lines.push("--- Net by payment method ---");
+  if (r.payments.length === 0) lines.push("(no paid orders)");
+  else r.payments.forEach((p) => lines.push(`${p.method.padEnd(10)} ${String(p.count).padStart(3)} orders   ${peso(p.net)}`));
+  lines.push(`TOTAL NET                 ${peso(totalNet)}`);
+  lines.push("");
+  lines.push("--- Cash drawer ---");
+  lines.push(`Starting cash:     ${peso(r.shift.starting_cash)}`);
+  lines.push(`Cash sales (net):  ${peso(cashNet)}`);
+  lines.push(`Expenses paid:     ${peso(r.total_expenses)}`);
+  lines.push(`Expected on hand:  ${peso(expectedCash)}`);
+  lines.push("");
+  lines.push("--- Expenses ---");
+  if (r.expenses.length === 0) lines.push("(none)");
+  else r.expenses.forEach((e) => lines.push(`- ${e.description}${e.category ? ` [${e.category}]` : ""}: ${peso(e.amount)}`));
+  return lines.join("\n");
+}
