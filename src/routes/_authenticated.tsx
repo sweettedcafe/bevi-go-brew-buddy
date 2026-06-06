@@ -29,7 +29,9 @@ const NAV: NavItem[] = [
   { to: "/payments", label: "Payment Methods", icon: CreditCard, roles: ["developer", "admin"] },
   { to: "/print-settings", label: "Print Settings", icon: Printer, roles: ["developer", "admin"] },
   { to: "/reports", label: "Reports", icon: BarChart3, roles: ["developer", "admin"] },
+  { to: "/sales-summary", label: "Sales Summary", icon: FileText, roles: ["developer", "admin"] },
   { to: "/timeclock-report", label: "Timeclock Report", icon: Clock, roles: ["developer", "admin"] },
+  { to: "/payslip", label: "Payslip", icon: Receipt, roles: ["developer", "admin"] },
   { to: "/eos-admin", label: "EOS by Date", icon: ClipboardList, roles: ["developer", "admin"] },
   { to: "/staff", label: "Staff & Roles", icon: ShieldCheck, roles: ["developer", "admin"] },
 ];
