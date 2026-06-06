@@ -94,6 +94,11 @@ function Dashboard() {
     return () => { alive = false; };
   }, [period]);
 
+  // Refresh dashboard instantly when orders or inventory change
+  const [tick, setTick] = useState(0);
+  useRealtime(["orders", "order_items", "inventory_items"], () => setTick((n) => n + 1));
+  useEffect(() => { if (tick > 0) setPeriod((p) => p); }, [tick]);
+
   const totals = useMemo(() => {
     const sum = (xs: Row[], k: string) => xs.reduce((s, x) => s + Number(x[k] || 0), 0);
     return {
