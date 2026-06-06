@@ -69,6 +69,8 @@ function CustomersPage() {
 
       {loyalty && <LoyaltyCard loyalty={loyalty} onSaved={load} />}
 
+      <RegisterQrCard />
+
       <Card className="p-4">
         <div className="flex items-center gap-3 mb-3">
           <div className="font-display text-lg">Registered customers</div>
