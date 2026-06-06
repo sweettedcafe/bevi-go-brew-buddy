@@ -304,8 +304,8 @@ function ReportsPage() {
           <Button size="sm" variant="outline" onClick={exportCurrent}>
             <Download className="h-3 w-3 mr-1" /> Export CSV
           </Button>
-          <Button size="sm" variant="outline" onClick={openSheetsImport}>
-            <FileSpreadsheet className="h-3 w-3 mr-1" /> Google Sheets
+          <Button size="sm" variant="outline" onClick={openSheetsImport} disabled={sheetsBusy}>
+            <FileSpreadsheet className="h-3 w-3 mr-1" /> {sheetsBusy ? "Exporting…" : "Google Sheets"}
           </Button>
         </div>
       </header>
