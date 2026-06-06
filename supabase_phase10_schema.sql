@@ -353,7 +353,7 @@ begin
       from public.order_payments op
       join public.orders o on o.id = op.order_id
      where o.business_date = v_shift.business_date
-       and o.status = 'paid'
+       and o.status in ('completed','refunded')
      group by op.method
      order by op.method
   ) t;
