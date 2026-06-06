@@ -174,12 +174,22 @@ function DiscountsPage() {
           open={open}
           onOpenChange={setOpen}
           initial={editing}
+          menuItems={menuItems}
           onSave={save}
         />
       )}
     </div>
   );
 }
+
+function DiscountDialog({
+  open, onOpenChange, initial, menuItems, onSave,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  initial: Discount;
+  menuItems: MenuItemLite[];
+  onSave: (d: Discount) => Promise<void>;
 
 function DiscountDialog({
   open, onOpenChange, initial, onSave,
