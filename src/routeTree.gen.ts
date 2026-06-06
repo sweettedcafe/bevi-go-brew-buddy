@@ -21,6 +21,7 @@ import { Route as AuthenticatedSalesSummaryRouteImport } from './routes/_authent
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
 import { Route as AuthenticatedPrintSettingsRouteImport } from './routes/_authenticated/print-settings'
 import { Route as AuthenticatedPosRouteImport } from './routes/_authenticated/pos'
+import { Route as AuthenticatedPayslipRouteImport } from './routes/_authenticated/payslip'
 import { Route as AuthenticatedPaymentsRouteImport } from './routes/_authenticated/payments'
 import { Route as AuthenticatedMenuRouteImport } from './routes/_authenticated/menu'
 import { Route as AuthenticatedInventoryRouteImport } from './routes/_authenticated/inventory'
@@ -93,6 +94,11 @@ const AuthenticatedPosRoute = AuthenticatedPosRouteImport.update({
   path: '/pos',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedPayslipRoute = AuthenticatedPayslipRouteImport.update({
+  id: '/payslip',
+  path: '/payslip',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedPaymentsRoute = AuthenticatedPaymentsRouteImport.update({
   id: '/payments',
   path: '/payments',
@@ -152,6 +158,7 @@ export interface FileRoutesByFullPath {
   '/inventory': typeof AuthenticatedInventoryRoute
   '/menu': typeof AuthenticatedMenuRoute
   '/payments': typeof AuthenticatedPaymentsRoute
+  '/payslip': typeof AuthenticatedPayslipRoute
   '/pos': typeof AuthenticatedPosRoute
   '/print-settings': typeof AuthenticatedPrintSettingsRoute
   '/reports': typeof AuthenticatedReportsRoute
@@ -174,6 +181,7 @@ export interface FileRoutesByTo {
   '/inventory': typeof AuthenticatedInventoryRoute
   '/menu': typeof AuthenticatedMenuRoute
   '/payments': typeof AuthenticatedPaymentsRoute
+  '/payslip': typeof AuthenticatedPayslipRoute
   '/pos': typeof AuthenticatedPosRoute
   '/print-settings': typeof AuthenticatedPrintSettingsRoute
   '/reports': typeof AuthenticatedReportsRoute
@@ -198,6 +206,7 @@ export interface FileRoutesById {
   '/_authenticated/inventory': typeof AuthenticatedInventoryRoute
   '/_authenticated/menu': typeof AuthenticatedMenuRoute
   '/_authenticated/payments': typeof AuthenticatedPaymentsRoute
+  '/_authenticated/payslip': typeof AuthenticatedPayslipRoute
   '/_authenticated/pos': typeof AuthenticatedPosRoute
   '/_authenticated/print-settings': typeof AuthenticatedPrintSettingsRoute
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
@@ -222,6 +231,7 @@ export interface FileRouteTypes {
     | '/inventory'
     | '/menu'
     | '/payments'
+    | '/payslip'
     | '/pos'
     | '/print-settings'
     | '/reports'
@@ -244,6 +254,7 @@ export interface FileRouteTypes {
     | '/inventory'
     | '/menu'
     | '/payments'
+    | '/payslip'
     | '/pos'
     | '/print-settings'
     | '/reports'
@@ -267,6 +278,7 @@ export interface FileRouteTypes {
     | '/_authenticated/inventory'
     | '/_authenticated/menu'
     | '/_authenticated/payments'
+    | '/_authenticated/payslip'
     | '/_authenticated/pos'
     | '/_authenticated/print-settings'
     | '/_authenticated/reports'
@@ -371,6 +383,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPosRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/payslip': {
+      id: '/_authenticated/payslip'
+      path: '/payslip'
+      fullPath: '/payslip'
+      preLoaderRoute: typeof AuthenticatedPayslipRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/payments': {
       id: '/_authenticated/payments'
       path: '/payments'
@@ -447,6 +466,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedInventoryRoute: typeof AuthenticatedInventoryRoute
   AuthenticatedMenuRoute: typeof AuthenticatedMenuRoute
   AuthenticatedPaymentsRoute: typeof AuthenticatedPaymentsRoute
+  AuthenticatedPayslipRoute: typeof AuthenticatedPayslipRoute
   AuthenticatedPosRoute: typeof AuthenticatedPosRoute
   AuthenticatedPrintSettingsRoute: typeof AuthenticatedPrintSettingsRoute
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
@@ -466,6 +486,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedInventoryRoute: AuthenticatedInventoryRoute,
   AuthenticatedMenuRoute: AuthenticatedMenuRoute,
   AuthenticatedPaymentsRoute: AuthenticatedPaymentsRoute,
+  AuthenticatedPayslipRoute: AuthenticatedPayslipRoute,
   AuthenticatedPosRoute: AuthenticatedPosRoute,
   AuthenticatedPrintSettingsRoute: AuthenticatedPrintSettingsRoute,
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
