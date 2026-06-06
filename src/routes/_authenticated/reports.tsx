@@ -29,6 +29,7 @@ type AnyRow = Record<string, any>;
 type Filters = {
   from: string; to: string;
   customer: string; orderId: string; cashier: string;
+  category: string; item: string;
 };
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
@@ -79,7 +80,7 @@ function ReportsPage() {
   const { hasRole } = useAuth();
   const canRefund = hasRole("admin") || hasRole("developer");
   const [filters, setFilters] = useState<Filters>({
-    from: daysAgoIso(30), to: todayIso(), customer: "", orderId: "", cashier: "",
+    from: daysAgoIso(30), to: todayIso(), customer: "", orderId: "", cashier: "", category: "", item: "",
   });
   const [tab, setTab] = useState("order");
   const [loading, setLoading] = useState(false);
@@ -154,7 +155,7 @@ function ReportsPage() {
   useEffect(() => { void loadAll(); /* eslint-disable-next-line */ }, []);
 
   // Per-item aggregation
-  const itemRows = useMemo(() => {
+  const itemRowsAll = useMemo(() => {
     const map = new Map<string, { name: string; category: string; qty: number; revenue: number }>();
     for (const o of orders) {
       if (o.status === "voided" || o.status === "refunded") continue;
@@ -172,6 +173,22 @@ function ReportsPage() {
     }
     return [...map.values()].sort((a, b) => b.qty - a.qty);
   }, [orders]);
+
+  const categoryOptions = useMemo(() => {
+    const s = new Set<string>();
+    itemRowsAll.forEach((r) => r.category && s.add(r.category));
+    return [...s].sort();
+  }, [itemRowsAll]);
+
+  const itemRows = useMemo(() => {
+    const cat = filters.category.trim().toLowerCase();
+    const item = filters.item.trim().toLowerCase();
+    return itemRowsAll.filter((r) => {
+      if (cat && r.category.toLowerCase() !== cat) return false;
+      if (item && !r.name.toLowerCase().includes(item)) return false;
+      return true;
+    });
+  }, [itemRowsAll, filters.category, filters.item]);
 
   const discountRows = useMemo(
     () => orders.filter((o) => Number(o.discount_total) > 0),
@@ -250,6 +267,19 @@ function ReportsPage() {
             <Input placeholder="#" value={filters.orderId} onChange={(e) => setFilters({ ...filters, orderId: e.target.value })} className="w-24" /></div>
           <div><Label className="text-xs">Cashier email</Label>
             <Input placeholder="@" value={filters.cashier} onChange={(e) => setFilters({ ...filters, cashier: e.target.value })} /></div>
+          <div>
+            <Label className="text-xs">Category</Label>
+            <select
+              className="h-9 rounded-md border border-input bg-transparent px-2 text-sm"
+              value={filters.category}
+              onChange={(e) => setFilters({ ...filters, category: e.target.value })}
+            >
+              <option value="">All</option>
+              {categoryOptions.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div><Label className="text-xs">Item name</Label>
+            <Input placeholder="Search item" value={filters.item} onChange={(e) => setFilters({ ...filters, item: e.target.value })} /></div>
           <Button size="sm" onClick={loadAll} disabled={loading}>{loading ? "Loading…" : "Apply"}</Button>
         </div>
       </Card>
