@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { AlertTriangle, Upload, Download, Plus, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { toCsv, downloadCsv } from "@/lib/csv";
+import { fetchPublicCsv } from "@/lib/fetch-csv.functions";
 
 export const Route = createFileRoute("/_authenticated/inventory")({
   component: InventoryPage,
@@ -313,17 +314,8 @@ function ImportDialog({ onClose, onDone }: { onClose: () => void; onDone: () => 
       let text = csv;
       if (mode === "url") {
         if (!url.trim()) throw new Error("Paste a CSV / published Google Sheet URL");
-        // Convert standard Google Sheets edit URL → CSV export URL
-        let u = url.trim();
-        const m = u.match(/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
-        if (m && !u.includes("output=csv")) {
-          const gidMatch = u.match(/[#&?]gid=(\d+)/);
-          const gid = gidMatch ? gidMatch[1] : "0";
-          u = `https://docs.google.com/spreadsheets/d/${m[1]}/export?format=csv&gid=${gid}`;
-        }
-        const res = await fetch(u);
-        if (!res.ok) throw new Error("Could not fetch sheet. Make sure it is shared as 'Anyone with link'.");
-        text = await res.text();
+        const r = await fetchPublicCsv({ data: { url: url.trim() } });
+        text = r.csv;
       }
       const rows = parseCSV(text);
       if (rows.length === 0) throw new Error("No rows parsed");
