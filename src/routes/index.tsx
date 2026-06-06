@@ -57,7 +57,7 @@ function Landing() {
       </main>
 
       <footer className="px-6 py-6 text-center text-xs text-muted-foreground">
-        © {new Date().getFullYear()} Bevi &amp; Go — Phase 1: Foundation
+        © 2026 Bevi &amp; Go
       </footer>
     </div>
   );
