@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import {
   LayoutDashboard, ShoppingCart, Package, BookOpen, Users, Tag,
-  CreditCard, BarChart3, Clock, ShieldCheck, LogOut, Receipt, Printer, Menu,
+  CreditCard, BarChart3, Clock, ShieldCheck, LogOut, Receipt, Printer, Menu, ClipboardList,
 } from "lucide-react";
 import type { AppRole } from "@/integrations/supabase/client";
 
@@ -17,9 +17,9 @@ export const Route = createFileRoute("/_authenticated")({
 type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; roles: AppRole[] };
 
 const NAV: NavItem[] = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["developer", "admin", "barista"] },
+  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["developer", "admin"] },
   { to: "/pos", label: "POS", icon: ShoppingCart, roles: ["developer", "admin", "barista"] },
-  { to: "/history", label: "Today's Orders", icon: Receipt, roles: ["developer", "admin", "barista"] },
+  { to: "/history", label: "Today's Orders", icon: Receipt, roles: ["developer", "admin"] },
   { to: "/timeclock", label: "Timeclock", icon: Clock, roles: ["developer", "admin", "barista"] },
   { to: "/inventory", label: "Inventory", icon: Package, roles: ["developer", "admin"] },
   { to: "/menu", label: "Menu & Recipes", icon: BookOpen, roles: ["developer", "admin"] },
