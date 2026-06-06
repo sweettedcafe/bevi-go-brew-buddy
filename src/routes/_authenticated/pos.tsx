@@ -1025,11 +1025,13 @@ function CheckoutDialog({
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="w-32">
-                    {i === 0 && <label className="text-xs text-muted-foreground">Amount</label>}
-                    <Input type="number" inputMode="decimal" value={s.amount}
-                      onChange={(e) => setSplit(i, { amount: e.target.value })} />
-                  </div>
+                  {pm?.kind === "cash" && (
+                    <div className="w-32">
+                      {i === 0 && <label className="text-xs text-muted-foreground">Cash Bill</label>}
+                      <Input type="number" inputMode="decimal" value={s.amount}
+                        onChange={(e) => setSplit(i, { amount: e.target.value })} />
+                    </div>
+                  )}
                   {splits.length > 1 && (
                     <Button size="icon" variant="ghost" onClick={() => removeSplit(i)}>
                       <X className="h-4 w-4" />
