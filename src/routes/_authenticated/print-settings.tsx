@@ -8,8 +8,10 @@ import { Label } from "@/components/ui/label";
 import { Printer, Save, TestTube } from "lucide-react";
 import { toast } from "sonner";
 import { loadPrintSettings, savePrintSettings, type PrintSettings } from "@/lib/print-settings";
+import { loadPosSettings, savePosSettings, type PosSettings } from "@/lib/pos-settings";
 import { printHTML } from "@/lib/print";
 import { receiptHTML, labelsHTML } from "@/lib/print-templates";
+import { ScanLine } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/print-settings")({
   component: PrintSettingsPage,
@@ -17,13 +19,18 @@ export const Route = createFileRoute("/_authenticated/print-settings")({
 
 function PrintSettingsPage() {
   const [s, setS] = useState<PrintSettings>(() => loadPrintSettings());
+  const [pos, setPos] = useState<PosSettings>(() => loadPosSettings());
 
   function save() {
     savePrintSettings(s);
-    toast.success("Print settings saved on this device");
+    savePosSettings(pos);
+    toast.success("Settings saved on this device");
   }
   function update<K extends keyof PrintSettings>(k: K, v: PrintSettings[K]) {
     setS((p) => ({ ...p, [k]: v }));
+  }
+  function updatePos<K extends keyof PosSettings>(k: K, v: PosSettings[K]) {
+    setPos((p) => ({ ...p, [k]: v }));
   }
   function testReceipt() {
     printHTML(receiptHTML({
@@ -101,6 +108,38 @@ function PrintSettingsPage() {
           <Button onClick={save}><Save className="h-3 w-3 mr-1" /> Save</Button>
           <Button variant="outline" onClick={testReceipt}><TestTube className="h-3 w-3 mr-1" /> Test receipt</Button>
           <Button variant="outline" onClick={testLabel}><TestTube className="h-3 w-3 mr-1" /> Test label</Button>
+        </div>
+      </Card>
+
+      <Card className="p-4 sm:p-6 space-y-5 mt-4">
+        <div className="flex items-center gap-2">
+          <ScanLine className="h-5 w-5 text-primary" />
+          <h2 className="font-display text-lg">POS Barcode Scanner</h2>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Enable to use a USB or Bluetooth barcode scanner on the POS. Scanning a customer's loyalty
+          barcode auto-fills their name, points balance, and recent orders. Most scanners emulate a
+          keyboard and send <b>Enter</b> at the end of the code — no driver needed.
+        </p>
+
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="font-medium">Enable barcode scanning on POS</div>
+            <div className="text-xs text-muted-foreground">Shows the scan input on the POS Current Order panel.</div>
+          </div>
+          <Switch checked={pos.scanEnabled} onCheckedChange={(v) => updatePos("scanEnabled", v)} />
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="font-medium">Keep scanner input focused</div>
+            <div className="text-xs text-muted-foreground">Auto-refocus so a scan is always captured even after tapping the menu.</div>
+          </div>
+          <Switch checked={pos.scanAutoFocus} onCheckedChange={(v) => updatePos("scanAutoFocus", v)} />
+        </div>
+
+        <div className="pt-2 border-t">
+          <Button onClick={save}><Save className="h-3 w-3 mr-1" /> Save</Button>
         </div>
       </Card>
     </div>
