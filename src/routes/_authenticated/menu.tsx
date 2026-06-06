@@ -14,8 +14,10 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2, Settings2 } from "lucide-react";
 import { toast } from "sonner";
+import { MenuOptionsEditor } from "@/components/menu/MenuOptionsEditor";
+import { emptyOptions, hasAnyCustomization, type MenuOptions } from "@/lib/menu-options";
 
 export const Route = createFileRoute("/_authenticated/menu")({
   component: MenuPage,
