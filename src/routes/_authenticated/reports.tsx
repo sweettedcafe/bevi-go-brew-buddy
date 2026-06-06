@@ -29,6 +29,7 @@ type AnyRow = Record<string, any>;
 type Filters = {
   from: string; to: string;
   customer: string; orderId: string; cashier: string;
+  category: string; item: string;
 };
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
