@@ -12,11 +12,12 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Trash2, Plus, Minus, ShoppingCart, Coffee, Search, X, Tag, Pause, PlayCircle, ClipboardList, Star } from "lucide-react";
+import { Trash2, Plus, Minus, ShoppingCart, Coffee, Search, X, Tag, Pause, PlayCircle, ClipboardList, Star, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { loadPrintSettings } from "@/lib/print-settings";
 import { printHTML } from "@/lib/print";
 import { receiptHTML, labelsHTML, type DrinkLabel } from "@/lib/print-templates";
+import { reprintReceiptById, reprintLabelsById } from "@/lib/reprint";
 import { CustomizeDialog } from "@/components/pos/CustomizeDialog";
 import {
   type MenuOptions, type SelectedCustom,
