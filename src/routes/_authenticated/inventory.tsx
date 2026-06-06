@@ -157,7 +157,18 @@ function InventoryPage() {
               : "bg-emerald-500";
             return (
               <Card key={r.id} className={`p-4 ${!r.is_active ? "opacity-60" : ""}`}>
+                {(() => {
+                  const packSize = Number(r.pack_size) || 1;
+                  const stock = Number(r.stock_qty) || 0;
+                  const fullStock = Number(r.full_stock_qty || 0);
+                  const wholePacks = packSize > 0 ? Math.floor(stock / packSize) : 0;
+                  const remainder = packSize > 0 ? stock - wholePacks * packSize : 0;
+                  const fullPacks = packSize > 0 ? Math.floor(fullStock / packSize) : 0;
+                  const packWord = r.pack_label || "pack";
+                  return (
+                <>
                 <div className="flex flex-wrap items-center gap-3">
+
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium truncate">{r.name}</span>
@@ -167,13 +178,18 @@ function InventoryPage() {
                       {s === "low" && <Badge className="bg-amber-500 text-white hover:bg-amber-500">low</Badge>}
                     </div>
                     <div className="text-xs text-muted-foreground mt-0.5">
-                      pack {Number(r.pack_size)} {r.unit} · threshold {Number(r.low_threshold)} {r.unit}
+                      1 {packWord} = {packSize.toLocaleString()} {r.unit} · threshold {Number(r.low_threshold)} {r.unit}
                     </div>
                   </div>
                   <div className="text-right shrink-0">
-                    <div className="font-display text-lg">
-                      {Number(r.stock_qty).toLocaleString()}
-                      <span className="text-sm text-muted-foreground"> / {Number(r.full_stock_qty || 0).toLocaleString()} {r.unit}</span>
+                    <div className="font-display text-lg leading-tight">
+                      {wholePacks.toLocaleString()}
+                      {fullPacks > 0 && <span className="text-sm text-muted-foreground"> / {fullPacks.toLocaleString()}</span>}
+                      <span className="text-sm text-muted-foreground"> {packWord}{wholePacks === 1 ? "" : "s"}</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {stock.toLocaleString()} {r.unit} total
+                      {remainder > 0 && wholePacks > 0 && ` (+${remainder.toLocaleString()} ${r.unit})`}
                     </div>
                   </div>
                   {isAdmin && (
@@ -192,9 +208,14 @@ function InventoryPage() {
                     style={{ width: `${pctOf(r)}%`, height: "0.5rem" }}
                   />
                 </div>
+                </>
+
+                  );
+                })()}
               </Card>
             );
           })}
+
         </div>
       )}
 
