@@ -705,9 +705,12 @@ function POSPage() {
           if (payments.length === 1 && payments[0].method === "cash") {
             payments[0].change_due = Math.max(0, payments[0].amount - total);
           }
+          const redeemPts = customer ? Math.max(0, parseInt(redeem || "0", 10) || 0) : 0;
           const payload: any = {
             order_type: orderType,
+            customer_id: customer?.id ?? null,
             customer_name: customerName || null,
+            redeem_points: redeemPts,
             notes: null,
             items: cart.map((l) => ({
               menu_item_id: l.menu_item_id, qty: l.qty,
@@ -720,10 +723,11 @@ function POSPage() {
           };
           const { data, error } = await db.rpc("pos_create_order", { p_payload: payload });
           if (error) { toast.error(`Order failed: ${error.message}`); return false; }
-          const r = data as { order_no: number };
+          const r = data as { order_no: number; points_earned?: number; points_redeemed?: number };
           const changeTotal = payments.reduce((s, p) => s + p.change_due, 0);
           autoPrint({ orderNo: r.order_no, splits, change: changeTotal });
-          toast.success(`Order #${String(r.order_no).padStart(3, "0")} completed`);
+          const pointsMsg = r.points_earned ? ` · +${r.points_earned} pts` : "";
+          toast.success(`Order #${String(r.order_no).padStart(3, "0")} completed${pointsMsg}`);
           clearAll();
           setCheckoutOpen(false);
           return true;
