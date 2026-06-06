@@ -4,7 +4,29 @@
 -- =====================================================================
 
 -- ---------- 1. Force-refresh customer_self_register (PostgREST cache) -
--- The schema cache sometimes drops phase-8 function. Drop & recreate.
+-- Also (re)create the helper fns in case phase 8 didn't run cleanly.
+create or replace function public._gen_customer_code()
+returns text language plpgsql security definer set search_path = public as $$
+declare v_code text; v_tries int := 0;
+begin
+  loop
+    v_code := lpad((floor(random()*100000000))::int::text, 8, '0');
+    exit when not exists(select 1 from public.customers where code = v_code);
+    v_tries := v_tries + 1;
+    if v_tries > 20 then raise exception 'cannot generate unique customer code'; end if;
+  end loop;
+  return v_code;
+end $$;
+
+create or replace function public._gen_customer_token()
+returns text language plpgsql security definer set search_path = public as $$
+declare v_token text;
+begin
+  v_token := encode(gen_random_bytes(18), 'base64');
+  v_token := replace(replace(replace(v_token, '+',''), '/',''), '=','');
+  return left(v_token, 22);
+end $$;
+
 drop function if exists public.customer_self_register(text, text, text);
 create or replace function public.customer_self_register(
   p_name text, p_phone text default null, p_email text default null
