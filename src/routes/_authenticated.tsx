@@ -173,6 +173,7 @@ function AuthenticatedLayout() {
           <Outlet />
         </main>
       </div>
+      <LowStockAlert />
     </div>
   );
 }
