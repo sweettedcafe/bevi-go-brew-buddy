@@ -86,21 +86,33 @@ function POSPage() {
   const [appliedPromo, setAppliedPromo] = useState<{ code: string; label: string; amount: number } | null>(null);
   const [manual, setManual] = useState<ManualDiscount>(null);
   const [topSellers, setTopSellers] = useState<Set<string>>(new Set());
+  const [bundles, setBundles] = useState<Bundle[]>([]);
+  const [bundleItems, setBundleItems] = useState<BundleItem[]>([]);
 
   useEffect(() => {
     let alive = true;
     (async () => {
-      const [{ data: c }, { data: m }, { data: p }, { data: pop }] = await Promise.all([
+      const nowIso = new Date().toISOString();
+      const [{ data: c }, { data: m }, { data: p }, { data: pop }, { data: bs }, { data: bi }] = await Promise.all([
         db.from("categories").select("id,name,sort_order,prints_label").eq("is_active", true).order("sort_order"),
         db.from("menu_items").select("*").eq("is_active", true).order("sort_order"),
         db.from("payment_methods").select("*").eq("is_active", true).order("sort_order"),
         db.from("menu_item_popularity").select("menu_item_id,qty_sold").order("qty_sold", { ascending: false }).limit(3),
+        db.from("bundles").select("*").eq("is_active", true)
+          .or(`ends_at.is.null,ends_at.gt.${nowIso}`),
+        db.from("bundle_items").select("bundle_id,menu_item_id,qty"),
       ]);
       if (!alive) return;
       setCats((c ?? []) as Category[]);
       setItems((m ?? []) as MenuItem[]);
       setPms((p ?? []) as PMConfig[]);
       setTopSellers(new Set((pop ?? []).map((r: any) => r.menu_item_id as string)));
+      // Filter bundles that haven't started yet on the client
+      const visibleBundles = ((bs ?? []) as Bundle[]).filter((b) =>
+        !b.starts_at || new Date(b.starts_at) <= new Date(),
+      );
+      setBundles(visibleBundles);
+      setBundleItems((bi ?? []) as BundleItem[]);
       setLoading(false);
     })();
     return () => { alive = false; };
