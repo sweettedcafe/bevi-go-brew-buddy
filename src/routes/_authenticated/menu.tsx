@@ -112,6 +112,11 @@ function MenuPage() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium">{it.name}</span>
                       <Badge variant="secondary">{catName(it.category_id)}</Badge>
+                      {hasAnyCustomization(it.options) && (
+                        <Badge variant="outline" className="text-xs gap-1">
+                          <Settings2 className="h-3 w-3" /> customizable
+                        </Badge>
+                      )}
                       {!it.is_active && <Badge variant="outline">inactive</Badge>}
                     </div>
                     {it.description && (
