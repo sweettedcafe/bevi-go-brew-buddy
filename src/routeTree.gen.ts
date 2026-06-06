@@ -17,6 +17,7 @@ import { Route as OTokenRouteImport } from './routes/o.$token'
 import { Route as AuthenticatedTimeclockReportRouteImport } from './routes/_authenticated/timeclock-report'
 import { Route as AuthenticatedTimeclockRouteImport } from './routes/_authenticated/timeclock'
 import { Route as AuthenticatedStaffRouteImport } from './routes/_authenticated/staff'
+import { Route as AuthenticatedSalesSummaryRouteImport } from './routes/_authenticated/sales-summary'
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
 import { Route as AuthenticatedPrintSettingsRouteImport } from './routes/_authenticated/print-settings'
 import { Route as AuthenticatedPosRouteImport } from './routes/_authenticated/pos'
@@ -70,6 +71,12 @@ const AuthenticatedStaffRoute = AuthenticatedStaffRouteImport.update({
   path: '/staff',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedSalesSummaryRoute =
+  AuthenticatedSalesSummaryRouteImport.update({
+    id: '/sales-summary',
+    path: '/sales-summary',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedReportsRoute = AuthenticatedReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
@@ -148,6 +155,7 @@ export interface FileRoutesByFullPath {
   '/pos': typeof AuthenticatedPosRoute
   '/print-settings': typeof AuthenticatedPrintSettingsRoute
   '/reports': typeof AuthenticatedReportsRoute
+  '/sales-summary': typeof AuthenticatedSalesSummaryRoute
   '/staff': typeof AuthenticatedStaffRoute
   '/timeclock': typeof AuthenticatedTimeclockRoute
   '/timeclock-report': typeof AuthenticatedTimeclockReportRoute
@@ -169,6 +177,7 @@ export interface FileRoutesByTo {
   '/pos': typeof AuthenticatedPosRoute
   '/print-settings': typeof AuthenticatedPrintSettingsRoute
   '/reports': typeof AuthenticatedReportsRoute
+  '/sales-summary': typeof AuthenticatedSalesSummaryRoute
   '/staff': typeof AuthenticatedStaffRoute
   '/timeclock': typeof AuthenticatedTimeclockRoute
   '/timeclock-report': typeof AuthenticatedTimeclockReportRoute
@@ -192,6 +201,7 @@ export interface FileRoutesById {
   '/_authenticated/pos': typeof AuthenticatedPosRoute
   '/_authenticated/print-settings': typeof AuthenticatedPrintSettingsRoute
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
+  '/_authenticated/sales-summary': typeof AuthenticatedSalesSummaryRoute
   '/_authenticated/staff': typeof AuthenticatedStaffRoute
   '/_authenticated/timeclock': typeof AuthenticatedTimeclockRoute
   '/_authenticated/timeclock-report': typeof AuthenticatedTimeclockReportRoute
@@ -215,6 +225,7 @@ export interface FileRouteTypes {
     | '/pos'
     | '/print-settings'
     | '/reports'
+    | '/sales-summary'
     | '/staff'
     | '/timeclock'
     | '/timeclock-report'
@@ -236,6 +247,7 @@ export interface FileRouteTypes {
     | '/pos'
     | '/print-settings'
     | '/reports'
+    | '/sales-summary'
     | '/staff'
     | '/timeclock'
     | '/timeclock-report'
@@ -258,6 +270,7 @@ export interface FileRouteTypes {
     | '/_authenticated/pos'
     | '/_authenticated/print-settings'
     | '/_authenticated/reports'
+    | '/_authenticated/sales-summary'
     | '/_authenticated/staff'
     | '/_authenticated/timeclock'
     | '/_authenticated/timeclock-report'
@@ -328,6 +341,13 @@ declare module '@tanstack/react-router' {
       path: '/staff'
       fullPath: '/staff'
       preLoaderRoute: typeof AuthenticatedStaffRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/sales-summary': {
+      id: '/_authenticated/sales-summary'
+      path: '/sales-summary'
+      fullPath: '/sales-summary'
+      preLoaderRoute: typeof AuthenticatedSalesSummaryRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/reports': {
@@ -430,6 +450,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedPosRoute: typeof AuthenticatedPosRoute
   AuthenticatedPrintSettingsRoute: typeof AuthenticatedPrintSettingsRoute
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
+  AuthenticatedSalesSummaryRoute: typeof AuthenticatedSalesSummaryRoute
   AuthenticatedStaffRoute: typeof AuthenticatedStaffRoute
   AuthenticatedTimeclockRoute: typeof AuthenticatedTimeclockRoute
   AuthenticatedTimeclockReportRoute: typeof AuthenticatedTimeclockReportRoute
@@ -448,6 +469,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedPosRoute: AuthenticatedPosRoute,
   AuthenticatedPrintSettingsRoute: AuthenticatedPrintSettingsRoute,
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
+  AuthenticatedSalesSummaryRoute: AuthenticatedSalesSummaryRoute,
   AuthenticatedStaffRoute: AuthenticatedStaffRoute,
   AuthenticatedTimeclockRoute: AuthenticatedTimeclockRoute,
   AuthenticatedTimeclockReportRoute: AuthenticatedTimeclockReportRoute,
