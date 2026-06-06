@@ -332,8 +332,18 @@ function EditMenuDialog({
 
 // ============ CSV import/export ============
 const MENU_CSV_COLS = [
-  "name","category","price","description","is_active","sort_order","ingredient","qty_per_unit","unit","options_json",
+  "name","category","price","description","is_active","sort_order",
+  "ingredient","qty_per_unit","unit",
+  "option_group","option_label","option_price","option_default",
 ];
+
+const EMPTY_SUB = {
+  ingredient: "", qty_per_unit: "", unit: "",
+  option_group: "", option_label: "", option_price: "", option_default: "",
+};
+const EMPTY_BASE = {
+  name: "", category: "", price: "", description: "", is_active: "", sort_order: "",
+};
 
 function ImportExportButtons({
   items, cats, invs, recipes, onImported,
@@ -347,8 +357,6 @@ function ImportExportButtons({
     const rows: Record<string, any>[] = [];
     for (const it of items) {
       const rcs = recipes.filter((r) => r.menu_item_id === it.id);
-      const optionsStr = it.options && hasAnyCustomization(it.options)
-        ? JSON.stringify(it.options) : "";
       const base = {
         name: it.name,
         category: catName(it.category_id),
@@ -357,18 +365,48 @@ function ImportExportButtons({
         is_active: it.is_active ? "true" : "false",
         sort_order: it.sort_order,
       };
-      if (rcs.length === 0) {
-        rows.push({ ...base, ingredient: "", qty_per_unit: "", unit: "", options_json: optionsStr });
-      } else {
-        rcs.forEach((r, idx) => {
-          const ing = invs.find((i) => i.id === r.inventory_item_id);
-          rows.push({
-            ...base,
-            ingredient: ing?.name ?? "",
-            qty_per_unit: r.qty_per_unit,
-            unit: ing?.unit ?? "",
-            options_json: idx === 0 ? optionsStr : "",
+
+      const subRows: Record<string, any>[] = [];
+      for (const r of rcs) {
+        const ing = invs.find((i) => i.id === r.inventory_item_id);
+        subRows.push({
+          ...EMPTY_SUB,
+          ingredient: ing?.name ?? "",
+          qty_per_unit: r.qty_per_unit,
+          unit: ing?.unit ?? "",
+        });
+      }
+      const o = it.options ?? {};
+      const optList: Array<[string, any[]]> = [
+        ["size", o.sizes ?? []], ["milk", o.milks ?? []], ["extra", o.extras ?? []],
+      ];
+      for (const [group, list] of optList) {
+        for (const opt of list) {
+          subRows.push({
+            ...EMPTY_SUB,
+            option_group: group,
+            option_label: opt.label,
+            option_price: opt.price_delta,
+            option_default: opt.is_default ? "true" : "",
           });
+        }
+      }
+      const flags: Array<[string, boolean | undefined]> = [
+        ["allow_other", o.allow_other],
+        ["allow_notes", o.allow_notes],
+        ["size_required", o.size_required],
+      ];
+      for (const [k, v] of flags) {
+        if (v) subRows.push({
+          ...EMPTY_SUB, option_group: "flag", option_label: k, option_price: "true",
+        });
+      }
+
+      if (subRows.length === 0) {
+        rows.push({ ...base, ...EMPTY_SUB });
+      } else {
+        subRows.forEach((s, i) => {
+          rows.push({ ...(i === 0 ? base : EMPTY_BASE), ...s });
         });
       }
     }
@@ -385,24 +423,56 @@ function ImportExportButtons({
       const text = await file.text();
       const parsed = parseCsv(text);
       if (parsed.length === 0) return toast.error("CSV is empty");
-      const missing = MENU_CSV_COLS.filter((c) => !(c in parsed[0]));
-      if (missing.length === MENU_CSV_COLS.length) return toast.error("CSV is missing required columns");
 
-      // Group rows by item name
-      const groups = new Map<string, { base: any; ings: { name: string; qty: number }[]; options?: any }>();
+      // Forward-fill name so option/ingredient rows can be blank in name column.
+      let lastName = "";
+      type Group = {
+        base: Record<string, any> | null;
+        ings: { name: string; qty: number }[];
+        sizes: any[]; milks: any[]; extras: any[];
+        allow_other?: boolean; allow_notes?: boolean; size_required?: boolean;
+      };
+      const groups = new Map<string, Group>();
+
       for (const r of parsed) {
-        const name = String(r.name ?? "").trim();
-        if (!name) continue;
-        const g = groups.get(name) ?? { base: r, ings: [] };
-        if (r.ingredient && String(r.ingredient).trim() && Number(r.qty_per_unit) > 0) {
-          g.ings.push({ name: String(r.ingredient).trim(), qty: Number(r.qty_per_unit) });
+        const rowName = String(r.name ?? "").trim();
+        if (rowName) lastName = rowName;
+        if (!lastName) continue;
+        const key = lastName.toLowerCase();
+        let g = groups.get(key);
+        if (!g) {
+          g = { base: null, ings: [], sizes: [], milks: [], extras: [] };
+          groups.set(key, g);
         }
-        const optStr = String(r.options_json ?? "").trim();
-        if (optStr && g.options === undefined) {
-          try { g.options = JSON.parse(optStr); }
-          catch { toast.error(`Bad options_json for "${name}" — skipped`); }
+        // Capture base on first row that has price/category/etc.
+        if (!g.base && (rowName || r.price || r.category || r.description || r.is_active || r.sort_order)) {
+          g.base = { ...r, name: lastName };
         }
-        groups.set(name, g);
+        // Ingredient row
+        const ingName = String(r.ingredient ?? "").trim();
+        if (ingName && Number(r.qty_per_unit) > 0) {
+          g.ings.push({ name: ingName, qty: Number(r.qty_per_unit) });
+        }
+        // Option row
+        const grp = String(r.option_group ?? "").trim().toLowerCase();
+        const lbl = String(r.option_label ?? "").trim();
+        if (grp && lbl) {
+          if (grp === "flag") {
+            const val = /^(true|1|yes)$/i.test(String(r.option_price ?? "true"));
+            if (lbl === "allow_other") g.allow_other = val;
+            else if (lbl === "allow_notes") g.allow_notes = val;
+            else if (lbl === "size_required") g.size_required = val;
+          } else {
+            const opt = {
+              label: lbl,
+              price_delta: Number(r.option_price) || 0,
+              is_default: /^(true|1|yes)$/i.test(String(r.option_default ?? "")),
+            };
+            if (grp === "size") g.sizes.push(opt);
+            else if (grp === "milk") g.milks.push(opt);
+            else if (grp === "extra") g.extras.push(opt);
+          }
+        }
       }
 
       const catByName = new Map(cats.map((c) => [c.name.toLowerCase(), c.id]));
@@ -412,17 +482,32 @@ function ImportExportButtons({
       let created = 0, updated = 0, skipped = 0;
       const unknownIngs = new Set<string>();
 
-      for (const [name, g] of groups) {
-        const catId = catByName.get(String(g.base.category ?? "").toLowerCase()) ?? null;
+      for (const [, g] of groups) {
+        const baseRow = g.base ?? {};
+        const name = String(baseRow.name ?? "").trim();
+        if (!name) { skipped++; continue; }
+        const catId = catByName.get(String(baseRow.category ?? "").toLowerCase()) ?? null;
+
+        const opts: MenuOptions = {
+          sizes: g.sizes,
+          milks: g.milks,
+          extras: g.extras,
+          allow_other: g.allow_other ?? false,
+          allow_notes: g.allow_notes ?? true,
+          size_required: g.size_required ?? false,
+        };
+        const hasOpts = g.sizes.length || g.milks.length || g.extras.length
+          || g.allow_other || g.size_required;
+
         const payload: any = {
           name,
-          description: String(g.base.description ?? "").trim() || null,
-          price: Number(g.base.price) || 0,
+          description: String(baseRow.description ?? "").trim() || null,
+          price: Number(baseRow.price) || 0,
           category_id: catId,
-          is_active: /^(true|1|yes)$/i.test(String(g.base.is_active ?? "true")),
-          sort_order: Number(g.base.sort_order) || 0,
+          is_active: /^(true|1|yes)$/i.test(String(baseRow.is_active ?? "true")),
+          sort_order: Number(baseRow.sort_order) || 0,
+          options: hasOpts ? opts : emptyOptions(),
         };
-        if (g.options !== undefined) payload.options = g.options;
         const existing = itemByName.get(name.toLowerCase());
         let id: string;
         if (existing) {
@@ -436,7 +521,6 @@ function ImportExportButtons({
           id = data.id;
           created++;
         }
-        // Replace recipes
         await db.from("recipes").delete().eq("menu_item_id", id);
         const validIngs = g.ings
           .map((x) => {
@@ -468,6 +552,7 @@ function ImportExportButtons({
     </>
   );
 }
+
 
 function parseCsv(text: string): Record<string, string>[] {
   const lines: string[][] = [];
