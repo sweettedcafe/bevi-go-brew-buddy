@@ -113,7 +113,17 @@ function ReportsPage() {
       .gte("created_at", fromTs).lte("created_at", toTs)
       .order("created_at", { ascending: false });
     if (filters.customer.trim()) q = q.ilike("customer_name", `%${filters.customer.trim()}%`);
-    if (filters.orderId.trim())  q = q.eq("order_no", Number(filters.orderId.trim()) || -1);
+    // Order ID filter: matches by order number (e.g. "3", "#003") OR by UUID prefix
+    const oid = filters.orderId.trim().replace(/^#/, "");
+    if (oid) {
+      const asNum = Number(oid);
+      if (Number.isFinite(asNum) && /^\d+$/.test(oid)) {
+        q = q.eq("order_no", asNum);
+      } else {
+        // UUID or partial UUID: match prefix on id
+        q = q.ilike("id", `${oid}%`);
+      }
+    }
 
     const [{ data: o }, { data: emails }] = await Promise.all([
       q,
@@ -152,6 +162,7 @@ function ReportsPage() {
         const fee_amount = ps.reduce((s, x) => s + Number(x.fee_amount || 0), 0);
         const payment_label = ps.map((p) => pmLabel.get(p.method_code) ?? p.method_code ?? p.method).join(", ");
         return { ...r, items_count, fee_amount, payment_label,
+          order_id_short: shortId(r.id),
           cashier_email: emailMap[r.cashier_id] ?? (r.cashier_id ? "—" : "self-order"),
           _items: its, _payments: ps };
       });
