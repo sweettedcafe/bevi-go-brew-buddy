@@ -72,33 +72,6 @@ const DISCOUNT_COLS = [
   { key: "discount_total", label: "Amount" },
   { key: "total", label: "Order total" },
 ];
-  { key: "created_at", label: "Date / time" },
-  { key: "customer_name", label: "Customer" },
-  { key: "cashier_email", label: "Cashier" },
-  { key: "items_count", label: "Items" },
-  { key: "subtotal", label: "Subtotal" },
-  { key: "discount_total", label: "Discount" },
-  { key: "discount_label", label: "Discount label" },
-  { key: "payment_label", label: "Payment" },
-  { key: "fee_amount", label: "Fee" },
-  { key: "total", label: "Total" },
-  { key: "status", label: "Status" },
-];
-const PER_ITEM_COLS = [
-  { key: "name", label: "Item" },
-  { key: "category", label: "Category" },
-  { key: "qty", label: "Qty sold" },
-  { key: "revenue", label: "Revenue" },
-];
-const DISCOUNT_COLS = [
-  { key: "order_no", label: "Order #" },
-  { key: "created_at", label: "Date" },
-  { key: "customer_name", label: "Customer" },
-  { key: "discount_label", label: "Promotion / discount" },
-  { key: "discount_code", label: "Code" },
-  { key: "discount_total", label: "Amount" },
-  { key: "total", label: "Order total" },
-];
 
 function loadCols(tab: string, defaults: string[]): string[] {
   try {
