@@ -222,7 +222,41 @@ function POSPage() {
   function clearAll() {
     setCart([]); setCustomerName("");
     setPromoCode(""); setAppliedPromo(null); setManual(null);
+    setCustomer(null); setRedeem(""); setScanInput("");
   }
+
+  async function lookupCustomerByCode(raw: string) {
+    const code = raw.trim();
+    if (!code) return;
+    setScanBusy(true);
+    try {
+      const { data, error } = await db.rpc("customer_lookup", { p_code: code });
+      if (error) { toast.error(error.message); return; }
+      if (!data) { toast.error(`No customer for code ${code}`); return; }
+      const c = data as LoyaltyCustomer;
+      setCustomer(c);
+      setCustomerName(c.name);
+      toast.success(`${c.name} · ${c.points} pts`);
+    } finally {
+      setScanBusy(false);
+      setScanInput("");
+      // refocus for the next scan
+      requestAnimationFrame(() => scanRef.current?.focus());
+    }
+  }
+
+  async function refreshCustomer() {
+    if (!customer) return;
+    const { data } = await db.rpc("customer_lookup", { p_code: customer.code });
+    if (data) setCustomer(data as LoyaltyCustomer);
+  }
+
+  // Auto-focus the scanner input when enabled (re-focus on cart changes)
+  useEffect(() => {
+    if (!posSettings.scanEnabled || !posSettings.scanAutoFocus) return;
+    const t = setTimeout(() => scanRef.current?.focus(), 50);
+    return () => clearTimeout(t);
+  }, [posSettings.scanEnabled, posSettings.scanAutoFocus, cart.length, checkoutOpen, holdOpen, todayOpen]);
 
   function addBundle(b: Bundle) {
     const rows = bundleItems.filter((x) => x.bundle_id === b.id);
