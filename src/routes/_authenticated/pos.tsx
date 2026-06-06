@@ -634,6 +634,28 @@ function POSPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {customizing && (
+        <CustomizeDialog
+          open
+          onOpenChange={(o) => !o && setCustomizing(null)}
+          itemName={customizing.item.name}
+          basePrice={Number(customizing.item.price)}
+          options={customizing.item.options ?? {}}
+          initial={customizing.initial}
+          onConfirm={(res) => {
+            addCustomizedLine({
+              item: customizing.item,
+              custom: res.custom,
+              addon: res.addon,
+              qty: res.qty,
+              notes: res.notes,
+              editingLineId: customizing.editingLineId,
+            });
+            setCustomizing(null);
+          }}
+        />
+      )}
     </div>
   );
 }
