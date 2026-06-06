@@ -79,6 +79,23 @@ function EndOfShiftPage() {
   };
 
   const totalPayments = (report?.payments ?? []).reduce((s, p) => s + Number(p.net), 0);
+  const cashNet = Number(report?.payments.find((p) => p.method === "cash")?.net ?? 0);
+  const expectedCash = report ? Number(report.shift.starting_cash) + cashNet - Number(report.total_expenses) : 0;
+
+  const summaryText = report ? buildSummary(report, totalPayments, cashNet, expectedCash) : "";
+
+  const copySummary = async () => {
+    try { await navigator.clipboard.writeText(summaryText); toast.success("Summary copied"); }
+    catch { toast.error("Copy failed"); }
+  };
+  const shareSummary = async () => {
+    if (typeof navigator !== "undefined" && (navigator as Navigator & { share?: (d: ShareData) => Promise<void> }).share) {
+      try { await navigator.share!({ title: "End of Shift Report", text: summaryText }); }
+      catch { /* user cancelled */ }
+    } else {
+      void copySummary();
+    }
+  };
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
@@ -89,9 +106,26 @@ function EndOfShiftPage() {
           </h1>
           <p className="text-sm text-muted-foreground">Latest shift summary in Manila time.</p>
         </div>
-        <Button variant="outline" size="sm" onClick={refresh} className="gap-2">
-          <RefreshCw className="h-4 w-4" /> Refresh
-        </Button>
+        <div className="flex gap-2">
+          {report && (
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button size="sm" className="gap-2"><Share2 className="h-4 w-4" /> Share summary</Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-lg">
+                <DialogHeader><DialogTitle>Shift summary</DialogTitle></DialogHeader>
+                <Textarea readOnly value={summaryText} className="font-mono text-xs min-h-[320px]" />
+                <DialogFooter className="gap-2">
+                  <Button variant="outline" onClick={copySummary} className="gap-2"><Copy className="h-4 w-4" /> Copy</Button>
+                  <Button onClick={shareSummary} className="gap-2"><Share2 className="h-4 w-4" /> Share</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
+          <Button variant="outline" size="sm" onClick={refresh} className="gap-2">
+            <RefreshCw className="h-4 w-4" /> Refresh
+          </Button>
+        </div>
       </div>
 
       {loading ? (
