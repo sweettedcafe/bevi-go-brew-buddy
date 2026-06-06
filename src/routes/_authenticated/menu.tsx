@@ -332,7 +332,7 @@ function EditMenuDialog({
 
 // ============ CSV import/export ============
 const MENU_CSV_COLS = [
-  "name","category","price","description","is_active","sort_order","ingredient","qty_per_unit","unit",
+  "name","category","price","description","is_active","sort_order","ingredient","qty_per_unit","unit","options_json",
 ];
 
 function ImportExportButtons({
@@ -347,6 +347,8 @@ function ImportExportButtons({
     const rows: Record<string, any>[] = [];
     for (const it of items) {
       const rcs = recipes.filter((r) => r.menu_item_id === it.id);
+      const optionsStr = it.options && hasAnyCustomization(it.options)
+        ? JSON.stringify(it.options) : "";
       const base = {
         name: it.name,
         category: catName(it.category_id),
@@ -356,15 +358,16 @@ function ImportExportButtons({
         sort_order: it.sort_order,
       };
       if (rcs.length === 0) {
-        rows.push({ ...base, ingredient: "", qty_per_unit: "", unit: "" });
+        rows.push({ ...base, ingredient: "", qty_per_unit: "", unit: "", options_json: optionsStr });
       } else {
-        rcs.forEach((r) => {
+        rcs.forEach((r, idx) => {
           const ing = invs.find((i) => i.id === r.inventory_item_id);
           rows.push({
             ...base,
             ingredient: ing?.name ?? "",
             qty_per_unit: r.qty_per_unit,
             unit: ing?.unit ?? "",
+            options_json: idx === 0 ? optionsStr : "",
           });
         });
       }
@@ -386,13 +389,18 @@ function ImportExportButtons({
       if (missing.length === MENU_CSV_COLS.length) return toast.error("CSV is missing required columns");
 
       // Group rows by item name
-      const groups = new Map<string, { base: any; ings: { name: string; qty: number }[] }>();
+      const groups = new Map<string, { base: any; ings: { name: string; qty: number }[]; options?: any }>();
       for (const r of parsed) {
         const name = String(r.name ?? "").trim();
         if (!name) continue;
         const g = groups.get(name) ?? { base: r, ings: [] };
         if (r.ingredient && String(r.ingredient).trim() && Number(r.qty_per_unit) > 0) {
           g.ings.push({ name: String(r.ingredient).trim(), qty: Number(r.qty_per_unit) });
+        }
+        const optStr = String(r.options_json ?? "").trim();
+        if (optStr && g.options === undefined) {
+          try { g.options = JSON.parse(optStr); }
+          catch { toast.error(`Bad options_json for "${name}" — skipped`); }
         }
         groups.set(name, g);
       }
@@ -406,7 +414,7 @@ function ImportExportButtons({
 
       for (const [name, g] of groups) {
         const catId = catByName.get(String(g.base.category ?? "").toLowerCase()) ?? null;
-        const payload = {
+        const payload: any = {
           name,
           description: String(g.base.description ?? "").trim() || null,
           price: Number(g.base.price) || 0,
@@ -414,6 +422,7 @@ function ImportExportButtons({
           is_active: /^(true|1|yes)$/i.test(String(g.base.is_active ?? "true")),
           sort_order: Number(g.base.sort_order) || 0,
         };
+        if (g.options !== undefined) payload.options = g.options;
         const existing = itemByName.get(name.toLowerCase());
         let id: string;
         if (existing) {
