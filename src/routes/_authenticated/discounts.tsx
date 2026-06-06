@@ -190,14 +190,6 @@ function DiscountDialog({
   initial: Discount;
   menuItems: MenuItemLite[];
   onSave: (d: Discount) => Promise<void>;
-
-function DiscountDialog({
-  open, onOpenChange, initial, onSave,
-}: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  initial: Discount;
-  onSave: (d: Discount) => Promise<void>;
 }) {
   const [d, setD] = useState<Discount>(initial);
   useEffect(() => { setD(initial); }, [initial]);
