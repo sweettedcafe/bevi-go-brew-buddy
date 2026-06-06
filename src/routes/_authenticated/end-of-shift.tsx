@@ -7,8 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { ClipboardList, Plus, Trash2, RefreshCw } from "lucide-react";
+import { ClipboardList, Plus, Trash2, RefreshCw, Share2, Copy } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/end-of-shift")({
   component: EndOfShiftPage,
@@ -77,6 +79,23 @@ function EndOfShiftPage() {
   };
 
   const totalPayments = (report?.payments ?? []).reduce((s, p) => s + Number(p.net), 0);
+  const cashNet = Number(report?.payments.find((p) => p.method === "cash")?.net ?? 0);
+  const expectedCash = report ? Number(report.shift.starting_cash) + cashNet - Number(report.total_expenses) : 0;
+
+  const summaryText = report ? buildSummary(report, totalPayments, cashNet, expectedCash) : "";
+
+  const copySummary = async () => {
+    try { await navigator.clipboard.writeText(summaryText); toast.success("Summary copied"); }
+    catch { toast.error("Copy failed"); }
+  };
+  const shareSummary = async () => {
+    if (typeof navigator !== "undefined" && (navigator as Navigator & { share?: (d: ShareData) => Promise<void> }).share) {
+      try { await navigator.share!({ title: "End of Shift Report", text: summaryText }); }
+      catch { /* user cancelled */ }
+    } else {
+      void copySummary();
+    }
+  };
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
@@ -87,9 +106,26 @@ function EndOfShiftPage() {
           </h1>
           <p className="text-sm text-muted-foreground">Latest shift summary in Manila time.</p>
         </div>
-        <Button variant="outline" size="sm" onClick={refresh} className="gap-2">
-          <RefreshCw className="h-4 w-4" /> Refresh
-        </Button>
+        <div className="flex gap-2">
+          {report && (
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button size="sm" className="gap-2"><Share2 className="h-4 w-4" /> Share summary</Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-lg">
+                <DialogHeader><DialogTitle>Shift summary</DialogTitle></DialogHeader>
+                <Textarea readOnly value={summaryText} className="font-mono text-xs min-h-[320px]" />
+                <DialogFooter className="gap-2">
+                  <Button variant="outline" onClick={copySummary} className="gap-2"><Copy className="h-4 w-4" /> Copy</Button>
+                  <Button onClick={shareSummary} className="gap-2"><Share2 className="h-4 w-4" /> Share</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
+          <Button variant="outline" size="sm" onClick={refresh} className="gap-2">
+            <RefreshCw className="h-4 w-4" /> Refresh
+          </Button>
+        </div>
       </div>
 
       {loading ? (
@@ -260,4 +296,36 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
       <div className="font-medium">{value}</div>
     </div>
   );
+}
+
+function buildSummary(r: EOS, totalNet: number, cashNet: number, expectedCash: number): string {
+  const peso = (n: number | string) => `PHP ${Number(n).toFixed(2)}`;
+  const fmt = (iso: string | null) => iso
+    ? new Intl.DateTimeFormat("en-PH", { timeZone: "Asia/Manila", dateStyle: "medium", timeStyle: "short" }).format(new Date(iso))
+    : "—";
+  const lines: string[] = [];
+  lines.push("=== END OF SHIFT REPORT ===");
+  lines.push(`Barista: ${r.user_email ?? "—"}`);
+  lines.push(`Date: ${r.shift.business_date} (Manila)`);
+  lines.push(`Time in:  ${fmt(r.shift.clock_in)}`);
+  lines.push(`Time out: ${r.shift.clock_out ? fmt(r.shift.clock_out) : "in progress"}`);
+  lines.push(`Breaks:   ${(r.break_seconds / 60).toFixed(0)} min`);
+  lines.push(`Leave:    ${r.leave_hours_deducted} h (approved)`);
+  lines.push(`Worked:   ${r.net_worked_hours} h (net)`);
+  lines.push("");
+  lines.push("--- Net by payment method ---");
+  if (r.payments.length === 0) lines.push("(no paid orders)");
+  else r.payments.forEach((p) => lines.push(`${p.method.padEnd(10)} ${String(p.count).padStart(3)} orders   ${peso(p.net)}`));
+  lines.push(`TOTAL NET                 ${peso(totalNet)}`);
+  lines.push("");
+  lines.push("--- Cash drawer ---");
+  lines.push(`Starting cash:     ${peso(r.shift.starting_cash)}`);
+  lines.push(`Cash sales (net):  ${peso(cashNet)}`);
+  lines.push(`Expenses paid:     ${peso(r.total_expenses)}`);
+  lines.push(`Expected on hand:  ${peso(expectedCash)}`);
+  lines.push("");
+  lines.push("--- Expenses ---");
+  if (r.expenses.length === 0) lines.push("(none)");
+  else r.expenses.forEach((e) => lines.push(`- ${e.description}${e.category ? ` [${e.category}]` : ""}: ${peso(e.amount)}`));
+  return lines.join("\n");
 }

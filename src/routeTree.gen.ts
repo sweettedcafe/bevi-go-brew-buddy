@@ -14,6 +14,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as OTokenRouteImport } from './routes/o.$token'
+import { Route as AuthenticatedTimeclockReportRouteImport } from './routes/_authenticated/timeclock-report'
 import { Route as AuthenticatedTimeclockRouteImport } from './routes/_authenticated/timeclock'
 import { Route as AuthenticatedStaffRouteImport } from './routes/_authenticated/staff'
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
@@ -23,6 +24,7 @@ import { Route as AuthenticatedPaymentsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedMenuRouteImport } from './routes/_authenticated/menu'
 import { Route as AuthenticatedInventoryRouteImport } from './routes/_authenticated/inventory'
 import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticated/history'
+import { Route as AuthenticatedEosAdminRouteImport } from './routes/_authenticated/eos-admin'
 import { Route as AuthenticatedEndOfShiftRouteImport } from './routes/_authenticated/end-of-shift'
 import { Route as AuthenticatedDiscountsRouteImport } from './routes/_authenticated/discounts'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
@@ -52,6 +54,12 @@ const OTokenRoute = OTokenRouteImport.update({
   path: '/o/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedTimeclockReportRoute =
+  AuthenticatedTimeclockReportRouteImport.update({
+    id: '/timeclock-report',
+    path: '/timeclock-report',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedTimeclockRoute = AuthenticatedTimeclockRouteImport.update({
   id: '/timeclock',
   path: '/timeclock',
@@ -98,6 +106,11 @@ const AuthenticatedHistoryRoute = AuthenticatedHistoryRouteImport.update({
   path: '/history',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedEosAdminRoute = AuthenticatedEosAdminRouteImport.update({
+  id: '/eos-admin',
+  path: '/eos-admin',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedEndOfShiftRoute = AuthenticatedEndOfShiftRouteImport.update({
   id: '/end-of-shift',
   path: '/end-of-shift',
@@ -127,6 +140,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/discounts': typeof AuthenticatedDiscountsRoute
   '/end-of-shift': typeof AuthenticatedEndOfShiftRoute
+  '/eos-admin': typeof AuthenticatedEosAdminRoute
   '/history': typeof AuthenticatedHistoryRoute
   '/inventory': typeof AuthenticatedInventoryRoute
   '/menu': typeof AuthenticatedMenuRoute
@@ -136,6 +150,7 @@ export interface FileRoutesByFullPath {
   '/reports': typeof AuthenticatedReportsRoute
   '/staff': typeof AuthenticatedStaffRoute
   '/timeclock': typeof AuthenticatedTimeclockRoute
+  '/timeclock-report': typeof AuthenticatedTimeclockReportRoute
   '/o/$token': typeof OTokenRoute
 }
 export interface FileRoutesByTo {
@@ -146,6 +161,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/discounts': typeof AuthenticatedDiscountsRoute
   '/end-of-shift': typeof AuthenticatedEndOfShiftRoute
+  '/eos-admin': typeof AuthenticatedEosAdminRoute
   '/history': typeof AuthenticatedHistoryRoute
   '/inventory': typeof AuthenticatedInventoryRoute
   '/menu': typeof AuthenticatedMenuRoute
@@ -155,6 +171,7 @@ export interface FileRoutesByTo {
   '/reports': typeof AuthenticatedReportsRoute
   '/staff': typeof AuthenticatedStaffRoute
   '/timeclock': typeof AuthenticatedTimeclockRoute
+  '/timeclock-report': typeof AuthenticatedTimeclockReportRoute
   '/o/$token': typeof OTokenRoute
 }
 export interface FileRoutesById {
@@ -167,6 +184,7 @@ export interface FileRoutesById {
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/discounts': typeof AuthenticatedDiscountsRoute
   '/_authenticated/end-of-shift': typeof AuthenticatedEndOfShiftRoute
+  '/_authenticated/eos-admin': typeof AuthenticatedEosAdminRoute
   '/_authenticated/history': typeof AuthenticatedHistoryRoute
   '/_authenticated/inventory': typeof AuthenticatedInventoryRoute
   '/_authenticated/menu': typeof AuthenticatedMenuRoute
@@ -176,6 +194,7 @@ export interface FileRoutesById {
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
   '/_authenticated/staff': typeof AuthenticatedStaffRoute
   '/_authenticated/timeclock': typeof AuthenticatedTimeclockRoute
+  '/_authenticated/timeclock-report': typeof AuthenticatedTimeclockReportRoute
   '/o/$token': typeof OTokenRoute
 }
 export interface FileRouteTypes {
@@ -188,6 +207,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/discounts'
     | '/end-of-shift'
+    | '/eos-admin'
     | '/history'
     | '/inventory'
     | '/menu'
@@ -197,6 +217,7 @@ export interface FileRouteTypes {
     | '/reports'
     | '/staff'
     | '/timeclock'
+    | '/timeclock-report'
     | '/o/$token'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -207,6 +228,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/discounts'
     | '/end-of-shift'
+    | '/eos-admin'
     | '/history'
     | '/inventory'
     | '/menu'
@@ -216,6 +238,7 @@ export interface FileRouteTypes {
     | '/reports'
     | '/staff'
     | '/timeclock'
+    | '/timeclock-report'
     | '/o/$token'
   id:
     | '__root__'
@@ -227,6 +250,7 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard'
     | '/_authenticated/discounts'
     | '/_authenticated/end-of-shift'
+    | '/_authenticated/eos-admin'
     | '/_authenticated/history'
     | '/_authenticated/inventory'
     | '/_authenticated/menu'
@@ -236,6 +260,7 @@ export interface FileRouteTypes {
     | '/_authenticated/reports'
     | '/_authenticated/staff'
     | '/_authenticated/timeclock'
+    | '/_authenticated/timeclock-report'
     | '/o/$token'
   fileRoutesById: FileRoutesById
 }
@@ -283,6 +308,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/o/$token'
       preLoaderRoute: typeof OTokenRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/timeclock-report': {
+      id: '/_authenticated/timeclock-report'
+      path: '/timeclock-report'
+      fullPath: '/timeclock-report'
+      preLoaderRoute: typeof AuthenticatedTimeclockReportRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/timeclock': {
       id: '/_authenticated/timeclock'
@@ -347,6 +379,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedHistoryRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/eos-admin': {
+      id: '/_authenticated/eos-admin'
+      path: '/eos-admin'
+      fullPath: '/eos-admin'
+      preLoaderRoute: typeof AuthenticatedEosAdminRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/end-of-shift': {
       id: '/_authenticated/end-of-shift'
       path: '/end-of-shift'
@@ -383,6 +422,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedDiscountsRoute: typeof AuthenticatedDiscountsRoute
   AuthenticatedEndOfShiftRoute: typeof AuthenticatedEndOfShiftRoute
+  AuthenticatedEosAdminRoute: typeof AuthenticatedEosAdminRoute
   AuthenticatedHistoryRoute: typeof AuthenticatedHistoryRoute
   AuthenticatedInventoryRoute: typeof AuthenticatedInventoryRoute
   AuthenticatedMenuRoute: typeof AuthenticatedMenuRoute
@@ -392,6 +432,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
   AuthenticatedStaffRoute: typeof AuthenticatedStaffRoute
   AuthenticatedTimeclockRoute: typeof AuthenticatedTimeclockRoute
+  AuthenticatedTimeclockReportRoute: typeof AuthenticatedTimeclockReportRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
@@ -399,6 +440,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedDiscountsRoute: AuthenticatedDiscountsRoute,
   AuthenticatedEndOfShiftRoute: AuthenticatedEndOfShiftRoute,
+  AuthenticatedEosAdminRoute: AuthenticatedEosAdminRoute,
   AuthenticatedHistoryRoute: AuthenticatedHistoryRoute,
   AuthenticatedInventoryRoute: AuthenticatedInventoryRoute,
   AuthenticatedMenuRoute: AuthenticatedMenuRoute,
@@ -408,6 +450,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
   AuthenticatedStaffRoute: AuthenticatedStaffRoute,
   AuthenticatedTimeclockRoute: AuthenticatedTimeclockRoute,
+  AuthenticatedTimeclockReportRoute: AuthenticatedTimeclockReportRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
