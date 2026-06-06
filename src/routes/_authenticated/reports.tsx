@@ -155,7 +155,7 @@ function ReportsPage() {
   useEffect(() => { void loadAll(); /* eslint-disable-next-line */ }, []);
 
   // Per-item aggregation
-  const itemRows = useMemo(() => {
+  const itemRowsAll = useMemo(() => {
     const map = new Map<string, { name: string; category: string; qty: number; revenue: number }>();
     for (const o of orders) {
       if (o.status === "voided" || o.status === "refunded") continue;
@@ -173,6 +173,22 @@ function ReportsPage() {
     }
     return [...map.values()].sort((a, b) => b.qty - a.qty);
   }, [orders]);
+
+  const categoryOptions = useMemo(() => {
+    const s = new Set<string>();
+    itemRowsAll.forEach((r) => r.category && s.add(r.category));
+    return [...s].sort();
+  }, [itemRowsAll]);
+
+  const itemRows = useMemo(() => {
+    const cat = filters.category.trim().toLowerCase();
+    const item = filters.item.trim().toLowerCase();
+    return itemRowsAll.filter((r) => {
+      if (cat && r.category.toLowerCase() !== cat) return false;
+      if (item && !r.name.toLowerCase().includes(item)) return false;
+      return true;
+    });
+  }, [itemRowsAll, filters.category, filters.item]);
 
   const discountRows = useMemo(
     () => orders.filter((o) => Number(o.discount_total) > 0),
