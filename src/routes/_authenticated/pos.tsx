@@ -12,11 +12,16 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Trash2, Plus, Minus, ShoppingCart, Coffee, Search, X, Tag, Pause, PlayCircle, ClipboardList } from "lucide-react";
+import { Trash2, Plus, Minus, ShoppingCart, Coffee, Search, X, Tag, Pause, PlayCircle, ClipboardList, Star } from "lucide-react";
 import { toast } from "sonner";
 import { loadPrintSettings } from "@/lib/print-settings";
 import { printHTML } from "@/lib/print";
 import { receiptHTML, labelsHTML, type DrinkLabel } from "@/lib/print-templates";
+import { CustomizeDialog } from "@/components/pos/CustomizeDialog";
+import {
+  type MenuOptions, type SelectedCustom,
+  hasAnyCustomization, addonTotal, customSignature, describeCustom,
+} from "@/lib/menu-options";
 
 export const Route = createFileRoute("/_authenticated/pos")({
   component: POSPage,
@@ -26,8 +31,19 @@ type Category = { id: string; name: string; sort_order: number; prints_label?: b
 type MenuItem = {
   id: string; category_id: string | null; name: string;
   description: string | null; price: number; is_active: boolean; sort_order: number;
+  options: MenuOptions | null;
 };
-type CartLine = { menu_item_id: string; name: string; unit_price: number; qty: number };
+type CartLine = {
+  lineId: string;
+  menu_item_id: string;
+  name: string;
+  base_price: number;
+  unit_price: number;
+  qty: number;
+  customization: SelectedCustom | null;
+  addon_total: number;
+  notes: string | null;
+};
 type OrderType = "dine_in" | "takeout" | "delivery";
 type PMConfig = {
   id: string; code: string; label: string;
