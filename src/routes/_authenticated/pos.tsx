@@ -54,6 +54,11 @@ type PMConfig = {
 };
 type SplitLine = { method_code: string; amount: string };
 type ManualDiscount = { type: "percent" | "fixed"; value: number; label: string } | null;
+type Bundle = {
+  id: string; name: string; description: string | null; price: number;
+  starts_at: string | null; ends_at: string | null; is_active: boolean;
+};
+type BundleItem = { bundle_id: string; menu_item_id: string; qty: number };
 
 const db = supabase as any;
 const fmt = (n: number) => n.toFixed(2);
@@ -64,7 +69,7 @@ function POSPage() {
   const [cats, setCats] = useState<Category[]>([]);
   const [items, setItems] = useState<MenuItem[]>([]);
   const [pms, setPms] = useState<PMConfig[]>([]);
-  const [activeCat, setActiveCat] = useState<string | "all">("all");
+  const [activeCat, setActiveCat] = useState<string | "all" | "__bundles__">("all");
   const [query, setQuery] = useState("");
   const [cart, setCart] = useState<CartLine[]>([]);
   const [orderType, setOrderType] = useState<OrderType>("takeout");
@@ -78,24 +83,38 @@ function POSPage() {
 
   // discount state
   const [promoCode, setPromoCode] = useState("");
-  const [appliedPromo, setAppliedPromo] = useState<{ code: string; label: string; amount: number } | null>(null);
+  const [appliedPromo, setAppliedPromo] = useState<
+    { code: string; label: string; amount: number; applies_to_item_id: string | null } | null
+  >(null);
   const [manual, setManual] = useState<ManualDiscount>(null);
   const [topSellers, setTopSellers] = useState<Set<string>>(new Set());
+  const [bundles, setBundles] = useState<Bundle[]>([]);
+  const [bundleItems, setBundleItems] = useState<BundleItem[]>([]);
 
   useEffect(() => {
     let alive = true;
     (async () => {
-      const [{ data: c }, { data: m }, { data: p }, { data: pop }] = await Promise.all([
+      const nowIso = new Date().toISOString();
+      const [{ data: c }, { data: m }, { data: p }, { data: pop }, { data: bs }, { data: bi }] = await Promise.all([
         db.from("categories").select("id,name,sort_order,prints_label").eq("is_active", true).order("sort_order"),
         db.from("menu_items").select("*").eq("is_active", true).order("sort_order"),
         db.from("payment_methods").select("*").eq("is_active", true).order("sort_order"),
         db.from("menu_item_popularity").select("menu_item_id,qty_sold").order("qty_sold", { ascending: false }).limit(3),
+        db.from("bundles").select("*").eq("is_active", true)
+          .or(`ends_at.is.null,ends_at.gt.${nowIso}`),
+        db.from("bundle_items").select("bundle_id,menu_item_id,qty"),
       ]);
       if (!alive) return;
       setCats((c ?? []) as Category[]);
       setItems((m ?? []) as MenuItem[]);
       setPms((p ?? []) as PMConfig[]);
       setTopSellers(new Set((pop ?? []).map((r: any) => r.menu_item_id as string)));
+      // Filter bundles that haven't started yet on the client
+      const visibleBundles = ((bs ?? []) as Bundle[]).filter((b) =>
+        !b.starts_at || new Date(b.starts_at) <= new Date(),
+      );
+      setBundles(visibleBundles);
+      setBundleItems((bi ?? []) as BundleItem[]);
       setLoading(false);
     })();
     return () => { alive = false; };
@@ -190,6 +209,34 @@ function POSPage() {
   function clearAll() {
     setCart([]); setCustomerName("");
     setPromoCode(""); setAppliedPromo(null); setManual(null);
+  }
+
+  function addBundle(b: Bundle) {
+    const rows = bundleItems.filter((x) => x.bundle_id === b.id);
+    if (rows.length === 0) { toast.error("Bundle has no items"); return; }
+    const newLines: CartLine[] = [];
+    let componentsTotal = 0;
+    for (const r of rows) {
+      const it = items.find((x) => x.id === r.menu_item_id);
+      if (!it) continue;
+      const base = Number(it.price);
+      componentsTotal += base * r.qty;
+      newLines.push({
+        lineId: newLineId(),
+        menu_item_id: it.id, name: it.name,
+        base_price: base, unit_price: base, qty: r.qty,
+        customization: null, addon_total: 0,
+        notes: `Bundle: ${b.name}`,
+      });
+    }
+    if (newLines.length === 0) { toast.error("Bundle items unavailable"); return; }
+    setCart((c) => [...c, ...newLines]);
+    const savings = Math.max(0, componentsTotal - Number(b.price));
+    if (savings > 0) {
+      setAppliedPromo(null);
+      setManual({ type: "fixed", value: savings, label: `Bundle: ${b.name}` });
+    }
+    toast.success(`${b.name} added`);
   }
 
   async function holdOrder() {
@@ -322,10 +369,26 @@ function POSPage() {
     if (data.ends_at && new Date(data.ends_at) < new Date()) { toast.error("Promo expired"); return; }
     if (data.starts_at && new Date(data.starts_at) > new Date()) { toast.error("Promo not started"); return; }
     if (data.max_uses != null && data.uses_count >= data.max_uses) { toast.error("Promo usage limit reached"); return; }
+
+    const itemId: string | null = data.applies_to_item_id ?? null;
+    // Compute base the discount applies to
+    let base = subtotal;
+    if (itemId) {
+      base = cart
+        .filter((l) => l.menu_item_id === itemId)
+        .reduce((s, l) => s + l.unit_price * l.qty, 0);
+      if (base <= 0) {
+        toast.error(`This promo only applies to a specific item not in cart`);
+        return;
+      }
+    }
     const amt = data.type === "percent"
-      ? Math.round(subtotal * Number(data.value)) / 100 * 100 / 100
-      : Number(data.value);
-    setAppliedPromo({ code: data.code, label: data.name, amount: amt });
+      ? Math.round(base * Number(data.value)) / 100
+      : Math.min(Number(data.value), base);
+    setAppliedPromo({
+      code: data.code, label: data.name, amount: amt,
+      applies_to_item_id: itemId,
+    });
     setManual(null);
     toast.success(`Promo "${data.name}" applied`);
   }
@@ -361,6 +424,13 @@ function POSPage() {
 
         <div className="px-6 py-3 border-b bg-card flex gap-2 overflow-x-auto">
           <Button size="sm" variant={activeCat === "all" ? "default" : "outline"} onClick={() => setActiveCat("all")}>All</Button>
+          {bundles.length > 0 && (
+            <Button size="sm"
+              variant={activeCat === "__bundles__" ? "default" : "outline"}
+              onClick={() => setActiveCat("__bundles__")}>
+              🎁 Bundles
+            </Button>
+          )}
           {cats.map((c) => (
             <Button key={c.id} size="sm" variant={activeCat === c.id ? "default" : "outline"} onClick={() => setActiveCat(c.id)}>
               {c.name}
@@ -371,6 +441,40 @@ function POSPage() {
         <div className="flex-1 overflow-y-auto p-6">
           {loading ? (
             <div className="text-muted-foreground text-sm">Loading menu…</div>
+          ) : activeCat === "__bundles__" ? (
+            bundles.length === 0 ? (
+              <div className="text-muted-foreground text-sm">No active bundles.</div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                {bundles.map((b) => {
+                  const its = bundleItems.filter((x) => x.bundle_id === b.id);
+                  return (
+                    <button key={b.id} onClick={() => addBundle(b)}
+                      className="relative text-left rounded-lg border-2 border-primary/40 bg-card hover:bg-accent hover:border-primary transition-colors p-4 shadow-sm">
+                      <span className="absolute -top-2 -right-2 rounded-full bg-primary text-primary-foreground text-[10px] px-2 py-0.5 shadow">
+                        BUNDLE
+                      </span>
+                      <div className="font-medium leading-tight">{b.name}</div>
+                      {b.description && <div className="text-xs text-muted-foreground mt-1 line-clamp-2">{b.description}</div>}
+                      <div className="mt-2 text-[11px] text-muted-foreground line-clamp-2">
+                        {its.map((r) => {
+                          const it = items.find((x) => x.id === r.menu_item_id);
+                          return it ? `${it.name} ×${r.qty}` : null;
+                        }).filter(Boolean).join(" + ")}
+                      </div>
+                      <div className="mt-3 flex items-end justify-between gap-2">
+                        <div className="font-display text-lg text-primary">{fmt(Number(b.price))}</div>
+                        {b.ends_at && (
+                          <span className="text-[10px] text-muted-foreground">
+                            until {new Date(b.ends_at).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )
           ) : filtered.length === 0 ? (
             <div className="text-muted-foreground text-sm">
               No items. {items.length === 0 && "Run the Phase 2 SQL to seed the menu."}

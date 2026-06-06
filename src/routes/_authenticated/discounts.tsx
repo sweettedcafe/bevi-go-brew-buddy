@@ -32,7 +32,9 @@ type Discount = {
   starts_at: string | null;
   ends_at: string | null;
   is_active: boolean;
+  applies_to_item_id: string | null;
 };
+type MenuItemLite = { id: string; name: string };
 
 const db = supabase as any;
 
@@ -43,12 +45,17 @@ function DiscountsPage() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Discount | null>(null);
   const [open, setOpen] = useState(false);
+  const [menuItems, setMenuItems] = useState<MenuItemLite[]>([]);
 
   async function load() {
     setLoading(true);
-    const { data, error } = await db.from("discounts").select("*").order("created_at", { ascending: false });
+    const [{ data, error }, { data: m }] = await Promise.all([
+      db.from("discounts").select("*").order("created_at", { ascending: false }),
+      db.from("menu_items").select("id,name").eq("is_active", true).order("name"),
+    ]);
     if (error) toast.error(error.message);
     setRows((data ?? []) as Discount[]);
+    setMenuItems((m ?? []) as MenuItemLite[]);
     setLoading(false);
   }
   useEffect(() => { load(); }, []);
@@ -58,6 +65,7 @@ function DiscountsPage() {
       id: "", code: "", name: "", type: "percent", value: 10,
       min_subtotal: 0, max_uses: null, uses_count: 0,
       starts_at: null, ends_at: null, is_active: true,
+      applies_to_item_id: null,
     });
     setOpen(true);
   }
@@ -73,6 +81,7 @@ function DiscountsPage() {
       starts_at: d.starts_at || null,
       ends_at: d.ends_at || null,
       is_active: d.is_active,
+      applies_to_item_id: d.applies_to_item_id || null,
     };
     if (!payload.name) { toast.error("Name required"); return; }
     const { error } = d.id
@@ -165,6 +174,7 @@ function DiscountsPage() {
           open={open}
           onOpenChange={setOpen}
           initial={editing}
+          menuItems={menuItems}
           onSave={save}
         />
       )}
@@ -173,11 +183,12 @@ function DiscountsPage() {
 }
 
 function DiscountDialog({
-  open, onOpenChange, initial, onSave,
+  open, onOpenChange, initial, menuItems, onSave,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   initial: Discount;
+  menuItems: MenuItemLite[];
   onSave: (d: Discount) => Promise<void>;
 }) {
   const [d, setD] = useState<Discount>(initial);
@@ -262,6 +273,26 @@ function DiscountDialog({
                 onChange={(e) => setD({ ...d, ends_at: e.target.value || null })}
               />
             </div>
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground">
+              Applies to (leave blank = whole order)
+            </label>
+            <Select
+              value={d.applies_to_item_id ?? "__all__"}
+              onValueChange={(v) => setD({ ...d, applies_to_item_id: v === "__all__" ? null : v })}
+            >
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Whole order (subtotal)</SelectItem>
+                {menuItems.map((m) => (
+                  <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] text-muted-foreground mt-1">
+              If an item is selected, the discount only reduces that specific item's line in the POS.
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <Switch checked={d.is_active} onCheckedChange={(v) => setD({ ...d, is_active: v })} />
