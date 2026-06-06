@@ -18,6 +18,8 @@ import {
 import { toast } from "sonner";
 import { BarChart3, Download, Filter, Settings2, RotateCcw, XCircle, Eye, FileSpreadsheet, Tag } from "lucide-react";
 import { toCsv, downloadCsv } from "@/lib/csv";
+import { useServerFn } from "@tanstack/react-start";
+import { exportToGoogleSheets } from "@/lib/sheets.functions";
 
 export const Route = createFileRoute("/_authenticated/reports")({
   component: ReportsPage,
@@ -34,9 +36,42 @@ type Filters = {
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
 const daysAgoIso = (n: number) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+const shortId = (id?: string | null) => (id ? String(id).slice(0, 8) : "—");
 
 const PER_ORDER_COLS = [
   { key: "order_no", label: "Order #" },
+  { key: "order_id_short", label: "Order ID" },
+  { key: "created_at", label: "Date / time" },
+  { key: "customer_name", label: "Customer" },
+  { key: "cashier_email", label: "Cashier" },
+  { key: "items_count", label: "Items" },
+  { key: "subtotal", label: "Subtotal" },
+  { key: "discount_total", label: "Discount" },
+  { key: "discount_label", label: "Discount label" },
+  { key: "payment_label", label: "Payment" },
+  { key: "fee_amount", label: "Fee" },
+  { key: "total", label: "Total" },
+  { key: "status", label: "Status" },
+];
+const PER_ITEM_COLS = [
+  { key: "order_no", label: "Order #" },
+  { key: "order_id_short", label: "Order ID" },
+  { key: "created_at", label: "Date" },
+  { key: "name", label: "Item" },
+  { key: "category", label: "Category" },
+  { key: "qty", label: "Qty" },
+  { key: "revenue", label: "Revenue" },
+];
+const DISCOUNT_COLS = [
+  { key: "order_no", label: "Order #" },
+  { key: "order_id_short", label: "Order ID" },
+  { key: "created_at", label: "Date" },
+  { key: "customer_name", label: "Customer" },
+  { key: "discount_label", label: "Promotion / discount" },
+  { key: "discount_code", label: "Code" },
+  { key: "discount_total", label: "Amount" },
+  { key: "total", label: "Order total" },
+];
   { key: "created_at", label: "Date / time" },
   { key: "customer_name", label: "Customer" },
   { key: "cashier_email", label: "Cashier" },
