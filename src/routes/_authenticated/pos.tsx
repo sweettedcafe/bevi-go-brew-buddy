@@ -982,7 +982,18 @@ function CheckoutDialog({
   }, 0);
 
   function setSplit(i: number, patch: Partial<SplitLine>) {
-    setSplits((arr) => arr.map((s, k) => k === i ? { ...s, ...patch } : s));
+    setSplits((arr) => arr.map((s, k) => {
+      if (k !== i) return s;
+      const next = { ...s, ...patch };
+      if (patch.method_code && patch.method_code !== s.method_code) {
+        const newPm = methods.find((m) => m.code === patch.method_code);
+        if (newPm && newPm.kind !== "cash") {
+          const othersPaid = arr.reduce((sum, x, idx) => idx === i ? sum : sum + (Number(x.amount) || 0), 0);
+          next.amount = Math.max(0, total - othersPaid).toFixed(2);
+        }
+      }
+      return next;
+    }));
   }
   function addSplit() {
     const remain = Math.max(0, total - paid);
@@ -1025,11 +1036,13 @@ function CheckoutDialog({
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="w-32">
-                    {i === 0 && <label className="text-xs text-muted-foreground">Amount</label>}
-                    <Input type="number" inputMode="decimal" value={s.amount}
-                      onChange={(e) => setSplit(i, { amount: e.target.value })} />
-                  </div>
+                  {pm?.kind === "cash" && (
+                    <div className="w-32">
+                      {i === 0 && <label className="text-xs text-muted-foreground">Cash Bill</label>}
+                      <Input type="number" inputMode="decimal" value={s.amount}
+                        onChange={(e) => setSplit(i, { amount: e.target.value })} />
+                    </div>
+                  )}
                   {splits.length > 1 && (
                     <Button size="icon" variant="ghost" onClick={() => removeSplit(i)}>
                       <X className="h-4 w-4" />
