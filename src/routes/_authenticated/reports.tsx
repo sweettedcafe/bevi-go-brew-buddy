@@ -18,6 +18,8 @@ import {
 import { toast } from "sonner";
 import { BarChart3, Download, Filter, Settings2, RotateCcw, XCircle, Eye, FileSpreadsheet, Tag } from "lucide-react";
 import { toCsv, downloadCsv } from "@/lib/csv";
+import { useServerFn } from "@tanstack/react-start";
+import { exportToGoogleSheets } from "@/lib/sheets.functions";
 
 export const Route = createFileRoute("/_authenticated/reports")({
   component: ReportsPage,
@@ -34,9 +36,11 @@ type Filters = {
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
 const daysAgoIso = (n: number) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+const shortId = (id?: string | null) => (id ? String(id).slice(0, 8) : "—");
 
 const PER_ORDER_COLS = [
   { key: "order_no", label: "Order #" },
+  { key: "order_id_short", label: "Order ID" },
   { key: "created_at", label: "Date / time" },
   { key: "customer_name", label: "Customer" },
   { key: "cashier_email", label: "Cashier" },
@@ -50,13 +54,17 @@ const PER_ORDER_COLS = [
   { key: "status", label: "Status" },
 ];
 const PER_ITEM_COLS = [
+  { key: "order_no", label: "Order #" },
+  { key: "order_id_short", label: "Order ID" },
+  { key: "created_at", label: "Date" },
   { key: "name", label: "Item" },
   { key: "category", label: "Category" },
-  { key: "qty", label: "Qty sold" },
+  { key: "qty", label: "Qty" },
   { key: "revenue", label: "Revenue" },
 ];
 const DISCOUNT_COLS = [
   { key: "order_no", label: "Order #" },
+  { key: "order_id_short", label: "Order ID" },
   { key: "created_at", label: "Date" },
   { key: "customer_name", label: "Customer" },
   { key: "discount_label", label: "Promotion / discount" },
@@ -105,7 +113,17 @@ function ReportsPage() {
       .gte("created_at", fromTs).lte("created_at", toTs)
       .order("created_at", { ascending: false });
     if (filters.customer.trim()) q = q.ilike("customer_name", `%${filters.customer.trim()}%`);
-    if (filters.orderId.trim())  q = q.eq("order_no", Number(filters.orderId.trim()) || -1);
+    // Order ID filter: matches by order number (e.g. "3", "#003") OR by UUID prefix
+    const oid = filters.orderId.trim().replace(/^#/, "");
+    if (oid) {
+      const asNum = Number(oid);
+      if (Number.isFinite(asNum) && /^\d+$/.test(oid)) {
+        q = q.eq("order_no", asNum);
+      } else {
+        // UUID or partial UUID: match prefix on id
+        q = q.ilike("id", `${oid}%`);
+      }
+    }
 
     const [{ data: o }, { data: emails }] = await Promise.all([
       q,
@@ -144,6 +162,7 @@ function ReportsPage() {
         const fee_amount = ps.reduce((s, x) => s + Number(x.fee_amount || 0), 0);
         const payment_label = ps.map((p) => pmLabel.get(p.method_code) ?? p.method_code ?? p.method).join(", ");
         return { ...r, items_count, fee_amount, payment_label,
+          order_id_short: shortId(r.id),
           cashier_email: emailMap[r.cashier_id] ?? (r.cashier_id ? "—" : "self-order"),
           _items: its, _payments: ps };
       });
@@ -154,24 +173,25 @@ function ReportsPage() {
 
   useEffect(() => { void loadAll(); /* eslint-disable-next-line */ }, []);
 
-  // Per-item aggregation
+  // Per-item rows: one row per order_item line, with order context
   const itemRowsAll = useMemo(() => {
-    const map = new Map<string, { name: string; category: string; qty: number; revenue: number }>();
+    const rows: AnyRow[] = [];
     for (const o of orders) {
       if (o.status === "voided" || o.status === "refunded") continue;
       for (const it of (o._items ?? [])) {
-        const key = it.menu_item_id ?? it.name_snapshot;
-        const cur = map.get(key) ?? {
+        rows.push({
+          order_id: o.id,
+          order_id_short: shortId(o.id),
+          order_no: o.order_no,
+          created_at: o.created_at,
           name: it.name_snapshot,
           category: it.menu_items?.categories?.name ?? "—",
-          qty: 0, revenue: 0,
-        };
-        cur.qty += Number(it.qty || 0);
-        cur.revenue += Number(it.line_total || 0);
-        map.set(key, cur);
+          qty: Number(it.qty || 0),
+          revenue: Number(it.line_total || 0),
+        });
       }
     }
-    return [...map.values()].sort((a, b) => b.qty - a.qty);
+    return rows;
   }, [orders]);
 
   const categoryOptions = useMemo(() => {
@@ -232,11 +252,47 @@ function ReportsPage() {
     }
   }
 
-  function openSheetsImport() {
-    toast.info(
-      "To auto-sync to Google Sheets, run the Phase 9 SQL then ask Lovable to enable the Google Sheets connector. For now, use Export CSV and import into Sheets via File → Import.",
-      { duration: 8000 },
-    );
+  const exportSheets = useServerFn(exportToGoogleSheets);
+  const [sheetsBusy, setSheetsBusy] = useState(false);
+  async function openSheetsImport() {
+    setSheetsBusy(true);
+    try {
+      const perOrder = {
+        title: "Per order",
+        headers: PER_ORDER_COLS.map((c) => c.label),
+        rows: orders.map((o) => PER_ORDER_COLS.map((c) => String(fmt(o[c.key], c.key)))),
+      };
+      const perItem = {
+        title: "Per item",
+        headers: PER_ITEM_COLS.map((c) => c.label),
+        rows: itemRows.map((r) => PER_ITEM_COLS.map((c) => {
+          const v = (r as any)[c.key];
+          if (c.key === "revenue") return Number(v).toFixed(2);
+          if (c.key === "created_at") return new Date(v).toLocaleString();
+          if (c.key === "order_no") return `#${String(v).padStart(3, "0")}`;
+          return v == null ? "" : String(v);
+        })),
+      };
+      const discounts = {
+        title: "Discounts",
+        headers: DISCOUNT_COLS.map((c) => c.label),
+        rows: discountRows.map((o) => DISCOUNT_COLS.map((c) => String(fmt(o[c.key], c.key)))),
+      };
+      const res = await exportSheets({
+        data: {
+          title: `Bevi & Go Reports ${todayIso()}`,
+          sheets: [perOrder, perItem, discounts],
+        },
+      });
+      toast.success("Exported to Google Sheets", {
+        action: { label: "Open", onClick: () => window.open(res.url, "_blank") },
+        duration: 10000,
+      });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Google Sheets export failed");
+    } finally {
+      setSheetsBusy(false);
+    }
   }
 
   return (
@@ -248,8 +304,8 @@ function ReportsPage() {
           <Button size="sm" variant="outline" onClick={exportCurrent}>
             <Download className="h-3 w-3 mr-1" /> Export CSV
           </Button>
-          <Button size="sm" variant="outline" onClick={openSheetsImport}>
-            <FileSpreadsheet className="h-3 w-3 mr-1" /> Google Sheets
+          <Button size="sm" variant="outline" onClick={openSheetsImport} disabled={sheetsBusy}>
+            <FileSpreadsheet className="h-3 w-3 mr-1" /> {sheetsBusy ? "Exporting…" : "Google Sheets"}
           </Button>
         </div>
       </header>
@@ -263,8 +319,8 @@ function ReportsPage() {
             <Input type="date" value={filters.to} onChange={(e) => setFilters({ ...filters, to: e.target.value })} /></div>
           <div><Label className="text-xs">Customer</Label>
             <Input placeholder="Search name" value={filters.customer} onChange={(e) => setFilters({ ...filters, customer: e.target.value })} /></div>
-          <div><Label className="text-xs">Order ID</Label>
-            <Input placeholder="#" value={filters.orderId} onChange={(e) => setFilters({ ...filters, orderId: e.target.value })} className="w-24" /></div>
+          <div><Label className="text-xs">Order # or ID</Label>
+            <Input placeholder="#003 or UUID prefix" value={filters.orderId} onChange={(e) => setFilters({ ...filters, orderId: e.target.value })} className="w-44" /></div>
           <div><Label className="text-xs">Cashier email</Label>
             <Input placeholder="@" value={filters.cashier} onChange={(e) => setFilters({ ...filters, cashier: e.target.value })} /></div>
           <div>
@@ -340,6 +396,9 @@ function ReportsPage() {
             rows={itemRows}
             render={(row, key) => {
               if (key === "revenue") return `₱${Number(row.revenue).toFixed(2)}`;
+              if (key === "created_at") return new Date(row.created_at).toLocaleString();
+              if (key === "order_no") return `#${String(row.order_no).padStart(3, "0")}`;
+              if (key === "order_id_short") return <span className="font-mono text-xs">{row.order_id_short}</span>;
               return (row as any)[key];
             }}
             empty="No items sold in this range."

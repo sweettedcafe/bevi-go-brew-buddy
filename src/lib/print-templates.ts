@@ -81,12 +81,14 @@ export function receiptHTML(d: ReceiptData, s: PrintSettings): string {
 
 export type DrinkLabel = {
   orderNo: number;
+  orderId?: string | null;       // short order ID for traceability
   drinkName: string;
   cupIndex: number;     // 1-based for split cups (e.g. "1 of 2")
   cupTotal: number;
   customerName: string | null;
   notes: string | null;
   createdAt: string;
+  quote?: string | null;         // random inspirational quote
 };
 
 export function labelsHTML(labels: DrinkLabel[], s: PrintSettings): string {
@@ -94,13 +96,14 @@ export function labelsHTML(labels: DrinkLabel[], s: PrintSettings): string {
   const each = labels.map((l, i) => `
     <section class="label${i < labels.length - 1 ? " brk" : ""}">
       <div class="row top">
-        <span class="ord">#${String(l.orderNo).padStart(3, "0")}</span>
+        <span class="ord">#${String(l.orderNo).padStart(3, "0")}${l.orderId ? ` · ${esc(l.orderId.slice(0, 8))}` : ""}</span>
         <span class="when">${new Date(l.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
       </div>
       <div class="name">${esc(l.drinkName)}</div>
       ${l.cupTotal > 1 ? `<div class="cup">${l.cupIndex} of ${l.cupTotal}</div>` : ""}
       <div class="cust">${esc(l.customerName ?? "Walk-in")}</div>
       ${l.notes ? `<div class="notes">${esc(l.notes)}</div>` : ""}
+      ${l.quote ? `<div class="quote">“${esc(l.quote)}”</div>` : ""}
       <div class="brand">${esc(s.shopName)}</div>
     </section>
   `).join("");
@@ -112,14 +115,15 @@ export function labelsHTML(labels: DrinkLabel[], s: PrintSettings): string {
   body { margin: 0; font-family: "Inter", system-ui, sans-serif; color: #000; }
   .label { width: 54mm; height: 36mm; padding: 2mm; display: flex; flex-direction: column; }
   .brk { page-break-after: always; }
-  .row { display: flex; justify-content: space-between; font-size: 10px; }
+  .row { display: flex; justify-content: space-between; font-size: 9px; }
   .top { margin-bottom: 2px; }
   .ord { font-weight: 700; }
   .name { font-size: 14px; font-weight: 700; line-height: 1.1; margin-top: 2px; }
   .cup  { font-size: 10px; color: #333; }
-  .cust { font-size: 13px; margin-top: auto; font-weight: 600; }
-  .notes { font-size: 10px; font-style: italic; }
-  .brand { font-size: 8px; color: #555; text-align: right; }
+  .cust { font-size: 12px; margin-top: 2px; font-weight: 600; }
+  .notes { font-size: 9px; font-style: italic; }
+  .quote { font-size: 8px; font-style: italic; color: #444; margin-top: auto; line-height: 1.15; }
+  .brand { font-size: 7px; color: #666; text-align: right; margin-top: 1px; }
 </style>
 ${each}
 `;
