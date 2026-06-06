@@ -16,6 +16,7 @@ import { AlertTriangle, Upload, Download, Plus, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { toCsv, downloadCsv } from "@/lib/csv";
 import { fetchPublicCsv } from "@/lib/fetch-csv.functions";
+import { useRealtime } from "@/lib/use-realtime";
 
 export const Route = createFileRoute("/_authenticated/inventory")({
   component: InventoryPage,
@@ -64,6 +65,7 @@ function InventoryPage() {
     setLoading(false);
   }
   useEffect(() => { void load(); }, []);
+  useRealtime("inventory_items", () => { void load(); });
 
   const visible = useMemo(
     () => rows.filter((r) => showInactive || r.is_active),

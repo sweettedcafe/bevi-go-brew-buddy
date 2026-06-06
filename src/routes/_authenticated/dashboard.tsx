@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useRealtime } from "@/lib/use-realtime";
 import { Card } from "@/components/ui/card";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -62,6 +63,9 @@ function Dashboard() {
 
   const r = useMemo(() => rangeFor(period), [period]);
 
+  const [tick, setTick] = useState(0);
+  useRealtime(["orders", "order_items", "inventory_items"], () => setTick((n) => n + 1));
+
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -91,7 +95,7 @@ function Dashboard() {
       setLoading(false);
     })();
     return () => { alive = false; };
-  }, [period]);
+  }, [period, tick]);
 
   const totals = useMemo(() => {
     const sum = (xs: Row[], k: string) => xs.reduce((s, x) => s + Number(x[k] || 0), 0);
