@@ -54,6 +54,11 @@ type PMConfig = {
 };
 type SplitLine = { method_code: string; amount: string };
 type ManualDiscount = { type: "percent" | "fixed"; value: number; label: string } | null;
+type Bundle = {
+  id: string; name: string; description: string | null; price: number;
+  starts_at: string | null; ends_at: string | null; is_active: boolean;
+};
+type BundleItem = { bundle_id: string; menu_item_id: string; qty: number };
 
 const db = supabase as any;
 const fmt = (n: number) => n.toFixed(2);
