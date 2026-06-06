@@ -391,9 +391,6 @@ function POSPage() {
                     {it.description && <div className="text-xs text-muted-foreground mt-1 line-clamp-2">{it.description}</div>}
                     <div className="mt-3 flex items-end justify-between gap-2">
                       <div className="font-display text-lg text-primary">{fmt(Number(it.price))}</div>
-                      {customizable && (
-                        <span className="text-[10px] text-muted-foreground uppercase tracking-wide">Customize</span>
-                      )}
                     </div>
                   </button>
                 );
