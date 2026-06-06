@@ -424,6 +424,13 @@ function POSPage() {
 
         <div className="px-6 py-3 border-b bg-card flex gap-2 overflow-x-auto">
           <Button size="sm" variant={activeCat === "all" ? "default" : "outline"} onClick={() => setActiveCat("all")}>All</Button>
+          {bundles.length > 0 && (
+            <Button size="sm"
+              variant={activeCat === "__bundles__" ? "default" : "outline"}
+              onClick={() => setActiveCat("__bundles__")}>
+              🎁 Bundles
+            </Button>
+          )}
           {cats.map((c) => (
             <Button key={c.id} size="sm" variant={activeCat === c.id ? "default" : "outline"} onClick={() => setActiveCat(c.id)}>
               {c.name}
@@ -434,6 +441,40 @@ function POSPage() {
         <div className="flex-1 overflow-y-auto p-6">
           {loading ? (
             <div className="text-muted-foreground text-sm">Loading menu…</div>
+          ) : activeCat === "__bundles__" ? (
+            bundles.length === 0 ? (
+              <div className="text-muted-foreground text-sm">No active bundles.</div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                {bundles.map((b) => {
+                  const its = bundleItems.filter((x) => x.bundle_id === b.id);
+                  return (
+                    <button key={b.id} onClick={() => addBundle(b)}
+                      className="relative text-left rounded-lg border-2 border-primary/40 bg-card hover:bg-accent hover:border-primary transition-colors p-4 shadow-sm">
+                      <span className="absolute -top-2 -right-2 rounded-full bg-primary text-primary-foreground text-[10px] px-2 py-0.5 shadow">
+                        BUNDLE
+                      </span>
+                      <div className="font-medium leading-tight">{b.name}</div>
+                      {b.description && <div className="text-xs text-muted-foreground mt-1 line-clamp-2">{b.description}</div>}
+                      <div className="mt-2 text-[11px] text-muted-foreground line-clamp-2">
+                        {its.map((r) => {
+                          const it = items.find((x) => x.id === r.menu_item_id);
+                          return it ? `${it.name} ×${r.qty}` : null;
+                        }).filter(Boolean).join(" + ")}
+                      </div>
+                      <div className="mt-3 flex items-end justify-between gap-2">
+                        <div className="font-display text-lg text-primary">{fmt(Number(b.price))}</div>
+                        {b.ends_at && (
+                          <span className="text-[10px] text-muted-foreground">
+                            until {new Date(b.ends_at).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )
           ) : filtered.length === 0 ? (
             <div className="text-muted-foreground text-sm">
               No items. {items.length === 0 && "Run the Phase 2 SQL to seed the menu."}
