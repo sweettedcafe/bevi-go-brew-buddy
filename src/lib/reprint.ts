@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { loadPrintSettings } from "./print-settings";
 import { printHTML } from "./print";
 import { receiptHTML, labelsHTML, type ReceiptData, type DrinkLabel } from "./print-templates";
+import { randomQuote } from "./quotes";
 
 const db = supabase as any;
 
@@ -68,11 +69,13 @@ export async function reprintLabelsById(orderId: string) {
     for (let i = 1; i <= total; i++) {
       labels.push({
         orderNo: ord.order_no,
+        orderId: orderId,
         drinkName: it.name_snapshot,
         cupIndex: i, cupTotal: total,
         customerName: ord.customer_name,
         notes: it.notes,
         createdAt: ord.created_at,
+        quote: randomQuote(),
       });
     }
   }
