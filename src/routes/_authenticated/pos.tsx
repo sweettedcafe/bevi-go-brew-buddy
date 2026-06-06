@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
@@ -91,6 +91,18 @@ function POSPage() {
   const [topSellers, setTopSellers] = useState<Set<string>>(new Set());
   const [bundles, setBundles] = useState<Bundle[]>([]);
   const [bundleItems, setBundleItems] = useState<BundleItem[]>([]);
+
+  // Barcode / customer loyalty
+  type LoyaltyCustomer = {
+    id: string; code: string; name: string; phone: string | null; points: number;
+    recent_orders: Array<{ id: string; order_no: number; created_at: string; total: number; status: string }>;
+  };
+  const posSettings = useMemo(() => loadPosSettings(), []);
+  const [customer, setCustomer] = useState<LoyaltyCustomer | null>(null);
+  const [scanInput, setScanInput] = useState("");
+  const [scanBusy, setScanBusy] = useState(false);
+  const [redeem, setRedeem] = useState<string>("");
+  const scanRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let alive = true;
