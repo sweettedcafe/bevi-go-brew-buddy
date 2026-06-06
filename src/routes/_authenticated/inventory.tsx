@@ -207,10 +207,13 @@ function InventoryPage() {
                     className={`absolute inset-y-0 left-0 ${color} rounded-full transition-all`}
                     style={{ width: `${pctOf(r)}%`, height: "0.5rem" }}
                   />
-                </div>
+                </>
+                  );
+                })()}
               </Card>
             );
           })}
+
         </div>
       )}
 
