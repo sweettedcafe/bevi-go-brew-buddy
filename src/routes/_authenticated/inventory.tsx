@@ -155,20 +155,16 @@ function InventoryPage() {
               s === "critical" ? "bg-destructive"
               : s === "low" ? "bg-amber-500"
               : "bg-emerald-500";
+            const packSize = Number(r.pack_size) || 1;
+            const stock = Number(r.stock_qty) || 0;
+            const fullStock = Number(r.full_stock_qty || 0);
+            const wholePacks = packSize > 0 ? Math.floor(stock / packSize) : 0;
+            const remainder = packSize > 0 ? stock - wholePacks * packSize : 0;
+            const fullPacks = packSize > 0 ? Math.floor(fullStock / packSize) : 0;
+            const packWord = r.pack_label || "pack";
             return (
               <Card key={r.id} className={`p-4 ${!r.is_active ? "opacity-60" : ""}`}>
-                {(() => {
-                  const packSize = Number(r.pack_size) || 1;
-                  const stock = Number(r.stock_qty) || 0;
-                  const fullStock = Number(r.full_stock_qty || 0);
-                  const wholePacks = packSize > 0 ? Math.floor(stock / packSize) : 0;
-                  const remainder = packSize > 0 ? stock - wholePacks * packSize : 0;
-                  const fullPacks = packSize > 0 ? Math.floor(fullStock / packSize) : 0;
-                  const packWord = r.pack_label || "pack";
-                  return (
-                <>
                 <div className="flex flex-wrap items-center gap-3">
-
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium truncate">{r.name}</span>
@@ -208,13 +204,10 @@ function InventoryPage() {
                     style={{ width: `${pctOf(r)}%`, height: "0.5rem" }}
                   />
                 </div>
-                </>
-
-                  );
-                })()}
               </Card>
             );
           })}
+
 
         </div>
       )}
