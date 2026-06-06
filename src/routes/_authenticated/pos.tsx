@@ -211,6 +211,34 @@ function POSPage() {
     setPromoCode(""); setAppliedPromo(null); setManual(null);
   }
 
+  function addBundle(b: Bundle) {
+    const rows = bundleItems.filter((x) => x.bundle_id === b.id);
+    if (rows.length === 0) { toast.error("Bundle has no items"); return; }
+    const newLines: CartLine[] = [];
+    let componentsTotal = 0;
+    for (const r of rows) {
+      const it = items.find((x) => x.id === r.menu_item_id);
+      if (!it) continue;
+      const base = Number(it.price);
+      componentsTotal += base * r.qty;
+      newLines.push({
+        lineId: newLineId(),
+        menu_item_id: it.id, name: it.name,
+        base_price: base, unit_price: base, qty: r.qty,
+        customization: null, addon_total: 0,
+        notes: `Bundle: ${b.name}`,
+      });
+    }
+    if (newLines.length === 0) { toast.error("Bundle items unavailable"); return; }
+    setCart((c) => [...c, ...newLines]);
+    const savings = Math.max(0, componentsTotal - Number(b.price));
+    if (savings > 0) {
+      setAppliedPromo(null);
+      setManual({ type: "fixed", value: savings, label: `Bundle: ${b.name}` });
+    }
+    toast.success(`${b.name} added`);
+  }
+
   async function holdOrder() {
     if (cart.length === 0) return;
     const { data, error } = await db.rpc("pos_hold_order", {
