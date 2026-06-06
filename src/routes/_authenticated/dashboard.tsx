@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { ShieldCheck, Coffee, Clock, Package, BarChart3, Users } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
@@ -8,7 +9,7 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 });
 
 function Dashboard() {
-  const { user, primaryRole, roles, roleError } = useAuth();
+  const { user, primaryRole, roles, roleError, refreshRoles } = useAuth();
   const noRole = !primaryRole;
   const permissionIssue = roleError?.toLowerCase().includes("permission denied");
 
@@ -44,12 +45,25 @@ function Dashboard() {
                 table yet. Run the permissions fix SQL, then refresh this page.
               </>
             ) : (
-              <>
-                Your account exists but has no role yet. Ask an Admin (or run the
-                seed SQL provided with this project) to assign you a role in the
-                <code className="mx-1 px-1.5 py-0.5 rounded bg-muted text-foreground">user_roles</code>
-                table. Without a role, the side navigation will be empty.
-              </>
+              <div className="space-y-3">
+                <p>
+                  Your account exists but no role row is visible yet for this signed-in user.
+                  Assign the role to this exact user ID in
+                  <code className="mx-1 px-1.5 py-0.5 rounded bg-muted text-foreground">user_roles</code>
+                  then click refresh.
+                </p>
+                <div className="rounded-md border border-border bg-background px-3 py-2 font-mono text-xs text-foreground break-all">
+                  {user?.id}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" size="sm" onClick={() => void refreshRoles()}>
+                    Refresh roles
+                  </Button>
+                  <Button type="button" size="sm" variant="outline" onClick={() => window.location.reload()}>
+                    Reload page
+                  </Button>
+                </div>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -69,12 +83,12 @@ function Dashboard() {
           <CardTitle>Foundation checklist</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
-          <Item done label="Connect to Supabase project (pwixzaejussrgxanxeyf)" />
+          <Item done label="Connect to Supabase project (ewwtxzoruibaxalffyli)" />
           <Item done label="Email/password auth wired to Supabase Auth" />
           <Item done label="Role-aware sidebar (Developer / Admin / Barista)" />
           <Item done label="RBAC schema, RLS policies, audit log (SQL provided)" />
-          <Item label="Run the provided supabase_schema.sql in your Supabase SQL editor" />
-          <Item label="Assign yourself a role in user_roles to unlock navigation" />
+          <Item label="Run the SQL schema in the current project SQL editor" />
+          <Item label="Assign developer/admin to the current signed-in user ID above" />
         </CardContent>
       </Card>
 

@@ -65,6 +65,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => sub.subscription.unsubscribe();
   }, []);
 
+  useEffect(() => {
+    if (!user || roles.length > 0) return;
+
+    const refresh = () => {
+      void fetchRoles(user.id).then((result) => {
+        setRoles(result.roles);
+        setRoleError(result.error);
+      });
+    };
+
+    const interval = window.setInterval(refresh, 4000);
+    const onFocus = () => refresh();
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [user, roles.length]);
+
   const primaryRole =
     ROLE_PRIORITY.find((r) => roles.includes(r)) ?? null;
 
