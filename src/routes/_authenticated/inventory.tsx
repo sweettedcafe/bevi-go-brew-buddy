@@ -16,6 +16,7 @@ import { AlertTriangle, Upload, Download, Plus, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { toCsv, downloadCsv } from "@/lib/csv";
 import { fetchPublicCsv } from "@/lib/fetch-csv.functions";
+import { useRealtime } from "@/lib/use-realtime";
 
 export const Route = createFileRoute("/_authenticated/inventory")({
   component: InventoryPage,
