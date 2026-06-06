@@ -173,24 +173,25 @@ function ReportsPage() {
 
   useEffect(() => { void loadAll(); /* eslint-disable-next-line */ }, []);
 
-  // Per-item aggregation
+  // Per-item rows: one row per order_item line, with order context
   const itemRowsAll = useMemo(() => {
-    const map = new Map<string, { name: string; category: string; qty: number; revenue: number }>();
+    const rows: AnyRow[] = [];
     for (const o of orders) {
       if (o.status === "voided" || o.status === "refunded") continue;
       for (const it of (o._items ?? [])) {
-        const key = it.menu_item_id ?? it.name_snapshot;
-        const cur = map.get(key) ?? {
+        rows.push({
+          order_id: o.id,
+          order_id_short: shortId(o.id),
+          order_no: o.order_no,
+          created_at: o.created_at,
           name: it.name_snapshot,
           category: it.menu_items?.categories?.name ?? "—",
-          qty: 0, revenue: 0,
-        };
-        cur.qty += Number(it.qty || 0);
-        cur.revenue += Number(it.line_total || 0);
-        map.set(key, cur);
+          qty: Number(it.qty || 0),
+          revenue: Number(it.line_total || 0),
+        });
       }
     }
-    return [...map.values()].sort((a, b) => b.qty - a.qty);
+    return rows;
   }, [orders]);
 
   const categoryOptions = useMemo(() => {
@@ -251,11 +252,47 @@ function ReportsPage() {
     }
   }
 
-  function openSheetsImport() {
-    toast.info(
-      "To auto-sync to Google Sheets, run the Phase 9 SQL then ask Lovable to enable the Google Sheets connector. For now, use Export CSV and import into Sheets via File → Import.",
-      { duration: 8000 },
-    );
+  const exportSheets = useServerFn(exportToGoogleSheets);
+  const [sheetsBusy, setSheetsBusy] = useState(false);
+  async function openSheetsImport() {
+    setSheetsBusy(true);
+    try {
+      const perOrder = {
+        title: "Per order",
+        headers: PER_ORDER_COLS.map((c) => c.label),
+        rows: orders.map((o) => PER_ORDER_COLS.map((c) => String(fmt(o[c.key], c.key)))),
+      };
+      const perItem = {
+        title: "Per item",
+        headers: PER_ITEM_COLS.map((c) => c.label),
+        rows: itemRows.map((r) => PER_ITEM_COLS.map((c) => {
+          const v = (r as any)[c.key];
+          if (c.key === "revenue") return Number(v).toFixed(2);
+          if (c.key === "created_at") return new Date(v).toLocaleString();
+          if (c.key === "order_no") return `#${String(v).padStart(3, "0")}`;
+          return v == null ? "" : String(v);
+        })),
+      };
+      const discounts = {
+        title: "Discounts",
+        headers: DISCOUNT_COLS.map((c) => c.label),
+        rows: discountRows.map((o) => DISCOUNT_COLS.map((c) => String(fmt(o[c.key], c.key)))),
+      };
+      const res = await exportSheets({
+        data: {
+          title: `Bevi & Go Reports ${todayIso()}`,
+          sheets: [perOrder, perItem, discounts],
+        },
+      });
+      toast.success("Exported to Google Sheets", {
+        action: { label: "Open", onClick: () => window.open(res.url, "_blank") },
+        duration: 10000,
+      });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Google Sheets export failed");
+    } finally {
+      setSheetsBusy(false);
+    }
   }
 
   return (
