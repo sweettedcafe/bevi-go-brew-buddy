@@ -63,6 +63,9 @@ function Dashboard() {
 
   const r = useMemo(() => rangeFor(period), [period]);
 
+  const [tick, setTick] = useState(0);
+  useRealtime(["orders", "order_items", "inventory_items"], () => setTick((n) => n + 1));
+
   useEffect(() => {
     let alive = true;
     (async () => {
