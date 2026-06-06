@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Clock, Coffee, Utensils, LogIn, LogOut, CalendarPlus, Trash2 } from "lucide-react";
+import { Clock, Coffee, Utensils, LogIn, LogOut, CalendarPlus } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/timeclock")({
   component: TimeclockPage,
