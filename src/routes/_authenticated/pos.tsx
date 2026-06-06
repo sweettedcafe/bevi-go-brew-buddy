@@ -576,6 +576,79 @@ function POSPage() {
             <label className="text-xs text-muted-foreground">Customer name (optional)</label>
             <Input value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="e.g. Ahmed" />
           </div>
+
+          {posSettings.scanEnabled && (
+            <div>
+              <label className="text-xs text-muted-foreground flex items-center gap-1">
+                <ScanLine className="h-3 w-3" /> Scan customer barcode
+              </label>
+              <form
+                onSubmit={(e) => { e.preventDefault(); lookupCustomerByCode(scanInput); }}
+                className="flex gap-2"
+              >
+                <Input
+                  ref={scanRef}
+                  value={scanInput}
+                  onChange={(e) => setScanInput(e.target.value)}
+                  placeholder="Scan or type code…"
+                  autoComplete="off"
+                  inputMode="numeric"
+                  disabled={scanBusy}
+                />
+                <Button type="submit" variant="outline" size="sm" disabled={scanBusy || !scanInput.trim()}>
+                  Find
+                </Button>
+              </form>
+            </div>
+          )}
+
+          {customer && (
+            <Card className="p-3 bg-accent/40 space-y-2">
+              <div className="flex items-start gap-2">
+                <UserCircle2 className="h-5 w-5 text-primary mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium truncate">{customer.name}</div>
+                  <div className="text-[11px] text-muted-foreground">
+                    #{customer.code}{customer.phone ? ` · ${customer.phone}` : ""}
+                  </div>
+                </div>
+                <Badge variant="secondary" className="gap-1">
+                  <Star className="h-3 w-3" /> {customer.points} pts
+                </Badge>
+                <Button size="icon" variant="ghost" onClick={() => { setCustomer(null); setRedeem(""); setCustomerName(""); }}>
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+
+              {customer.points > 0 && (
+                <div className="flex items-center gap-2">
+                  <label className="text-[11px] text-muted-foreground whitespace-nowrap">Redeem pts</label>
+                  <Input
+                    type="number" min={0} max={customer.points}
+                    value={redeem}
+                    onChange={(e) => setRedeem(e.target.value)}
+                    placeholder="0" className="h-7"
+                  />
+                </div>
+              )}
+
+              {customer.recent_orders && customer.recent_orders.length > 0 && (
+                <div className="pt-1 border-t border-border/50">
+                  <div className="text-[11px] text-muted-foreground mb-1">
+                    Recent orders ({customer.recent_orders.length})
+                  </div>
+                  <div className="space-y-0.5 max-h-24 overflow-y-auto">
+                    {customer.recent_orders.slice(0, 5).map((o) => (
+                      <div key={o.id} className="flex justify-between text-[11px]">
+                        <span>#{String(o.order_no).padStart(3, "0")} · {new Date(o.created_at).toLocaleDateString()}</span>
+                        <span className="font-medium">{fmt(Number(o.total))}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </Card>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
