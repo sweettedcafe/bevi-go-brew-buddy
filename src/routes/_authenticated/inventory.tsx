@@ -65,7 +65,7 @@ function InventoryPage() {
     setLoading(false);
   }
   useEffect(() => { void load(); }, []);
-  useRealtime(["inventory_items", "inventory_packs"], () => { void load(); });
+  useRealtime("inventory_items", () => { void load(); });
 
   const visible = useMemo(
     () => rows.filter((r) => showInactive || r.is_active),
