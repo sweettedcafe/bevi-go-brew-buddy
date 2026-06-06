@@ -12,7 +12,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Trash2, Plus, Minus, ShoppingCart, Coffee, Search, X, Tag, Pause, PlayCircle } from "lucide-react";
+import { Trash2, Plus, Minus, ShoppingCart, Coffee, Search, X, Tag, Pause, PlayCircle, ClipboardList } from "lucide-react";
 import { toast } from "sonner";
 import { loadPrintSettings } from "@/lib/print-settings";
 import { printHTML } from "@/lib/print";
@@ -56,6 +56,8 @@ function POSPage() {
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [holdOpen, setHoldOpen] = useState(false);
   const [heldOrders, setHeldOrders] = useState<Array<{ id: string; order_no: number; customer_name: string | null; held_at: string; total: number }>>([]);
+  const [todayOpen, setTodayOpen] = useState(false);
+  const [todayOrders, setTodayOrders] = useState<Array<{ id: string; order_no: number; customer_name: string | null; created_at: string; total: number; order_type: string }>>([]);
 
   // discount state
   const [promoCode, setPromoCode] = useState("");
@@ -141,6 +143,19 @@ function POSPage() {
     if (error) { toast.error(error.message); return; }
     setHeldOrders((data ?? []) as any);
     setHoldOpen(true);
+  }
+
+  async function openTodayList() {
+    const today = new Date().toISOString().slice(0, 10);
+    const { data, error } = await db
+      .from("orders")
+      .select("id, order_no, customer_name, created_at, total, order_type")
+      .eq("business_date", today)
+      .eq("status", "completed")
+      .order("created_at", { ascending: false });
+    if (error) { toast.error(error.message); return; }
+    setTodayOrders((data ?? []) as any);
+    setTodayOpen(true);
   }
 
   async function resumeHeld(id: string) {
@@ -248,8 +263,11 @@ function POSPage() {
         <header className="px-4 sm:px-6 py-3 sm:py-4 border-b bg-card flex flex-wrap items-center gap-3">
           <Coffee className="h-5 w-5 text-primary" />
           <h1 className="text-lg sm:text-xl font-display">Point of Sale</h1>
-          <Button size="sm" variant="outline" onClick={openHeldList} className="ml-auto">
-            <PlayCircle className="h-3 w-3 mr-1" /> Held orders
+          <Button size="sm" variant="outline" onClick={openTodayList} className="ml-auto">
+            <ClipboardList className="h-3 w-3 mr-1" /> Today
+          </Button>
+          <Button size="sm" variant="outline" onClick={openHeldList}>
+            <PlayCircle className="h-3 w-3 mr-1" /> Held
           </Button>
           <div className="relative w-full sm:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -464,6 +482,31 @@ function POSPage() {
                     <PlayCircle className="h-4 w-4 text-primary" />
                   </div>
                 </button>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Today's orders dialog */}
+      <Dialog open={todayOpen} onOpenChange={setTodayOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Today's orders ({todayOrders.length})</DialogTitle></DialogHeader>
+          {todayOrders.length === 0 ? (
+            <div className="text-sm text-muted-foreground py-6 text-center">No completed orders today yet.</div>
+          ) : (
+            <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+              {todayOrders.map((o) => (
+                <div key={o.id} className="rounded-md border p-3 flex items-center gap-3">
+                  <div className="font-display text-lg">#{String(o.order_no).padStart(3, "0")}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate">{o.customer_name || "Walk-in"}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {new Date(o.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · {o.order_type}
+                    </div>
+                  </div>
+                  <div className="font-medium">{fmt(Number(o.total))}</div>
+                </div>
               ))}
             </div>
           )}
