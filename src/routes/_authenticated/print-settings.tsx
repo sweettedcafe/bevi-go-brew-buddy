@@ -110,6 +110,38 @@ function PrintSettingsPage() {
           <Button variant="outline" onClick={testLabel}><TestTube className="h-3 w-3 mr-1" /> Test label</Button>
         </div>
       </Card>
+
+      <Card className="p-4 sm:p-6 space-y-5 mt-4">
+        <div className="flex items-center gap-2">
+          <ScanLine className="h-5 w-5 text-primary" />
+          <h2 className="font-display text-lg">POS Barcode Scanner</h2>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Enable to use a USB or Bluetooth barcode scanner on the POS. Scanning a customer's loyalty
+          barcode auto-fills their name, points balance, and recent orders. Most scanners emulate a
+          keyboard and send <b>Enter</b> at the end of the code — no driver needed.
+        </p>
+
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="font-medium">Enable barcode scanning on POS</div>
+            <div className="text-xs text-muted-foreground">Shows the scan input on the POS Current Order panel.</div>
+          </div>
+          <Switch checked={pos.scanEnabled} onCheckedChange={(v) => updatePos("scanEnabled", v)} />
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="font-medium">Keep scanner input focused</div>
+            <div className="text-xs text-muted-foreground">Auto-refocus so a scan is always captured even after tapping the menu.</div>
+          </div>
+          <Switch checked={pos.scanAutoFocus} onCheckedChange={(v) => updatePos("scanAutoFocus", v)} />
+        </div>
+
+        <div className="pt-2 border-t">
+          <Button onClick={save}><Save className="h-3 w-3 mr-1" /> Save</Button>
+        </div>
+      </Card>
     </div>
   );
 }
