@@ -267,6 +267,19 @@ function ReportsPage() {
             <Input placeholder="#" value={filters.orderId} onChange={(e) => setFilters({ ...filters, orderId: e.target.value })} className="w-24" /></div>
           <div><Label className="text-xs">Cashier email</Label>
             <Input placeholder="@" value={filters.cashier} onChange={(e) => setFilters({ ...filters, cashier: e.target.value })} /></div>
+          <div>
+            <Label className="text-xs">Category</Label>
+            <select
+              className="h-9 rounded-md border border-input bg-transparent px-2 text-sm"
+              value={filters.category}
+              onChange={(e) => setFilters({ ...filters, category: e.target.value })}
+            >
+              <option value="">All</option>
+              {categoryOptions.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div><Label className="text-xs">Item name</Label>
+            <Input placeholder="Search item" value={filters.item} onChange={(e) => setFilters({ ...filters, item: e.target.value })} /></div>
           <Button size="sm" onClick={loadAll} disabled={loading}>{loading ? "Loading…" : "Apply"}</Button>
         </div>
       </Card>
