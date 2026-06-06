@@ -121,16 +121,68 @@ function POSPage() {
 
   const total = Math.max(0, subtotal - discountAmount);
 
+  // Customize dialog state
+  const [customizing, setCustomizing] = useState<{
+    item: MenuItem;
+    initial?: { custom: SelectedCustom | null; qty: number; notes: string };
+    editingLineId?: string;
+  } | null>(null);
+
+  function newLineId() {
+    return (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+  }
+
   function addItem(it: MenuItem) {
+    if (hasAnyCustomization(it.options)) {
+      setCustomizing({ item: it });
+      return;
+    }
     setCart((c) => {
-      const f = c.find((l) => l.menu_item_id === it.id);
-      if (f) return c.map((l) => l.menu_item_id === it.id ? { ...l, qty: l.qty + 1 } : l);
-      return [...c, { menu_item_id: it.id, name: it.name, unit_price: Number(it.price), qty: 1 }];
+      const sig = customSignature(null, null);
+      const f = c.find((l) => l.menu_item_id === it.id && customSignature(l.customization, l.notes) === sig);
+      if (f) return c.map((l) => l.lineId === f.lineId ? { ...l, qty: l.qty + 1 } : l);
+      const base = Number(it.price);
+      return [...c, {
+        lineId: newLineId(),
+        menu_item_id: it.id, name: it.name,
+        base_price: base, unit_price: base, qty: 1,
+        customization: null, addon_total: 0, notes: null,
+      }];
     });
   }
-  const changeQty = (id: string, d: number) =>
-    setCart((c) => c.map((l) => l.menu_item_id === id ? { ...l, qty: l.qty + d } : l).filter((l) => l.qty > 0));
-  const removeLine = (id: string) => setCart((c) => c.filter((l) => l.menu_item_id !== id));
+
+  function addCustomizedLine(args: {
+    item: MenuItem; custom: SelectedCustom; addon: number; qty: number; notes: string;
+    editingLineId?: string;
+  }) {
+    const base = Number(args.item.price);
+    const unit = base + args.addon;
+    const cleanNotes = args.notes.trim() || null;
+    setCart((c) => {
+      // If editing an existing line, replace it
+      if (args.editingLineId) {
+        return c.map((l) => l.lineId === args.editingLineId
+          ? { ...l, customization: args.custom, addon_total: args.addon, unit_price: unit, qty: args.qty, notes: cleanNotes }
+          : l);
+      }
+      // Merge if exact same customization+notes already exists
+      const sig = customSignature(args.custom, cleanNotes);
+      const dup = c.find((l) =>
+        l.menu_item_id === args.item.id &&
+        customSignature(l.customization, l.notes) === sig);
+      if (dup) return c.map((l) => l.lineId === dup.lineId ? { ...l, qty: l.qty + args.qty } : l);
+      return [...c, {
+        lineId: newLineId(),
+        menu_item_id: args.item.id, name: args.item.name,
+        base_price: base, unit_price: unit, qty: args.qty,
+        customization: args.custom, addon_total: args.addon, notes: cleanNotes,
+      }];
+    });
+  }
+
+  const changeQty = (lineId: string, d: number) =>
+    setCart((c) => c.map((l) => l.lineId === lineId ? { ...l, qty: l.qty + d } : l).filter((l) => l.qty > 0));
+  const removeLine = (lineId: string) => setCart((c) => c.filter((l) => l.lineId !== lineId));
   function clearAll() {
     setCart([]); setCustomerName("");
     setPromoCode(""); setAppliedPromo(null); setManual(null);
@@ -142,7 +194,11 @@ function POSPage() {
       p_payload: {
         order_type: orderType,
         customer_name: customerName || null,
-        items: cart.map((l) => ({ menu_item_id: l.menu_item_id, qty: l.qty })),
+        items: cart.map((l) => ({
+          menu_item_id: l.menu_item_id, qty: l.qty,
+          unit_price: l.unit_price, addon_total: l.addon_total,
+          customization: l.customization, notes: l.notes,
+        })),
       },
     });
     if (error) { toast.error(error.message); return; }
