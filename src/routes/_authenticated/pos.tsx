@@ -79,19 +79,22 @@ function POSPage() {
   const [promoCode, setPromoCode] = useState("");
   const [appliedPromo, setAppliedPromo] = useState<{ code: string; label: string; amount: number } | null>(null);
   const [manual, setManual] = useState<ManualDiscount>(null);
+  const [topSellers, setTopSellers] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let alive = true;
     (async () => {
-      const [{ data: c }, { data: m }, { data: p }] = await Promise.all([
+      const [{ data: c }, { data: m }, { data: p }, { data: pop }] = await Promise.all([
         db.from("categories").select("id,name,sort_order,prints_label").eq("is_active", true).order("sort_order"),
         db.from("menu_items").select("*").eq("is_active", true).order("sort_order"),
         db.from("payment_methods").select("*").eq("is_active", true).order("sort_order"),
+        db.from("menu_item_popularity").select("menu_item_id,qty_sold").order("qty_sold", { ascending: false }).limit(3),
       ]);
       if (!alive) return;
       setCats((c ?? []) as Category[]);
       setItems((m ?? []) as MenuItem[]);
       setPms((p ?? []) as PMConfig[]);
+      setTopSellers(new Set((pop ?? []).map((r: any) => r.menu_item_id as string)));
       setLoading(false);
     })();
     return () => { alive = false; };
