@@ -341,10 +341,26 @@ function POSPage() {
     if (data.ends_at && new Date(data.ends_at) < new Date()) { toast.error("Promo expired"); return; }
     if (data.starts_at && new Date(data.starts_at) > new Date()) { toast.error("Promo not started"); return; }
     if (data.max_uses != null && data.uses_count >= data.max_uses) { toast.error("Promo usage limit reached"); return; }
+
+    const itemId: string | null = data.applies_to_item_id ?? null;
+    // Compute base the discount applies to
+    let base = subtotal;
+    if (itemId) {
+      base = cart
+        .filter((l) => l.menu_item_id === itemId)
+        .reduce((s, l) => s + l.unit_price * l.qty, 0);
+      if (base <= 0) {
+        toast.error(`This promo only applies to a specific item not in cart`);
+        return;
+      }
+    }
     const amt = data.type === "percent"
-      ? Math.round(subtotal * Number(data.value)) / 100 * 100 / 100
-      : Number(data.value);
-    setAppliedPromo({ code: data.code, label: data.name, amount: amt });
+      ? Math.round(base * Number(data.value)) / 100
+      : Math.min(Number(data.value), base);
+    setAppliedPromo({
+      code: data.code, label: data.name, amount: amt,
+      applies_to_item_id: itemId,
+    });
     setManual(null);
     toast.success(`Promo "${data.name}" applied`);
   }
