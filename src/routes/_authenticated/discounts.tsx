@@ -274,6 +274,26 @@ function DiscountDialog({
               />
             </div>
           </div>
+          <div>
+            <label className="text-xs text-muted-foreground">
+              Applies to (leave blank = whole order)
+            </label>
+            <Select
+              value={d.applies_to_item_id ?? "__all__"}
+              onValueChange={(v) => setD({ ...d, applies_to_item_id: v === "__all__" ? null : v })}
+            >
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Whole order (subtotal)</SelectItem>
+                {menuItems.map((m) => (
+                  <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] text-muted-foreground mt-1">
+              If an item is selected, the discount only reduces that specific item's line in the POS.
+            </p>
+          </div>
           <div className="flex items-center gap-2">
             <Switch checked={d.is_active} onCheckedChange={(v) => setD({ ...d, is_active: v })} />
             <span className="text-sm">Active</span>
