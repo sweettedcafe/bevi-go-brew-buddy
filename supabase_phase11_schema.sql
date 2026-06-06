@@ -29,19 +29,19 @@ begin
 
   return query
   with br as (
-    select shift_id,
-      coalesce(sum(extract(epoch from (coalesce(ended_at, now()) - started_at))),0)::bigint as secs
-      from public.shift_breaks group by shift_id
+    select sb.shift_id as sid,
+      coalesce(sum(extract(epoch from (coalesce(sb.ended_at, now()) - sb.started_at))),0)::bigint as secs
+      from public.shift_breaks sb group by sb.shift_id
   ),
   ex as (
-    select shift_id, coalesce(sum(amount),0)::numeric as tot
-      from public.shift_expenses group by shift_id
+    select se.shift_id as sid, coalesce(sum(se.amount),0)::numeric as tot
+      from public.shift_expenses se group by se.shift_id
   ),
   lv as (
-    select user_id, leave_date,
-      sum(case when duration = 'full' then 8 else 4 end)::numeric as hrs
-      from public.leave_requests where status = 'approved'
-      group by user_id, leave_date
+    select lr.user_id as uid, lr.leave_date as ldate,
+      sum(case when lr.duration = 'full' then 8 else 4 end)::numeric as hrs
+      from public.leave_requests lr where lr.status = 'approved'
+      group by lr.user_id, lr.leave_date
   )
   select
     s.id,
@@ -61,9 +61,9 @@ begin
     coalesce(ex.tot, 0)
   from public.shifts s
   left join auth.users u on u.id = s.user_id
-  left join br on br.shift_id = s.id
-  left join ex on ex.shift_id = s.id
-  left join lv on lv.user_id = s.user_id and lv.leave_date = s.business_date
+  left join br on br.sid = s.id
+  left join ex on ex.sid = s.id
+  left join lv on lv.uid = s.user_id and lv.ldate = s.business_date
   where (p_from    is null or s.business_date >= p_from)
     and (p_to      is null or s.business_date <= p_to)
     and (p_user_id is null or s.user_id = p_user_id)
