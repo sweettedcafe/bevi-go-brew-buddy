@@ -84,7 +84,7 @@ create or replace function public._gen_customer_token()
 returns text language plpgsql as $$
 declare v_token text;
 begin
-  v_token := encode(gen_random_bytes(18), 'base64');
+  v_token := encode(extensions.gen_random_bytes(18), 'base64');
   v_token := replace(replace(replace(v_token, '+',''), '/',''), '=','');
   return left(v_token, 22);
 end $$;
