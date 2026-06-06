@@ -89,13 +89,19 @@ function MenuPage() {
           </p>
         </div>
         {isAdmin && (
-          <Button size="sm" onClick={() => setEditing({
-            id: "", name: "", description: "", price: 0,
-            is_active: true, category_id: cats[0]?.id ?? null, sort_order: items.length + 1,
-            options: emptyOptions(),
-          })}>
-            <Plus className="h-3 w-3 mr-1" /> New item
-          </Button>
+          <div className="flex gap-2">
+            <ImportExportButtons
+              items={items} cats={cats} invs={invs} recipes={recipes}
+              onImported={() => void load()}
+            />
+            <Button size="sm" onClick={() => setEditing({
+              id: "", name: "", description: "", price: 0,
+              is_active: true, category_id: cats[0]?.id ?? null, sort_order: items.length + 1,
+              options: emptyOptions(),
+            })}>
+              <Plus className="h-3 w-3 mr-1" /> New item
+            </Button>
+          </div>
         )}
       </div>
 
