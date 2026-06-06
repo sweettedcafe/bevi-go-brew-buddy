@@ -319,8 +319,8 @@ function ReportsPage() {
             <Input type="date" value={filters.to} onChange={(e) => setFilters({ ...filters, to: e.target.value })} /></div>
           <div><Label className="text-xs">Customer</Label>
             <Input placeholder="Search name" value={filters.customer} onChange={(e) => setFilters({ ...filters, customer: e.target.value })} /></div>
-          <div><Label className="text-xs">Order ID</Label>
-            <Input placeholder="#" value={filters.orderId} onChange={(e) => setFilters({ ...filters, orderId: e.target.value })} className="w-24" /></div>
+          <div><Label className="text-xs">Order # or ID</Label>
+            <Input placeholder="#003 or UUID prefix" value={filters.orderId} onChange={(e) => setFilters({ ...filters, orderId: e.target.value })} className="w-44" /></div>
           <div><Label className="text-xs">Cashier email</Label>
             <Input placeholder="@" value={filters.cashier} onChange={(e) => setFilters({ ...filters, cashier: e.target.value })} /></div>
           <div>
