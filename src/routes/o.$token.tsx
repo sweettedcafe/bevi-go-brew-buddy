@@ -35,7 +35,7 @@ function SelfOrderPage() {
   const [customizing, setCustomizing] = useState<Item | null>(null);
   const [loading, setLoading] = useState(true);
   const [placing, setPlacing] = useState(false);
-  const [done, setDone] = useState<{ order_no: number; total: number } | null>(null);
+  const [done, setDone] = useState<{ order_no: number; order_id: string; total: number } | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -99,7 +99,7 @@ function SelfOrderPage() {
     setPlacing(false);
     if (error) { toast.error(error.message); return; }
     const r = data as any;
-    setDone({ order_no: r.order_no, total: Number(r.total) });
+    setDone({ order_no: r.order_no, order_id: r.order_id, total: Number(r.total) });
     setCart([]);
   }
 
@@ -114,6 +114,7 @@ function SelfOrderPage() {
           <h1 className="font-display text-2xl">Order placed!</h1>
           <div className="text-sm text-muted-foreground">Show this number at the counter to pay.</div>
           <div className="font-display text-5xl text-primary">#{String(done.order_no).padStart(3,"0")}</div>
+          <div className="text-[10px] text-muted-foreground font-mono break-all">ID: {done.order_id}</div>
           <div className="text-lg">Total ₱{fmt(done.total)}</div>
           <div className="text-xs text-muted-foreground">Pay with cash at the counter — the barista will complete your order.</div>
           <Button className="w-full" onClick={() => setDone(null)}>Order again</Button>
