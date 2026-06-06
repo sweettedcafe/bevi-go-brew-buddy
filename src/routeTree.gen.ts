@@ -17,9 +17,11 @@ import { Route as OTokenRouteImport } from './routes/o.$token'
 import { Route as AuthenticatedTimeclockReportRouteImport } from './routes/_authenticated/timeclock-report'
 import { Route as AuthenticatedTimeclockRouteImport } from './routes/_authenticated/timeclock'
 import { Route as AuthenticatedStaffRouteImport } from './routes/_authenticated/staff'
+import { Route as AuthenticatedSalesSummaryRouteImport } from './routes/_authenticated/sales-summary'
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
 import { Route as AuthenticatedPrintSettingsRouteImport } from './routes/_authenticated/print-settings'
 import { Route as AuthenticatedPosRouteImport } from './routes/_authenticated/pos'
+import { Route as AuthenticatedPayslipRouteImport } from './routes/_authenticated/payslip'
 import { Route as AuthenticatedPaymentsRouteImport } from './routes/_authenticated/payments'
 import { Route as AuthenticatedMenuRouteImport } from './routes/_authenticated/menu'
 import { Route as AuthenticatedInventoryRouteImport } from './routes/_authenticated/inventory'
@@ -70,6 +72,12 @@ const AuthenticatedStaffRoute = AuthenticatedStaffRouteImport.update({
   path: '/staff',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedSalesSummaryRoute =
+  AuthenticatedSalesSummaryRouteImport.update({
+    id: '/sales-summary',
+    path: '/sales-summary',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedReportsRoute = AuthenticatedReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
@@ -84,6 +92,11 @@ const AuthenticatedPrintSettingsRoute =
 const AuthenticatedPosRoute = AuthenticatedPosRouteImport.update({
   id: '/pos',
   path: '/pos',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedPayslipRoute = AuthenticatedPayslipRouteImport.update({
+  id: '/payslip',
+  path: '/payslip',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedPaymentsRoute = AuthenticatedPaymentsRouteImport.update({
@@ -145,9 +158,11 @@ export interface FileRoutesByFullPath {
   '/inventory': typeof AuthenticatedInventoryRoute
   '/menu': typeof AuthenticatedMenuRoute
   '/payments': typeof AuthenticatedPaymentsRoute
+  '/payslip': typeof AuthenticatedPayslipRoute
   '/pos': typeof AuthenticatedPosRoute
   '/print-settings': typeof AuthenticatedPrintSettingsRoute
   '/reports': typeof AuthenticatedReportsRoute
+  '/sales-summary': typeof AuthenticatedSalesSummaryRoute
   '/staff': typeof AuthenticatedStaffRoute
   '/timeclock': typeof AuthenticatedTimeclockRoute
   '/timeclock-report': typeof AuthenticatedTimeclockReportRoute
@@ -166,9 +181,11 @@ export interface FileRoutesByTo {
   '/inventory': typeof AuthenticatedInventoryRoute
   '/menu': typeof AuthenticatedMenuRoute
   '/payments': typeof AuthenticatedPaymentsRoute
+  '/payslip': typeof AuthenticatedPayslipRoute
   '/pos': typeof AuthenticatedPosRoute
   '/print-settings': typeof AuthenticatedPrintSettingsRoute
   '/reports': typeof AuthenticatedReportsRoute
+  '/sales-summary': typeof AuthenticatedSalesSummaryRoute
   '/staff': typeof AuthenticatedStaffRoute
   '/timeclock': typeof AuthenticatedTimeclockRoute
   '/timeclock-report': typeof AuthenticatedTimeclockReportRoute
@@ -189,9 +206,11 @@ export interface FileRoutesById {
   '/_authenticated/inventory': typeof AuthenticatedInventoryRoute
   '/_authenticated/menu': typeof AuthenticatedMenuRoute
   '/_authenticated/payments': typeof AuthenticatedPaymentsRoute
+  '/_authenticated/payslip': typeof AuthenticatedPayslipRoute
   '/_authenticated/pos': typeof AuthenticatedPosRoute
   '/_authenticated/print-settings': typeof AuthenticatedPrintSettingsRoute
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
+  '/_authenticated/sales-summary': typeof AuthenticatedSalesSummaryRoute
   '/_authenticated/staff': typeof AuthenticatedStaffRoute
   '/_authenticated/timeclock': typeof AuthenticatedTimeclockRoute
   '/_authenticated/timeclock-report': typeof AuthenticatedTimeclockReportRoute
@@ -212,9 +231,11 @@ export interface FileRouteTypes {
     | '/inventory'
     | '/menu'
     | '/payments'
+    | '/payslip'
     | '/pos'
     | '/print-settings'
     | '/reports'
+    | '/sales-summary'
     | '/staff'
     | '/timeclock'
     | '/timeclock-report'
@@ -233,9 +254,11 @@ export interface FileRouteTypes {
     | '/inventory'
     | '/menu'
     | '/payments'
+    | '/payslip'
     | '/pos'
     | '/print-settings'
     | '/reports'
+    | '/sales-summary'
     | '/staff'
     | '/timeclock'
     | '/timeclock-report'
@@ -255,9 +278,11 @@ export interface FileRouteTypes {
     | '/_authenticated/inventory'
     | '/_authenticated/menu'
     | '/_authenticated/payments'
+    | '/_authenticated/payslip'
     | '/_authenticated/pos'
     | '/_authenticated/print-settings'
     | '/_authenticated/reports'
+    | '/_authenticated/sales-summary'
     | '/_authenticated/staff'
     | '/_authenticated/timeclock'
     | '/_authenticated/timeclock-report'
@@ -330,6 +355,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedStaffRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/sales-summary': {
+      id: '/_authenticated/sales-summary'
+      path: '/sales-summary'
+      fullPath: '/sales-summary'
+      preLoaderRoute: typeof AuthenticatedSalesSummaryRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/reports': {
       id: '/_authenticated/reports'
       path: '/reports'
@@ -349,6 +381,13 @@ declare module '@tanstack/react-router' {
       path: '/pos'
       fullPath: '/pos'
       preLoaderRoute: typeof AuthenticatedPosRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/payslip': {
+      id: '/_authenticated/payslip'
+      path: '/payslip'
+      fullPath: '/payslip'
+      preLoaderRoute: typeof AuthenticatedPayslipRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/payments': {
@@ -427,9 +466,11 @@ interface AuthenticatedRouteChildren {
   AuthenticatedInventoryRoute: typeof AuthenticatedInventoryRoute
   AuthenticatedMenuRoute: typeof AuthenticatedMenuRoute
   AuthenticatedPaymentsRoute: typeof AuthenticatedPaymentsRoute
+  AuthenticatedPayslipRoute: typeof AuthenticatedPayslipRoute
   AuthenticatedPosRoute: typeof AuthenticatedPosRoute
   AuthenticatedPrintSettingsRoute: typeof AuthenticatedPrintSettingsRoute
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
+  AuthenticatedSalesSummaryRoute: typeof AuthenticatedSalesSummaryRoute
   AuthenticatedStaffRoute: typeof AuthenticatedStaffRoute
   AuthenticatedTimeclockRoute: typeof AuthenticatedTimeclockRoute
   AuthenticatedTimeclockReportRoute: typeof AuthenticatedTimeclockReportRoute
@@ -445,9 +486,11 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedInventoryRoute: AuthenticatedInventoryRoute,
   AuthenticatedMenuRoute: AuthenticatedMenuRoute,
   AuthenticatedPaymentsRoute: AuthenticatedPaymentsRoute,
+  AuthenticatedPayslipRoute: AuthenticatedPayslipRoute,
   AuthenticatedPosRoute: AuthenticatedPosRoute,
   AuthenticatedPrintSettingsRoute: AuthenticatedPrintSettingsRoute,
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
+  AuthenticatedSalesSummaryRoute: AuthenticatedSalesSummaryRoute,
   AuthenticatedStaffRoute: AuthenticatedStaffRoute,
   AuthenticatedTimeclockRoute: AuthenticatedTimeclockRoute,
   AuthenticatedTimeclockReportRoute: AuthenticatedTimeclockReportRoute,
