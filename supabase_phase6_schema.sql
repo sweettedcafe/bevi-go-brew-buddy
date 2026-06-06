@@ -294,7 +294,7 @@ begin
             'notes', notes,
             'customization', customization,
             'addon_total', addon_total
-         ) order by created_at), '[]'::jsonb)
+         ) order by id), '[]'::jsonb)
     into v_items
     from public.order_items where order_id = p_order_id;
 
