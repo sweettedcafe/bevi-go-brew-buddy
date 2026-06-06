@@ -142,10 +142,10 @@ function SelfOrderPage() {
         ))}
       </div>
 
-      <div className="p-3 grid grid-cols-2 gap-2 pb-48">
+      <div className="p-3 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 pb-56 max-w-3xl mx-auto">
         {filtered.map((it) => (
           <button key={it.id} onClick={() => tap(it)}
-            className="text-left rounded-lg border bg-card hover:bg-accent transition-colors p-3">
+            className="text-left rounded-lg border bg-card hover:bg-accent active:scale-[0.98] transition-all p-3 min-h-[88px] touch-manipulation">
             <div className="font-medium leading-tight">{it.name}</div>
             {it.description && <div className="text-xs text-muted-foreground mt-1 line-clamp-2">{it.description}</div>}
             <div className="mt-2 font-display text-lg text-primary">{fmt(Number(it.price))}</div>
@@ -154,7 +154,7 @@ function SelfOrderPage() {
       </div>
 
       {cart.length > 0 && (
-        <div className="fixed bottom-0 inset-x-0 bg-card border-t shadow-lg p-3 space-y-2 max-h-[55vh] flex flex-col">
+        <div className="fixed bottom-0 inset-x-0 bg-card border-t shadow-lg p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] space-y-2 max-h-[60vh] flex flex-col">
           <div className="flex items-center gap-2">
             <Badge>{cart.reduce((n,l) => n + l.qty, 0)} items</Badge>
             <div className="ml-auto font-display text-xl text-primary">₱{fmt(subtotal)}</div>

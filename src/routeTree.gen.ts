@@ -24,11 +24,13 @@ import { Route as AuthenticatedPosRouteImport } from './routes/_authenticated/po
 import { Route as AuthenticatedPayslipRouteImport } from './routes/_authenticated/payslip'
 import { Route as AuthenticatedPaymentsRouteImport } from './routes/_authenticated/payments'
 import { Route as AuthenticatedMenuRouteImport } from './routes/_authenticated/menu'
+import { Route as AuthenticatedManualRouteImport } from './routes/_authenticated/manual'
 import { Route as AuthenticatedInventoryRouteImport } from './routes/_authenticated/inventory'
 import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticated/history'
 import { Route as AuthenticatedEosAdminRouteImport } from './routes/_authenticated/eos-admin'
 import { Route as AuthenticatedEndOfShiftRouteImport } from './routes/_authenticated/end-of-shift'
 import { Route as AuthenticatedDiscountsRouteImport } from './routes/_authenticated/discounts'
+import { Route as AuthenticatedDeveloperRouteImport } from './routes/_authenticated/developer'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCustomersRouteImport } from './routes/_authenticated/customers'
 import { Route as AuthenticatedBundlesRouteImport } from './routes/_authenticated/bundles'
@@ -111,6 +113,11 @@ const AuthenticatedMenuRoute = AuthenticatedMenuRouteImport.update({
   path: '/menu',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedManualRoute = AuthenticatedManualRouteImport.update({
+  id: '/manual',
+  path: '/manual',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedInventoryRoute = AuthenticatedInventoryRouteImport.update({
   id: '/inventory',
   path: '/inventory',
@@ -134,6 +141,11 @@ const AuthenticatedEndOfShiftRoute = AuthenticatedEndOfShiftRouteImport.update({
 const AuthenticatedDiscountsRoute = AuthenticatedDiscountsRouteImport.update({
   id: '/discounts',
   path: '/discounts',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedDeveloperRoute = AuthenticatedDeveloperRouteImport.update({
+  id: '/developer',
+  path: '/developer',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
@@ -165,11 +177,13 @@ export interface FileRoutesByFullPath {
   '/bundles': typeof AuthenticatedBundlesRoute
   '/customers': typeof AuthenticatedCustomersRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/developer': typeof AuthenticatedDeveloperRoute
   '/discounts': typeof AuthenticatedDiscountsRoute
   '/end-of-shift': typeof AuthenticatedEndOfShiftRoute
   '/eos-admin': typeof AuthenticatedEosAdminRoute
   '/history': typeof AuthenticatedHistoryRoute
   '/inventory': typeof AuthenticatedInventoryRoute
+  '/manual': typeof AuthenticatedManualRoute
   '/menu': typeof AuthenticatedMenuRoute
   '/payments': typeof AuthenticatedPaymentsRoute
   '/payslip': typeof AuthenticatedPayslipRoute
@@ -190,11 +204,13 @@ export interface FileRoutesByTo {
   '/bundles': typeof AuthenticatedBundlesRoute
   '/customers': typeof AuthenticatedCustomersRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/developer': typeof AuthenticatedDeveloperRoute
   '/discounts': typeof AuthenticatedDiscountsRoute
   '/end-of-shift': typeof AuthenticatedEndOfShiftRoute
   '/eos-admin': typeof AuthenticatedEosAdminRoute
   '/history': typeof AuthenticatedHistoryRoute
   '/inventory': typeof AuthenticatedInventoryRoute
+  '/manual': typeof AuthenticatedManualRoute
   '/menu': typeof AuthenticatedMenuRoute
   '/payments': typeof AuthenticatedPaymentsRoute
   '/payslip': typeof AuthenticatedPayslipRoute
@@ -217,11 +233,13 @@ export interface FileRoutesById {
   '/_authenticated/bundles': typeof AuthenticatedBundlesRoute
   '/_authenticated/customers': typeof AuthenticatedCustomersRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/developer': typeof AuthenticatedDeveloperRoute
   '/_authenticated/discounts': typeof AuthenticatedDiscountsRoute
   '/_authenticated/end-of-shift': typeof AuthenticatedEndOfShiftRoute
   '/_authenticated/eos-admin': typeof AuthenticatedEosAdminRoute
   '/_authenticated/history': typeof AuthenticatedHistoryRoute
   '/_authenticated/inventory': typeof AuthenticatedInventoryRoute
+  '/_authenticated/manual': typeof AuthenticatedManualRoute
   '/_authenticated/menu': typeof AuthenticatedMenuRoute
   '/_authenticated/payments': typeof AuthenticatedPaymentsRoute
   '/_authenticated/payslip': typeof AuthenticatedPayslipRoute
@@ -244,11 +262,13 @@ export interface FileRouteTypes {
     | '/bundles'
     | '/customers'
     | '/dashboard'
+    | '/developer'
     | '/discounts'
     | '/end-of-shift'
     | '/eos-admin'
     | '/history'
     | '/inventory'
+    | '/manual'
     | '/menu'
     | '/payments'
     | '/payslip'
@@ -269,11 +289,13 @@ export interface FileRouteTypes {
     | '/bundles'
     | '/customers'
     | '/dashboard'
+    | '/developer'
     | '/discounts'
     | '/end-of-shift'
     | '/eos-admin'
     | '/history'
     | '/inventory'
+    | '/manual'
     | '/menu'
     | '/payments'
     | '/payslip'
@@ -295,11 +317,13 @@ export interface FileRouteTypes {
     | '/_authenticated/bundles'
     | '/_authenticated/customers'
     | '/_authenticated/dashboard'
+    | '/_authenticated/developer'
     | '/_authenticated/discounts'
     | '/_authenticated/end-of-shift'
     | '/_authenticated/eos-admin'
     | '/_authenticated/history'
     | '/_authenticated/inventory'
+    | '/_authenticated/manual'
     | '/_authenticated/menu'
     | '/_authenticated/payments'
     | '/_authenticated/payslip'
@@ -428,6 +452,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMenuRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/manual': {
+      id: '/_authenticated/manual'
+      path: '/manual'
+      fullPath: '/manual'
+      preLoaderRoute: typeof AuthenticatedManualRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/inventory': {
       id: '/_authenticated/inventory'
       path: '/inventory'
@@ -461,6 +492,13 @@ declare module '@tanstack/react-router' {
       path: '/discounts'
       fullPath: '/discounts'
       preLoaderRoute: typeof AuthenticatedDiscountsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/developer': {
+      id: '/_authenticated/developer'
+      path: '/developer'
+      fullPath: '/developer'
+      preLoaderRoute: typeof AuthenticatedDeveloperRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/dashboard': {
@@ -499,11 +537,13 @@ interface AuthenticatedRouteChildren {
   AuthenticatedBundlesRoute: typeof AuthenticatedBundlesRoute
   AuthenticatedCustomersRoute: typeof AuthenticatedCustomersRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedDeveloperRoute: typeof AuthenticatedDeveloperRoute
   AuthenticatedDiscountsRoute: typeof AuthenticatedDiscountsRoute
   AuthenticatedEndOfShiftRoute: typeof AuthenticatedEndOfShiftRoute
   AuthenticatedEosAdminRoute: typeof AuthenticatedEosAdminRoute
   AuthenticatedHistoryRoute: typeof AuthenticatedHistoryRoute
   AuthenticatedInventoryRoute: typeof AuthenticatedInventoryRoute
+  AuthenticatedManualRoute: typeof AuthenticatedManualRoute
   AuthenticatedMenuRoute: typeof AuthenticatedMenuRoute
   AuthenticatedPaymentsRoute: typeof AuthenticatedPaymentsRoute
   AuthenticatedPayslipRoute: typeof AuthenticatedPayslipRoute
@@ -521,11 +561,13 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedBundlesRoute: AuthenticatedBundlesRoute,
   AuthenticatedCustomersRoute: AuthenticatedCustomersRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedDeveloperRoute: AuthenticatedDeveloperRoute,
   AuthenticatedDiscountsRoute: AuthenticatedDiscountsRoute,
   AuthenticatedEndOfShiftRoute: AuthenticatedEndOfShiftRoute,
   AuthenticatedEosAdminRoute: AuthenticatedEosAdminRoute,
   AuthenticatedHistoryRoute: AuthenticatedHistoryRoute,
   AuthenticatedInventoryRoute: AuthenticatedInventoryRoute,
+  AuthenticatedManualRoute: AuthenticatedManualRoute,
   AuthenticatedMenuRoute: AuthenticatedMenuRoute,
   AuthenticatedPaymentsRoute: AuthenticatedPaymentsRoute,
   AuthenticatedPayslipRoute: AuthenticatedPayslipRoute,

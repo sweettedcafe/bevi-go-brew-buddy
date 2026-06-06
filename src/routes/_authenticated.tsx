@@ -8,6 +8,7 @@ import {
   LayoutDashboard, ShoppingCart, Package, BookOpen, Users, Tag,
   CreditCard, BarChart3, Clock, ShieldCheck, LogOut, Receipt, Printer, Menu,
   ClipboardList, FileText, ChevronDown, ChevronRight, Coffee, Wallet, Settings, Gift, History,
+  HelpCircle, Wrench,
 } from "lucide-react";
 import type { AppRole } from "@/integrations/supabase/client";
 
@@ -64,6 +65,16 @@ const GROUPS: NavGroup[] = [
       { to: "/print-settings", label: "Print Settings", icon: Printer, roles: ["developer", "admin"] },
       { to: "/staff", label: "Staff & Roles", icon: ShieldCheck, roles: ["developer", "admin"] },
       { to: "/audit-log", label: "Audit Log", icon: History, roles: ["developer", "admin"] },
+    ],
+  },
+  {
+    id: "help", label: "Help", icon: HelpCircle, items: [
+      { to: "/manual", label: "User Manual", icon: HelpCircle, roles: ["developer", "admin", "barista"] },
+    ],
+  },
+  {
+    id: "developer", label: "Developer", icon: Wrench, items: [
+      { to: "/developer", label: "Developer Tools", icon: Wrench, roles: ["developer"] },
     ],
   },
 ];
