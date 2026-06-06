@@ -4,6 +4,9 @@
 -- Idempotent.
 -- =====================================================================
 
+create schema if not exists extensions;
+create extension if not exists pgcrypto with schema extensions;
+
 -- ---------- 1. CUSTOMERS ---------------------------------------------
 create table if not exists public.customers (
   id          uuid primary key default gen_random_uuid(),
@@ -81,10 +84,10 @@ begin
 end $$;
 
 create or replace function public._gen_customer_token()
-returns text language plpgsql as $$
+returns text language plpgsql security definer set search_path = public, extensions as $$
 declare v_token text;
 begin
-  v_token := encode(extensions.gen_random_bytes(18), 'base64');
+  v_token := encode(gen_random_bytes(18), 'base64');
   v_token := replace(replace(replace(v_token, '+',''), '/',''), '=','');
   return left(v_token, 22);
 end $$;
