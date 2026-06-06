@@ -154,7 +154,7 @@ function SelfOrderPage() {
       </div>
 
       {cart.length > 0 && (
-        <div className="fixed bottom-0 inset-x-0 bg-card border-t shadow-lg p-3 space-y-2 max-h-[55vh] flex flex-col">
+        <div className="fixed bottom-0 inset-x-0 bg-card border-t shadow-lg p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] space-y-2 max-h-[60vh] flex flex-col">
           <div className="flex items-center gap-2">
             <Badge>{cart.reduce((n,l) => n + l.qty, 0)} items</Badge>
             <div className="ml-auto font-display text-xl text-primary">₱{fmt(subtotal)}</div>
