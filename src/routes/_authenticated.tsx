@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import {
   LayoutDashboard, ShoppingCart, Package, BookOpen, Users, Tag,
-  CreditCard, BarChart3, Clock, ShieldCheck, LogOut, Receipt, Printer, Menu, ClipboardList,
+  CreditCard, BarChart3, Clock, ShieldCheck, LogOut, Receipt, Printer, Menu, ClipboardList, FileText,
 } from "lucide-react";
 import type { AppRole } from "@/integrations/supabase/client";
 
