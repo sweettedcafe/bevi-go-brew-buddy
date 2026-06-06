@@ -14,8 +14,10 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2, Settings2 } from "lucide-react";
 import { toast } from "sonner";
+import { MenuOptionsEditor } from "@/components/menu/MenuOptionsEditor";
+import { emptyOptions, hasAnyCustomization, type MenuOptions } from "@/lib/menu-options";
 
 export const Route = createFileRoute("/_authenticated/menu")({
   component: MenuPage,
@@ -29,6 +31,7 @@ type Item = {
   is_active: boolean;
   category_id: string | null;
   sort_order: number;
+  options: MenuOptions | null;
 };
 type Cat = { id: string; name: string };
 type Inv = { id: string; name: string; unit: string; is_active: boolean };
@@ -87,6 +90,7 @@ function MenuPage() {
           <Button size="sm" onClick={() => setEditing({
             id: "", name: "", description: "", price: 0,
             is_active: true, category_id: cats[0]?.id ?? null, sort_order: items.length + 1,
+            options: emptyOptions(),
           })}>
             <Plus className="h-3 w-3 mr-1" /> New item
           </Button>
@@ -108,6 +112,11 @@ function MenuPage() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium">{it.name}</span>
                       <Badge variant="secondary">{catName(it.category_id)}</Badge>
+                      {hasAnyCustomization(it.options) && (
+                        <Badge variant="outline" className="text-xs gap-1">
+                          <Settings2 className="h-3 w-3" /> customizable
+                        </Badge>
+                      )}
                       {!it.is_active && <Badge variant="outline">inactive</Badge>}
                     </div>
                     {it.description && (
@@ -177,6 +186,9 @@ function EditMenuDialog({
   const [rcs, setRcs] = useState<Array<{ inventory_item_id: string; qty: string }>>(
     initialRecipes.map((r) => ({ inventory_item_id: r.inventory_item_id, qty: String(r.qty_per_unit) })),
   );
+  const [options, setOptions] = useState<MenuOptions>(
+    (item.options && typeof item.options === "object") ? item.options : emptyOptions(),
+  );
   const [saving, setSaving] = useState(false);
   const activeInvs = useMemo(() => invs.filter((i) => i.is_active), [invs]);
 
@@ -190,6 +202,7 @@ function EditMenuDialog({
       category_id: f.category_id || null,
       is_active: f.is_active,
       sort_order: Number(f.sort_order) || 0,
+      options,
     };
     let id = item.id;
     if (id) {
@@ -293,6 +306,11 @@ function EditMenuDialog({
               })}
             </div>
           )}
+        </div>
+
+        <div className="mt-4 border-t pt-3">
+          <h3 className="font-medium text-sm mb-2">Customization options</h3>
+          <MenuOptionsEditor value={options} onChange={setOptions} />
         </div>
 
         <DialogFooter>

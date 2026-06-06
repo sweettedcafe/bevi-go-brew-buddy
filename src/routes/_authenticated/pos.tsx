@@ -12,11 +12,16 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Trash2, Plus, Minus, ShoppingCart, Coffee, Search, X, Tag, Pause, PlayCircle, ClipboardList } from "lucide-react";
+import { Trash2, Plus, Minus, ShoppingCart, Coffee, Search, X, Tag, Pause, PlayCircle, ClipboardList, Star } from "lucide-react";
 import { toast } from "sonner";
 import { loadPrintSettings } from "@/lib/print-settings";
 import { printHTML } from "@/lib/print";
 import { receiptHTML, labelsHTML, type DrinkLabel } from "@/lib/print-templates";
+import { CustomizeDialog } from "@/components/pos/CustomizeDialog";
+import {
+  type MenuOptions, type SelectedCustom,
+  hasAnyCustomization, addonTotal, customSignature, describeCustom,
+} from "@/lib/menu-options";
 
 export const Route = createFileRoute("/_authenticated/pos")({
   component: POSPage,
@@ -26,8 +31,19 @@ type Category = { id: string; name: string; sort_order: number; prints_label?: b
 type MenuItem = {
   id: string; category_id: string | null; name: string;
   description: string | null; price: number; is_active: boolean; sort_order: number;
+  options: MenuOptions | null;
 };
-type CartLine = { menu_item_id: string; name: string; unit_price: number; qty: number };
+type CartLine = {
+  lineId: string;
+  menu_item_id: string;
+  name: string;
+  base_price: number;
+  unit_price: number;
+  qty: number;
+  customization: SelectedCustom | null;
+  addon_total: number;
+  notes: string | null;
+};
 type OrderType = "dine_in" | "takeout" | "delivery";
 type PMConfig = {
   id: string; code: string; label: string;
@@ -63,19 +79,22 @@ function POSPage() {
   const [promoCode, setPromoCode] = useState("");
   const [appliedPromo, setAppliedPromo] = useState<{ code: string; label: string; amount: number } | null>(null);
   const [manual, setManual] = useState<ManualDiscount>(null);
+  const [topSellers, setTopSellers] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let alive = true;
     (async () => {
-      const [{ data: c }, { data: m }, { data: p }] = await Promise.all([
+      const [{ data: c }, { data: m }, { data: p }, { data: pop }] = await Promise.all([
         db.from("categories").select("id,name,sort_order,prints_label").eq("is_active", true).order("sort_order"),
         db.from("menu_items").select("*").eq("is_active", true).order("sort_order"),
         db.from("payment_methods").select("*").eq("is_active", true).order("sort_order"),
+        db.from("menu_item_popularity").select("menu_item_id,qty_sold").order("qty_sold", { ascending: false }).limit(3),
       ]);
       if (!alive) return;
       setCats((c ?? []) as Category[]);
       setItems((m ?? []) as MenuItem[]);
       setPms((p ?? []) as PMConfig[]);
+      setTopSellers(new Set((pop ?? []).map((r: any) => r.menu_item_id as string)));
       setLoading(false);
     })();
     return () => { alive = false; };
@@ -105,16 +124,68 @@ function POSPage() {
 
   const total = Math.max(0, subtotal - discountAmount);
 
+  // Customize dialog state
+  const [customizing, setCustomizing] = useState<{
+    item: MenuItem;
+    initial?: { custom: SelectedCustom | null; qty: number; notes: string };
+    editingLineId?: string;
+  } | null>(null);
+
+  function newLineId() {
+    return (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+  }
+
   function addItem(it: MenuItem) {
+    if (hasAnyCustomization(it.options)) {
+      setCustomizing({ item: it });
+      return;
+    }
     setCart((c) => {
-      const f = c.find((l) => l.menu_item_id === it.id);
-      if (f) return c.map((l) => l.menu_item_id === it.id ? { ...l, qty: l.qty + 1 } : l);
-      return [...c, { menu_item_id: it.id, name: it.name, unit_price: Number(it.price), qty: 1 }];
+      const sig = customSignature(null, null);
+      const f = c.find((l) => l.menu_item_id === it.id && customSignature(l.customization, l.notes) === sig);
+      if (f) return c.map((l) => l.lineId === f.lineId ? { ...l, qty: l.qty + 1 } : l);
+      const base = Number(it.price);
+      return [...c, {
+        lineId: newLineId(),
+        menu_item_id: it.id, name: it.name,
+        base_price: base, unit_price: base, qty: 1,
+        customization: null, addon_total: 0, notes: null,
+      }];
     });
   }
-  const changeQty = (id: string, d: number) =>
-    setCart((c) => c.map((l) => l.menu_item_id === id ? { ...l, qty: l.qty + d } : l).filter((l) => l.qty > 0));
-  const removeLine = (id: string) => setCart((c) => c.filter((l) => l.menu_item_id !== id));
+
+  function addCustomizedLine(args: {
+    item: MenuItem; custom: SelectedCustom; addon: number; qty: number; notes: string;
+    editingLineId?: string;
+  }) {
+    const base = Number(args.item.price);
+    const unit = base + args.addon;
+    const cleanNotes = args.notes.trim() || null;
+    setCart((c) => {
+      // If editing an existing line, replace it
+      if (args.editingLineId) {
+        return c.map((l) => l.lineId === args.editingLineId
+          ? { ...l, customization: args.custom, addon_total: args.addon, unit_price: unit, qty: args.qty, notes: cleanNotes }
+          : l);
+      }
+      // Merge if exact same customization+notes already exists
+      const sig = customSignature(args.custom, cleanNotes);
+      const dup = c.find((l) =>
+        l.menu_item_id === args.item.id &&
+        customSignature(l.customization, l.notes) === sig);
+      if (dup) return c.map((l) => l.lineId === dup.lineId ? { ...l, qty: l.qty + args.qty } : l);
+      return [...c, {
+        lineId: newLineId(),
+        menu_item_id: args.item.id, name: args.item.name,
+        base_price: base, unit_price: unit, qty: args.qty,
+        customization: args.custom, addon_total: args.addon, notes: cleanNotes,
+      }];
+    });
+  }
+
+  const changeQty = (lineId: string, d: number) =>
+    setCart((c) => c.map((l) => l.lineId === lineId ? { ...l, qty: l.qty + d } : l).filter((l) => l.qty > 0));
+  const removeLine = (lineId: string) => setCart((c) => c.filter((l) => l.lineId !== lineId));
   function clearAll() {
     setCart([]); setCustomerName("");
     setPromoCode(""); setAppliedPromo(null); setManual(null);
@@ -126,7 +197,11 @@ function POSPage() {
       p_payload: {
         order_type: orderType,
         customer_name: customerName || null,
-        items: cart.map((l) => ({ menu_item_id: l.menu_item_id, qty: l.qty })),
+        items: cart.map((l) => ({
+          menu_item_id: l.menu_item_id, qty: l.qty,
+          unit_price: l.unit_price, addon_total: l.addon_total,
+          customization: l.customization, notes: l.notes,
+        })),
       },
     });
     if (error) { toast.error(error.message); return; }
@@ -162,10 +237,18 @@ function POSPage() {
     const { data, error } = await db.rpc("pos_resume_order", { p_order_id: id });
     if (error) { toast.error(error.message); return; }
     const r = data as any;
-    setCart((r.items ?? []).map((it: any) => ({
-      menu_item_id: it.menu_item_id, name: it.name,
-      unit_price: Number(it.unit_price), qty: Number(it.qty),
-    })));
+    setCart((r.items ?? []).map((it: any) => {
+      const unit = Number(it.unit_price);
+      const addon = Number(it.addon_total ?? 0);
+      return {
+        lineId: newLineId(),
+        menu_item_id: it.menu_item_id, name: it.name,
+        base_price: unit - addon, unit_price: unit, qty: Number(it.qty),
+        customization: (it.customization ?? null) as SelectedCustom | null,
+        addon_total: addon,
+        notes: it.notes ?? null,
+      } as CartLine;
+    }));
     setCustomerName(r.customer_name ?? "");
     setOrderType((r.order_type as OrderType) ?? "takeout");
     setHoldOpen(false);
@@ -293,14 +376,28 @@ function POSPage() {
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-              {filtered.map((it) => (
-                <button key={it.id} onClick={() => addItem(it)}
-                  className="text-left rounded-lg border bg-card hover:bg-accent hover:border-primary/50 transition-colors p-4 shadow-sm">
-                  <div className="font-medium leading-tight">{it.name}</div>
-                  {it.description && <div className="text-xs text-muted-foreground mt-1 line-clamp-2">{it.description}</div>}
-                  <div className="mt-3 font-display text-lg text-primary">{fmt(Number(it.price))}</div>
-                </button>
-              ))}
+              {filtered.map((it) => {
+                const isPop = topSellers.has(it.id);
+                const customizable = hasAnyCustomization(it.options);
+                return (
+                  <button key={it.id} onClick={() => addItem(it)}
+                    className="relative text-left rounded-lg border bg-card hover:bg-accent hover:border-primary/50 transition-colors p-4 shadow-sm">
+                    {isPop && (
+                      <span className="absolute -top-2 -right-2 inline-flex items-center gap-1 rounded-full bg-primary text-primary-foreground text-[10px] px-2 py-0.5 shadow">
+                        <Star className="h-3 w-3 fill-current" /> Most Ordered
+                      </span>
+                    )}
+                    <div className="font-medium leading-tight">{it.name}</div>
+                    {it.description && <div className="text-xs text-muted-foreground mt-1 line-clamp-2">{it.description}</div>}
+                    <div className="mt-3 flex items-end justify-between gap-2">
+                      <div className="font-display text-lg text-primary">{fmt(Number(it.price))}</div>
+                      {customizable && (
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-wide">Customize</span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
@@ -336,22 +433,43 @@ function POSPage() {
           {cart.length === 0 ? (
             <div className="text-sm text-muted-foreground text-center py-10">Tap a menu item to add it.</div>
           ) : (
-            cart.map((l) => (
-              <Card key={l.menu_item_id} className="p-3">
-                <div className="flex items-start gap-2">
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium truncate">{l.name}</div>
-                    <div className="text-xs text-muted-foreground">{fmt(l.unit_price)} × {l.qty} = {fmt(l.unit_price * l.qty)}</div>
+            cart.map((l) => {
+              const desc = describeCustom(l.customization);
+              const itemRef = items.find((x) => x.id === l.menu_item_id);
+              const editable = hasAnyCustomization(itemRef?.options ?? null);
+              return (
+                <Card key={l.lineId} className="p-3">
+                  <div className="flex items-start gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium truncate">{l.name}</div>
+                      <div className="text-xs text-muted-foreground">{fmt(l.unit_price)} × {l.qty} = {fmt(l.unit_price * l.qty)}</div>
+                      {(desc.length > 0 || l.notes) && (
+                        <div className="mt-1 text-[11px] text-muted-foreground space-y-0.5">
+                          {desc.map((d, i) => <div key={i}>• {d}</div>)}
+                          {l.notes && <div className="italic">“{l.notes}”</div>}
+                        </div>
+                      )}
+                    </div>
+                    <Button size="icon" variant="ghost" onClick={() => removeLine(l.lineId)}><Trash2 className="h-4 w-4" /></Button>
                   </div>
-                  <Button size="icon" variant="ghost" onClick={() => removeLine(l.menu_item_id)}><Trash2 className="h-4 w-4" /></Button>
-                </div>
-                <div className="flex items-center gap-2 mt-2">
-                  <Button size="icon" variant="outline" onClick={() => changeQty(l.menu_item_id, -1)}><Minus className="h-3 w-3" /></Button>
-                  <span className="w-8 text-center font-medium">{l.qty}</span>
-                  <Button size="icon" variant="outline" onClick={() => changeQty(l.menu_item_id, 1)}><Plus className="h-3 w-3" /></Button>
-                </div>
-              </Card>
-            ))
+                  <div className="flex items-center gap-2 mt-2">
+                    <Button size="icon" variant="outline" onClick={() => changeQty(l.lineId, -1)}><Minus className="h-3 w-3" /></Button>
+                    <span className="w-8 text-center font-medium">{l.qty}</span>
+                    <Button size="icon" variant="outline" onClick={() => changeQty(l.lineId, 1)}><Plus className="h-3 w-3" /></Button>
+                    {editable && itemRef && (
+                      <Button size="sm" variant="ghost" className="ml-auto h-7 text-xs"
+                        onClick={() => setCustomizing({
+                          item: itemRef,
+                          initial: { custom: l.customization, qty: l.qty, notes: l.notes ?? "" },
+                          editingLineId: l.lineId,
+                        })}>
+                        Edit
+                      </Button>
+                    )}
+                  </div>
+                </Card>
+              );
+            })
           )}
         </div>
 
@@ -442,7 +560,11 @@ function POSPage() {
             order_type: orderType,
             customer_name: customerName || null,
             notes: null,
-            items: cart.map((l) => ({ menu_item_id: l.menu_item_id, qty: l.qty })),
+            items: cart.map((l) => ({
+              menu_item_id: l.menu_item_id, qty: l.qty,
+              unit_price: l.unit_price, addon_total: l.addon_total,
+              customization: l.customization, notes: l.notes,
+            })),
             discount_code: appliedPromo?.code ?? null,
             manual_discount: manual,
             payments,
@@ -512,6 +634,28 @@ function POSPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {customizing && (
+        <CustomizeDialog
+          open
+          onOpenChange={(o) => !o && setCustomizing(null)}
+          itemName={customizing.item.name}
+          basePrice={Number(customizing.item.price)}
+          options={customizing.item.options ?? {}}
+          initial={customizing.initial}
+          onConfirm={(res) => {
+            addCustomizedLine({
+              item: customizing.item,
+              custom: res.custom,
+              addon: res.addon,
+              qty: res.qty,
+              notes: res.notes,
+              editingLineId: customizing.editingLineId,
+            });
+            setCustomizing(null);
+          }}
+        />
+      )}
     </div>
   );
 }
