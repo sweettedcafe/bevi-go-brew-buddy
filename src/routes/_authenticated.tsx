@@ -7,7 +7,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import {
   LayoutDashboard, ShoppingCart, Package, BookOpen, Users, Tag,
   CreditCard, BarChart3, Clock, ShieldCheck, LogOut, Receipt, Printer, Menu,
-  ClipboardList, FileText, ChevronDown, ChevronRight, Coffee, Wallet, Settings, Gift,
+  ClipboardList, FileText, ChevronDown, ChevronRight, Coffee, Wallet, Settings, Gift, History,
 } from "lucide-react";
 import type { AppRole } from "@/integrations/supabase/client";
 
@@ -63,6 +63,7 @@ const GROUPS: NavGroup[] = [
       { to: "/payments", label: "Payment Methods", icon: CreditCard, roles: ["developer", "admin"] },
       { to: "/print-settings", label: "Print Settings", icon: Printer, roles: ["developer", "admin"] },
       { to: "/staff", label: "Staff & Roles", icon: ShieldCheck, roles: ["developer", "admin"] },
+      { to: "/audit-log", label: "Audit Log", icon: History, roles: ["developer", "admin"] },
     ],
   },
 ];
