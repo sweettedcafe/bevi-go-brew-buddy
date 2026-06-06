@@ -19,6 +19,7 @@ import { loadPosSettings } from "@/lib/pos-settings";
 import { printHTML } from "@/lib/print";
 import { receiptHTML, labelsHTML, type DrinkLabel } from "@/lib/print-templates";
 import { reprintReceiptById, reprintLabelsById } from "@/lib/reprint";
+import { randomQuote } from "@/lib/quotes";
 import { CustomizeDialog } from "@/components/pos/CustomizeDialog";
 import {
   type MenuOptions, type SelectedCustom,
@@ -390,6 +391,7 @@ function POSPage() {
             customerName: customerName || null,
             notes: null,
             createdAt: now,
+            quote: randomQuote(),
           });
         }
       }
