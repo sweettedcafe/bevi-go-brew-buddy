@@ -166,7 +166,9 @@ function InventoryPage() {
                   const fullPacks = packSize > 0 ? Math.floor(fullStock / packSize) : 0;
                   const packWord = r.pack_label || "pack";
                   return (
+                <>
                 <div className="flex flex-wrap items-center gap-3">
+
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium truncate">{r.name}</span>
