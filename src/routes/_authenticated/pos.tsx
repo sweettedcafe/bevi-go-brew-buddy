@@ -12,11 +12,12 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Trash2, Plus, Minus, ShoppingCart, Coffee, Search, X, Tag, Pause, PlayCircle, ClipboardList, Star } from "lucide-react";
+import { Trash2, Plus, Minus, ShoppingCart, Coffee, Search, X, Tag, Pause, PlayCircle, ClipboardList, Star, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { loadPrintSettings } from "@/lib/print-settings";
 import { printHTML } from "@/lib/print";
 import { receiptHTML, labelsHTML, type DrinkLabel } from "@/lib/print-templates";
+import { reprintReceiptById, reprintLabelsById } from "@/lib/reprint";
 import { CustomizeDialog } from "@/components/pos/CustomizeDialog";
 import {
   type MenuOptions, type SelectedCustom,
@@ -616,7 +617,7 @@ function POSPage() {
           ) : (
             <div className="space-y-2 max-h-[60vh] overflow-y-auto">
               {todayOrders.map((o) => (
-                <div key={o.id} className="rounded-md border p-3 flex items-center gap-3">
+                <div key={o.id} className="rounded-md border p-3 flex flex-wrap items-center gap-3">
                   <div className="font-display text-lg">#{String(o.order_no).padStart(3, "0")}</div>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium truncate">{o.customer_name || "Walk-in"}</div>
@@ -625,6 +626,22 @@ function POSPage() {
                     </div>
                   </div>
                   <div className="font-medium">{fmt(Number(o.total))}</div>
+                  <div className="flex gap-1">
+                    <Button size="sm" variant="outline" onClick={async () => {
+                      try { await reprintReceiptById(o.id, user?.email ?? "—"); }
+                      catch (e: any) { toast.error(e.message); }
+                    }}>
+                      <Printer className="h-3 w-3 mr-1" /> Receipt
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={async () => {
+                      try {
+                        const ok = await reprintLabelsById(o.id);
+                        if (!ok) toast.message("No drinks to label in this order.");
+                      } catch (e: any) { toast.error(e.message); }
+                    }}>
+                      <Tag className="h-3 w-3 mr-1" /> Labels
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
