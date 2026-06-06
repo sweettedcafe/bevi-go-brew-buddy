@@ -12,8 +12,9 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { AlertTriangle, Upload, Plus, Pencil } from "lucide-react";
+import { AlertTriangle, Upload, Download, Plus, Pencil } from "lucide-react";
 import { toast } from "sonner";
+import { toCsv, downloadCsv } from "@/lib/csv";
 
 export const Route = createFileRoute("/_authenticated/inventory")({
   component: InventoryPage,
@@ -95,6 +96,19 @@ function InventoryPage() {
               <Switch checked={showInactive} onCheckedChange={setShowInactive} id="si" />
               <label htmlFor="si" className="text-muted-foreground">Show inactive</label>
             </div>
+            <Button variant="outline" size="sm" onClick={() => {
+              const cols = ["name","unit","pack_size","pack_label","stock_qty","low_threshold","full_stock_qty","cost_per_unit","is_active"];
+              const csv = toCsv(rows.map((r) => ({
+                name: r.name, unit: r.unit, pack_size: r.pack_size, pack_label: r.pack_label ?? "",
+                stock_qty: r.stock_qty, low_threshold: r.low_threshold,
+                full_stock_qty: r.full_stock_qty ?? "", cost_per_unit: r.cost_per_unit,
+                is_active: r.is_active ? "true" : "false",
+              })), cols);
+              downloadCsv(`inventory-${new Date().toISOString().slice(0,10)}.csv`, csv);
+              toast.success(`Exported ${rows.length} item(s)`);
+            }}>
+              <Download className="h-3 w-3 mr-1" /> Export
+            </Button>
             <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
               <Upload className="h-3 w-3 mr-1" /> Import
             </Button>
