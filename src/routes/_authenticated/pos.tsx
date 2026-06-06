@@ -245,11 +245,8 @@ function POSPage() {
     }
   }
 
-  async function refreshCustomer() {
-    if (!customer) return;
-    const { data } = await db.rpc("customer_lookup", { p_code: customer.code });
-    if (data) setCustomer(data as LoyaltyCustomer);
-  }
+
+
 
   // Auto-focus the scanner input when enabled (re-focus on cart changes)
   useEffect(() => {
