@@ -67,6 +67,16 @@ const GROUPS: NavGroup[] = [
       { to: "/audit-log", label: "Audit Log", icon: History, roles: ["developer", "admin"] },
     ],
   },
+  {
+    id: "help", label: "Help", icon: HelpCircle, items: [
+      { to: "/manual", label: "User Manual", icon: HelpCircle, roles: ["developer", "admin", "barista"] },
+    ],
+  },
+  {
+    id: "developer", label: "Developer", icon: Wrench, items: [
+      { to: "/developer", label: "Developer Tools", icon: Wrench, roles: ["developer"] },
+    ],
+  },
 ];
 
 function AuthenticatedLayout() {
