@@ -108,8 +108,9 @@ function MenuPage() {
               onImported={() => void load()}
             />
             <Button size="sm" onClick={() => setEditing({
-              id: "", name: "", description: "", price: 0,
-              is_active: true, category_id: cats[0]?.id ?? null, sort_order: items.length + 1,
+              id: "", product_code: null, name: "", description: "", price: 0,
+              is_active: true, has_variants: false,
+              category_id: cats[0]?.id ?? null, sort_order: items.length + 1,
               options: emptyOptions(),
             })}>
               <Plus className="h-3 w-3 mr-1" /> New item
