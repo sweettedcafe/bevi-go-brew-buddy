@@ -56,6 +56,7 @@ function InventoryPage() {
   const [loading, setLoading] = useState(true);
   const [showInactive, setShowInactive] = useState(false);
   const [editing, setEditing] = useState<Inv | null>(null);
+  const [restock, setRestock] = useState<Inv | null>(null);
   const [importOpen, setImportOpen] = useState(false);
 
   async function load() {
