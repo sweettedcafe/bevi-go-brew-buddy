@@ -77,6 +77,7 @@ type DiscountRow = {
   min_subtotal: number; max_uses: number | null; uses_count: number;
   starts_at: string | null; ends_at: string | null; is_active: boolean;
   applies_to_item_id: string | null;
+  applies_to_item_ids: string[] | null;
 };
 
 const db = supabase as any;
