@@ -104,7 +104,9 @@ export function OrderDetailSheet({ orderId, onClose, onChanged, canReverse = tru
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             Order #{String(o.order_no).padStart(3, "0")}
-            <Badge variant={o.status === "completed" ? "default" : "secondary"} className="capitalize">{o.status}</Badge>
+            <Badge variant={isSale ? (o.status === "completed" ? "default" : "secondary") : "destructive"} className="capitalize">
+              {isSale ? o.status : (o.txn_kind === "void" ? "voided" : "refunded")}
+            </Badge>
             {!isSale && <Badge variant="outline" className="capitalize">{o.txn_kind}</Badge>}
           </DialogTitle>
         </DialogHeader>
