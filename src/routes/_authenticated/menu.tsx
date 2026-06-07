@@ -27,10 +27,12 @@ export const Route = createFileRoute("/_authenticated/menu")({
 
 type Item = {
   id: string;
+  product_code: string | null;
   name: string;
   description: string | null;
   price: number;
   is_active: boolean;
+  has_variants: boolean;
   category_id: string | null;
   sort_order: number;
   options: MenuOptions | null;
@@ -38,6 +40,11 @@ type Item = {
 type Cat = { id: string; name: string };
 type Inv = { id: string; name: string; unit: string; is_active: boolean };
 type Recipe = { menu_item_id: string; inventory_item_id: string; qty_per_unit: number };
+type Variant = {
+  id: string; menu_item_id: string; name: string; price: number;
+  sort_order: number; is_active: boolean;
+};
+type VariantRecipe = { variant_id: string; inventory_item_id: string; qty_per_unit: number };
 
 const db = supabase as any;
 
@@ -48,21 +55,27 @@ function MenuPage() {
   const [cats, setCats] = useState<Cat[]>([]);
   const [invs, setInvs] = useState<Inv[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [variants, setVariants] = useState<Variant[]>([]);
+  const [vrecipes, setVRecipes] = useState<VariantRecipe[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Item | null>(null);
 
   async function load() {
     setLoading(true);
-    const [{ data: m }, { data: c }, { data: i }, { data: r }] = await Promise.all([
+    const [{ data: m }, { data: c }, { data: i }, { data: r }, { data: v }, { data: vr }] = await Promise.all([
       db.from("menu_items").select("*").order("sort_order"),
       db.from("categories").select("id,name").order("sort_order"),
       db.from("inventory_items").select("id,name,unit,is_active").order("name"),
       db.from("recipes").select("*"),
+      db.from("menu_item_variants").select("*").order("sort_order"),
+      db.from("variant_recipes").select("*"),
     ]);
     setItems((m ?? []) as Item[]);
     setCats((c ?? []) as Cat[]);
     setInvs((i ?? []) as Inv[]);
     setRecipes((r ?? []) as Recipe[]);
+    setVariants((v ?? []) as Variant[]);
+    setVRecipes((vr ?? []) as VariantRecipe[]);
     setLoading(false);
   }
   useEffect(() => { void load(); }, []);
