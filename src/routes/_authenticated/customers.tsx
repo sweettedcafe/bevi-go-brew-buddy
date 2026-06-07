@@ -123,6 +123,33 @@ function CustomersPage() {
         )}
       </Card>
 
+      {isDev && deletedList.length > 0 && (
+        <Card className="p-4">
+          <div className="flex items-center gap-3 mb-3">
+            <Trash2 className="h-4 w-4 text-muted-foreground" />
+            <div className="font-display text-lg">Deleted customers</div>
+            <Badge variant="secondary">{deletedList.length}</Badge>
+            <span className="ml-auto text-xs text-muted-foreground">Developer-only · can be restored</span>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {deletedList.map((c) => (
+              <div key={c.id} className="rounded-md border p-3 bg-muted/40">
+                <div className="font-medium truncate">{c.name}</div>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  {c.phone ?? "—"} · code {c.code}
+                </div>
+                <div className="text-[10px] text-muted-foreground mt-1">
+                  Deleted {c.deleted_at ? new Date(c.deleted_at).toLocaleString() : "—"}
+                </div>
+                <Button size="sm" variant="outline" className="mt-2" onClick={() => restoreCustomer(c.id)}>
+                  <Undo2 className="h-3 w-3 mr-1" /> Restore
+                </Button>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
       {adding && (
         <RegisterDialog onClose={(created) => { setAdding(false); if (created) load(); }} />
       )}
