@@ -10,9 +10,10 @@ import { Switch } from "@/components/ui/switch";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { Users, QrCode, Plus, Search, Star, Printer, Save, ExternalLink } from "lucide-react";
+import { Users, QrCode, Plus, Search, Star, Printer, Save, ExternalLink, Trash2, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { QrCanvas, BarcodeSvg } from "@/components/customers/CodeRenderers";
+import { useAuth } from "@/lib/auth-context";
 
 export const Route = createFileRoute("/_authenticated/customers")({
   component: CustomersPage,
@@ -24,6 +25,7 @@ type Customer = {
   id: string; code: string; token: string;
   name: string; phone: string | null; email: string | null;
   points: number; is_active: boolean; created_at: string;
+  deleted_at?: string | null;
 };
 type Loyalty = {
   is_active: boolean; earn_rate: number;
@@ -31,7 +33,10 @@ type Loyalty = {
 };
 
 function CustomersPage() {
+  const { hasRole } = useAuth();
+  const isDev = hasRole("developer");
   const [list, setList] = useState<Customer[]>([]);
+  const [deletedList, setDeletedList] = useState<Customer[]>([]);
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
@@ -41,14 +46,25 @@ function CustomersPage() {
   async function load() {
     setLoading(true);
     const [{ data: c }, { data: l }] = await Promise.all([
-      db.from("customers").select("*").order("created_at", { ascending: false }),
+      db.from("customers").select("*").is("deleted_at", null).order("created_at", { ascending: false }),
       db.from("loyalty_settings").select("*").eq("id", 1).maybeSingle(),
     ]);
     setList((c ?? []) as Customer[]);
     if (l) setLoyalty(l as Loyalty);
+    if (isDev) {
+      const { data: d } = await db.rpc("dev_list_deleted_customers");
+      setDeletedList((d ?? []) as Customer[]);
+    }
     setLoading(false);
   }
   useEffect(() => { load(); }, []);
+
+  async function restoreCustomer(id: string) {
+    const { error } = await db.rpc("dev_restore_customer", { p_id: id });
+    if (error) { toast.error(error.message); return; }
+    toast.success("Customer restored");
+    load();
+  }
 
   const filtered = q.trim()
     ? list.filter((c) =>
@@ -106,6 +122,33 @@ function CustomersPage() {
           </div>
         )}
       </Card>
+
+      {isDev && deletedList.length > 0 && (
+        <Card className="p-4">
+          <div className="flex items-center gap-3 mb-3">
+            <Trash2 className="h-4 w-4 text-muted-foreground" />
+            <div className="font-display text-lg">Deleted customers</div>
+            <Badge variant="secondary">{deletedList.length}</Badge>
+            <span className="ml-auto text-xs text-muted-foreground">Developer-only · can be restored</span>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {deletedList.map((c) => (
+              <div key={c.id} className="rounded-md border p-3 bg-muted/40">
+                <div className="font-medium truncate">{c.name}</div>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  {c.phone ?? "—"} · code {c.code}
+                </div>
+                <div className="text-[10px] text-muted-foreground mt-1">
+                  Deleted {c.deleted_at ? new Date(c.deleted_at).toLocaleString() : "—"}
+                </div>
+                <Button size="sm" variant="outline" className="mt-2" onClick={() => restoreCustomer(c.id)}>
+                  <Undo2 className="h-3 w-3 mr-1" /> Restore
+                </Button>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {adding && (
         <RegisterDialog onClose={(created) => { setAdding(false); if (created) load(); }} />
@@ -204,9 +247,22 @@ function RegisterDialog({ onClose }: { onClose: (created: boolean) => void }) {
 }
 
 function CustomerDetailDialog({ customer, onClose }: { customer: Customer; onClose: (changed: boolean) => void }) {
+  const { hasRole } = useAuth();
+  const canDelete = hasRole("admin") || hasRole("developer");
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(false);
   const orderUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/o/${customer.token}`;
+
+  async function deleteCustomer() {
+    if (!confirm(`Delete customer "${customer.name}"? A developer can restore it later.`)) return;
+    setDeleting(true);
+    const { error } = await db.rpc("admin_delete_customer", { p_id: customer.id });
+    setDeleting(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Customer deleted");
+    onClose(true);
+  }
 
   useEffect(() => {
     (async () => {
@@ -275,7 +331,12 @@ function CustomerDetailDialog({ customer, onClose }: { customer: Customer; onClo
             <div className="text-[10px] text-muted-foreground break-all">{orderUrl}</div>
           </div>
         </div>
-        <DialogFooter>
+        <DialogFooter className="gap-2">
+          {canDelete && (
+            <Button variant="destructive" onClick={deleteCustomer} disabled={deleting} className="mr-auto">
+              <Trash2 className="h-3 w-3 mr-1" /> Delete
+            </Button>
+          )}
           <Button variant="outline" onClick={printCard}><Printer className="h-3 w-3 mr-1" />Print card</Button>
           <Button onClick={() => onClose(false)}>Close</Button>
         </DialogFooter>
