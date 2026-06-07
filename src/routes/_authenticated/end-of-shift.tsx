@@ -377,3 +377,98 @@ function buildSummary(r: EOS, totalNet: number, cashNet: number, expectedCash: n
   else r.expenses.forEach((e) => lines.push(`- ${e.description}${e.category ? ` [${e.category}]` : ""}: ${peso(e.amount)}`));
   return lines.join("\n");
 }
+
+type ReceiptProps = { report: EOS; totalNet: number; cashNet: number; expectedCash: number };
+
+const ShiftReceipt = forwardRef<HTMLDivElement, ReceiptProps>(function ShiftReceipt(
+  { report: r, totalNet, cashNet, expectedCash }, ref,
+) {
+  const peso = (n: number | string) => `₱${Number(n).toFixed(2)}`;
+  const fmt = (iso: string | null) => iso
+    ? new Intl.DateTimeFormat("en-PH", { timeZone: "Asia/Manila", dateStyle: "medium", timeStyle: "short" }).format(new Date(iso))
+    : "—";
+  return (
+    <div
+      ref={ref}
+      style={{ fontFamily: "ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif" }}
+      className="bg-white text-zinc-900 rounded-lg border border-zinc-200 shadow-sm p-6 w-full max-w-[420px] mx-auto"
+    >
+      <div className="text-center border-b border-dashed border-zinc-300 pb-3 mb-3">
+        <div className="text-base font-bold tracking-wide">BEVI &amp; GO</div>
+        <div className="text-xs text-zinc-500 mt-0.5">End of Shift Report</div>
+        <div className="text-[11px] text-zinc-500">{r.shift.business_date} · Manila</div>
+      </div>
+
+      <div className="text-[12px] space-y-1">
+        <Row label="Barista" value={r.user_email ?? "—"} />
+        <Row label="Time in" value={fmt(r.shift.clock_in)} />
+        <Row label="Time out" value={r.shift.clock_out ? fmt(r.shift.clock_out) : "in progress"} />
+        <Row label="Breaks" value={`${(r.break_seconds / 60).toFixed(0)} min`} />
+        <Row label="Leave" value={`${r.leave_hours_deducted} h (approved)`} />
+        <Row label="Worked" value={`${r.net_worked_hours} h (net)`} />
+      </div>
+
+      <SectionTitle>Net by payment method</SectionTitle>
+      <div className="text-[12px] space-y-1">
+        {r.payments.length === 0 ? (
+          <div className="text-zinc-500 italic">(no paid orders)</div>
+        ) : r.payments.map((p) => (
+          <div key={p.method} className="flex justify-between">
+            <span className="capitalize">{p.method} · {p.count} {p.count === 1 ? "order" : "orders"}</span>
+            <span className="tabular-nums">{peso(p.net)}</span>
+          </div>
+        ))}
+        <div className="flex justify-between border-t border-dashed border-zinc-300 pt-1 mt-1 font-semibold">
+          <span>TOTAL NET</span>
+          <span className="tabular-nums">{peso(totalNet)}</span>
+        </div>
+      </div>
+
+      <SectionTitle>Cash drawer</SectionTitle>
+      <div className="text-[12px] space-y-1">
+        <Row label="Starting cash" value={peso(r.shift.starting_cash)} mono />
+        <Row label="Cash sales (net)" value={peso(cashNet)} mono />
+        <Row label="Expenses paid" value={peso(r.total_expenses)} mono />
+        <div className="flex justify-between font-semibold border-t border-dashed border-zinc-300 pt-1 mt-1">
+          <span>Expected on hand</span>
+          <span className="tabular-nums">{peso(expectedCash)}</span>
+        </div>
+      </div>
+
+      <SectionTitle>Expenses</SectionTitle>
+      <div className="text-[12px] space-y-1">
+        {r.expenses.length === 0 ? (
+          <div className="text-zinc-500 italic">(none)</div>
+        ) : r.expenses.map((e) => (
+          <div key={e.id} className="flex justify-between gap-2">
+            <span className="truncate">
+              {e.description}{e.category ? ` · ${e.category}` : ""}
+            </span>
+            <span className="tabular-nums">{peso(e.amount)}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="text-center text-[10px] text-zinc-400 mt-4 pt-3 border-t border-dashed border-zinc-300">
+        Generated {new Intl.DateTimeFormat("en-PH", { timeZone: "Asia/Manila", dateStyle: "medium", timeStyle: "short" }).format(new Date())}
+      </div>
+    </div>
+  );
+});
+
+function Row({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
+  return (
+    <div className="flex justify-between gap-3">
+      <span className="text-zinc-500">{label}</span>
+      <span className={mono ? "tabular-nums" : ""}>{value}</span>
+    </div>
+  );
+}
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="text-[11px] uppercase tracking-wider text-zinc-500 mt-4 mb-1 border-b border-dashed border-zinc-300 pb-1">
+      {children}
+    </div>
+  );
+}
