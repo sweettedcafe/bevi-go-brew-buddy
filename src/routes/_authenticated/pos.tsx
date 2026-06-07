@@ -78,7 +78,7 @@ function POSPage() {
   const [variants, setVariants] = useState<Variant[]>([]);
   const [pms, setPms] = useState<PMConfig[]>([]);
   const [activeCat, setActiveCat] = useState<string | "all" | "__bundles__">("all");
-  const [variantPick, setVariantPick] = useState<MenuItem | null>(null);
+  
   const [query, setQuery] = useState("");
   const [cart, setCart] = useState<CartLine[]>([]);
   const [orderType, setOrderType] = useState<OrderType>("takeout");
@@ -179,9 +179,9 @@ function POSPage() {
 
   function addItem(it: MenuItem) {
     if (it.has_variants) {
-      const hasAny = variants.some((v) => v.menu_item_id === it.id);
+      const hasAny = variants.some((v) => v.menu_item_id === it.id && v.is_active !== false);
       if (!hasAny) { toast.error(`${it.name} has no variants configured`); return; }
-      setVariantPick(it);
+      setCustomizing({ item: it });
       return;
     }
     if (hasAnyCustomization(it.options)) {
@@ -213,28 +213,34 @@ function POSPage() {
 
   function addCustomizedLine(args: {
     item: MenuItem; custom: SelectedCustom; addon: number; qty: number; notes: string;
+    variant: { id: string; name: string; price: number } | null;
     editingLineId?: string;
   }) {
-    const base = Number(args.item.price);
+    const base = Number(args.variant?.price ?? args.item.price);
     const unit = base + args.addon;
     const cleanNotes = args.notes.trim() || null;
+    const variantId = args.variant?.id ?? null;
+    const variantName = args.variant?.name ?? null;
+    const displayName = args.variant ? `${args.item.name} — ${args.variant.name}` : args.item.name;
     setCart((c) => {
       if (args.editingLineId) {
         return c.map((l) => l.lineId === args.editingLineId
-          ? { ...l, customization: args.custom, addon_total: args.addon, unit_price: unit, qty: args.qty, notes: cleanNotes }
+          ? { ...l, customization: args.custom, addon_total: args.addon, unit_price: unit, qty: args.qty, notes: cleanNotes,
+              variant_id: variantId, variant_name: variantName, name: displayName, base_price: base }
           : l);
       }
       const sig = customSignature(args.custom, cleanNotes);
       const dup = c.find((l) =>
         l.menu_item_id === args.item.id &&
+        l.variant_id === variantId &&
         customSignature(l.customization, l.notes) === sig);
       if (dup) return c.map((l) => l.lineId === dup.lineId ? { ...l, qty: l.qty + args.qty } : l);
       return [...c, {
         lineId: newLineId(),
         menu_item_id: args.item.id,
-        variant_id: null,
-        variant_name: null,
-        name: args.item.name,
+        variant_id: variantId,
+        variant_name: variantName,
+        name: displayName,
         base_price: base, unit_price: unit, qty: args.qty,
         customization: args.custom, addon_total: args.addon, notes: cleanNotes,
       }];
@@ -926,6 +932,13 @@ function POSPage() {
           itemName={customizing.item.name}
           basePrice={Number(customizing.item.price)}
           options={customizing.item.options ?? {}}
+          variants={
+            customizing.item.has_variants
+              ? variants
+                  .filter((v) => v.menu_item_id === customizing.item.id && v.is_active !== false)
+                  .map((v) => ({ id: v.id, name: v.name, price: Number(v.price), sort_order: v.sort_order }))
+              : undefined
+          }
           initial={customizing.initial}
           onConfirm={(res) => {
             addCustomizedLine({
@@ -934,6 +947,7 @@ function POSPage() {
               addon: res.addon,
               qty: res.qty,
               notes: res.notes,
+              variant: res.variant,
               editingLineId: customizing.editingLineId,
             });
             setCustomizing(null);
@@ -941,28 +955,6 @@ function POSPage() {
         />
       )}
 
-      {variantPick && (
-        <Dialog open onOpenChange={(o) => !o && setVariantPick(null)}>
-          <DialogContent className="max-w-sm">
-            <DialogHeader>
-              <DialogTitle>Choose size — {variantPick.name}</DialogTitle>
-            </DialogHeader>
-            <div className="grid gap-2">
-              {variants
-                .filter((v) => v.menu_item_id === variantPick.id)
-                .sort((a,b) => a.sort_order - b.sort_order)
-                .map((v) => (
-                  <button key={v.id}
-                    onClick={() => { addPlainLine(variantPick, v); setVariantPick(null); }}
-                    className="flex items-center justify-between rounded-md border p-3 hover:bg-accent transition-colors">
-                    <span className="font-medium">{v.name}</span>
-                    <span className="font-display text-primary">{fmt(Number(v.price))}</span>
-                  </button>
-                ))}
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
     </div>
   );
 }

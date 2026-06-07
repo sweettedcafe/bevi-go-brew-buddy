@@ -14,22 +14,40 @@ import {
 
 const fmt = (n: number) => n.toFixed(2);
 
+export type VariantChoice = {
+  id: string;
+  name: string;
+  price: number;
+  sort_order?: number;
+};
+
 export function CustomizeDialog({
   open, onOpenChange, itemName, basePrice, options, onConfirm,
-  initial,
+  initial, variants,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   itemName: string;
   basePrice: number;
   options: MenuOptions;
-  initial?: { custom: SelectedCustom | null; qty: number; notes: string };
-  onConfirm: (sel: { custom: SelectedCustom; addon: number; qty: number; notes: string }) => void;
+  variants?: VariantChoice[];
+  initial?: { custom: SelectedCustom | null; qty: number; notes: string; variantId?: string | null };
+  onConfirm: (sel: {
+    custom: SelectedCustom; addon: number; qty: number; notes: string;
+    variant: VariantChoice | null;
+  }) => void;
 }) {
   const defSize = useMemo(
     () => options.sizes?.find((s) => s.is_default) ?? options.sizes?.[0] ?? null,
     [options.sizes],
   );
+  const sortedVariants = useMemo(
+    () => (variants ?? []).slice().sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)),
+    [variants],
+  );
+  const hasVariants = sortedVariants.length > 0;
+
+  const [variantId, setVariantId] = useState<string | null>(null);
   const [size, setSize] = useState<PriceOption | null>(null);
   const [milk, setMilk] = useState<PriceOption | null>(null);
   const [extras, setExtras] = useState<PriceOption[]>([]);
@@ -41,6 +59,7 @@ export function CustomizeDialog({
 
   useEffect(() => {
     if (!open) return;
+    setVariantId(initial?.variantId ?? sortedVariants[0]?.id ?? null);
     setSize(initial?.custom?.size ?? defSize);
     setMilk(initial?.custom?.milk ?? null);
     setExtras(initial?.custom?.extras ?? []);
@@ -48,7 +67,11 @@ export function CustomizeDialog({
     setOtherLabel(""); setOtherPrice("");
     setQty(initial?.qty ?? 1);
     setNotes(initial?.notes ?? "");
-  }, [open, initial, defSize]);
+  }, [open, initial, defSize, sortedVariants]);
+
+  const selectedVariant = hasVariants
+    ? (sortedVariants.find((v) => v.id === variantId) ?? null)
+    : null;
 
   const sel: SelectedCustom = {
     size: size ?? undefined,
@@ -57,7 +80,8 @@ export function CustomizeDialog({
     other: other.length ? other : undefined,
   };
   const addon = addonTotal(sel);
-  const unit = Number(basePrice) + addon;
+  const base = selectedVariant ? Number(selectedVariant.price) : Number(basePrice);
+  const unit = base + addon;
   const sizes = options.sizes ?? [];
   const milks = options.milks ?? [];
   const exs = options.extras ?? [];
@@ -78,8 +102,13 @@ export function CustomizeDialog({
   }
 
   function confirm() {
-    onConfirm({ custom: sel, addon, qty: Math.max(1, qty), notes: notes.trim() });
+    onConfirm({
+      custom: sel, addon, qty: Math.max(1, qty), notes: notes.trim(),
+      variant: selectedVariant,
+    });
   }
+
+  const disabled = (sizeRequired && !size) || (hasVariants && !selectedVariant);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -89,7 +118,27 @@ export function CustomizeDialog({
         </DialogHeader>
 
         <div className="space-y-4 text-sm">
-          {sizes.length > 0 && (
+          {hasVariants && (
+            <section>
+              <div className="text-xs font-medium text-muted-foreground mb-2">
+                Size <span className="text-destructive">*</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {sortedVariants.map((v) => (
+                  <button key={v.id}
+                    onClick={() => setVariantId(v.id)}
+                    className={`rounded-md border p-2 text-left transition-colors ${
+                      variantId === v.id ? "border-primary bg-primary/10" : "hover:bg-accent"
+                    }`}>
+                    <div className="font-medium leading-tight">{v.name}</div>
+                    <div className="text-xs text-muted-foreground">{fmt(Number(v.price))}</div>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {!hasVariants && sizes.length > 0 && (
             <section>
               <div className="text-xs font-medium text-muted-foreground mb-2">
                 Size {sizeRequired && <span className="text-destructive">*</span>}
@@ -203,7 +252,7 @@ export function CustomizeDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={confirm} disabled={sizeRequired && !size}>
+          <Button onClick={confirm} disabled={disabled}>
             Add — {fmt(unit * Math.max(1, qty))}
           </Button>
         </DialogFooter>

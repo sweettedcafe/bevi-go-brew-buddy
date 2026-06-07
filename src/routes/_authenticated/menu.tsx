@@ -34,10 +34,12 @@ type Item = {
   is_active: boolean;
   has_variants: boolean;
   category_id: string | null;
+  owner_id: string | null;
   sort_order: number;
   options: MenuOptions | null;
 };
 type Cat = { id: string; name: string };
+type Owner = { id: string; name: string; is_active: boolean };
 type Inv = { id: string; name: string; unit: string; is_active: boolean };
 type Recipe = { menu_item_id: string; inventory_item_id: string; qty_per_unit: number };
 type Variant = {
@@ -53,18 +55,21 @@ function MenuPage() {
   const isAdmin = primaryRole === "admin" || primaryRole === "developer";
   const [items, setItems] = useState<Item[]>([]);
   const [cats, setCats] = useState<Cat[]>([]);
+  const [owners, setOwners] = useState<Owner[]>([]);
   const [invs, setInvs] = useState<Inv[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [variants, setVariants] = useState<Variant[]>([]);
   const [vrecipes, setVRecipes] = useState<VariantRecipe[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Item | null>(null);
+  const [deleting, setDeleting] = useState<Item | null>(null);
 
   async function load() {
     setLoading(true);
-    const [{ data: m }, { data: c }, { data: i }, { data: r }, { data: v }, { data: vr }] = await Promise.all([
+    const [{ data: m }, { data: c }, { data: o }, { data: i }, { data: r }, { data: v }, { data: vr }] = await Promise.all([
       db.from("menu_items").select("*").order("sort_order"),
       db.from("categories").select("id,name").order("sort_order"),
+      db.from("owners").select("id,name,is_active").eq("is_active", true).order("name"),
       db.from("inventory_items").select("id,name,unit,is_active").order("name"),
       db.from("recipes").select("*"),
       db.from("menu_item_variants").select("*").order("sort_order"),
@@ -72,6 +77,7 @@ function MenuPage() {
     ]);
     setItems((m ?? []) as Item[]);
     setCats((c ?? []) as Cat[]);
+    setOwners((o ?? []) as Owner[]);
     setInvs((i ?? []) as Inv[]);
     setRecipes((r ?? []) as Recipe[]);
     setVariants((v ?? []) as Variant[]);
@@ -81,6 +87,7 @@ function MenuPage() {
   useEffect(() => { void load(); }, []);
 
   const catName = (id: string | null) => cats.find((c) => c.id === id)?.name ?? "—";
+  const ownerName = (id: string | null) => owners.find((o) => o.id === id)?.name ?? null;
   const itemRecipes = (id: string) => recipes.filter((r) => r.menu_item_id === id);
   const invName = (id: string) => invs.find((i) => i.id === id);
 
@@ -89,6 +96,26 @@ function MenuPage() {
       .update({ is_active: !it.is_active }).eq("id", it.id);
     if (error) return toast.error(error.message);
     toast.success(`${it.name} ${!it.is_active ? "activated" : "deactivated"}`);
+    void load();
+  }
+
+  async function confirmDelete(it: Item) {
+    // Try hard delete; if FK from order_items blocks it, fall back to soft delete (deactivate).
+    const { error } = await db.from("menu_items").delete().eq("id", it.id);
+    if (error) {
+      const msg = String(error.message || "").toLowerCase();
+      if (msg.includes("foreign key") || msg.includes("violates")) {
+        const { error: e2 } = await db.from("menu_items").update({ is_active: false }).eq("id", it.id);
+        if (e2) { setDeleting(null); return toast.error(e2.message); }
+        toast.success(`${it.name} has past orders — deactivated instead of deleted.`);
+      } else {
+        setDeleting(null);
+        return toast.error(error.message);
+      }
+    } else {
+      toast.success(`${it.name} deleted`);
+    }
+    setDeleting(null);
     void load();
   }
 
@@ -110,7 +137,8 @@ function MenuPage() {
             <Button size="sm" onClick={() => setEditing({
               id: "", product_code: null, name: "", description: "", price: 0,
               is_active: true, has_variants: false,
-              category_id: cats[0]?.id ?? null, sort_order: items.length + 1,
+              category_id: cats[0]?.id ?? null, owner_id: null,
+              sort_order: items.length + 1,
               options: emptyOptions(),
             })}>
               <Plus className="h-3 w-3 mr-1" /> New item
@@ -138,6 +166,9 @@ function MenuPage() {
                         <Badge variant="outline" className="text-[10px] font-mono">{it.product_code}</Badge>
                       )}
                       <Badge variant="secondary">{catName(it.category_id)}</Badge>
+                      {ownerName(it.owner_id) && (
+                        <Badge variant="outline" className="text-xs">{ownerName(it.owner_id)}</Badge>
+                      )}
                       {it.has_variants && (
                         <Badge className="bg-primary/15 text-primary hover:bg-primary/15">variants</Badge>
                       )}
@@ -190,6 +221,11 @@ function MenuPage() {
                       <Button size="icon" variant="ghost" onClick={() => setEditing(it)}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
+                      <Button size="icon" variant="ghost"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => setDeleting(it)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
                     </div>
                   )}
                 </div>
@@ -203,35 +239,59 @@ function MenuPage() {
         <EditMenuDialog
           item={editing}
           cats={cats}
+          owners={owners}
           invs={invs}
           initialRecipes={editing.id ? itemRecipes(editing.id) : []}
           initialVariants={editing.id ? variants.filter((v) => v.menu_item_id === editing.id) : []}
           allVariantRecipes={vrecipes}
           onClose={() => setEditing(null)}
           onSaved={() => { setEditing(null); void load(); }}
+          onOwnersChanged={() => void load()}
         />
+      )}
+      {deleting && (
+        <Dialog open onOpenChange={(o) => !o && setDeleting(null)}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Delete menu item?</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">
+              Delete <span className="font-medium text-foreground">{deleting.name}</span>?
+              If this item appears in past orders, it will be deactivated instead of removed
+              so reports stay accurate.
+            </p>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeleting(null)}>Cancel</Button>
+              <Button variant="destructive" onClick={() => void confirmDelete(deleting)}>Delete</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );
 }
 
 function EditMenuDialog({
-  item, cats, invs, initialRecipes, initialVariants, allVariantRecipes, onClose, onSaved,
+  item, cats, owners, invs, initialRecipes, initialVariants, allVariantRecipes,
+  onClose, onSaved, onOwnersChanged,
 }: {
   item: Item;
   cats: Cat[];
+  owners: Owner[];
   invs: Inv[];
   initialRecipes: Recipe[];
   initialVariants: Variant[];
   allVariantRecipes: VariantRecipe[];
   onClose: () => void;
   onSaved: () => void;
+  onOwnersChanged: () => void;
 }) {
   const [f, setF] = useState({
     name: item.name,
     description: item.description ?? "",
     price: String(item.price),
     category_id: item.category_id ?? "",
+    owner_id: item.owner_id ?? "",
     is_active: item.is_active,
     has_variants: item.has_variants,
     sort_order: String(item.sort_order),
@@ -271,6 +331,7 @@ function EditMenuDialog({
       description: f.description.trim() || null,
       price: Number(f.price) || 0,
       category_id: f.category_id || null,
+      owner_id: f.owner_id || null,
       is_active: f.is_active,
       has_variants: f.has_variants,
       sort_order: Number(f.sort_order) || 0,
@@ -396,6 +457,30 @@ function EditMenuDialog({
                 {cats.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
               </SelectContent>
             </Select>
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground">Owner</label>
+            <div className="flex gap-2">
+              <Select value={f.owner_id || "__none__"} onValueChange={(v) => setF({ ...f, owner_id: v === "__none__" ? "" : v })}>
+                <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">—</SelectItem>
+                  {owners.map((o) => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Button type="button" size="sm" variant="outline"
+                onClick={async () => {
+                  const name = window.prompt("New owner name (e.g. Coffee Bar, Pastry Co.)")?.trim();
+                  if (!name) return;
+                  const { data, error } = await db.from("owners")
+                    .insert({ name }).select("id").single();
+                  if (error) return toast.error(error.message);
+                  setF((cur) => ({ ...cur, owner_id: data.id }));
+                  onOwnersChanged();
+                }}>
+                <Plus className="h-3 w-3" />
+              </Button>
+            </div>
           </div>
           <div>
             <label className="text-xs text-muted-foreground">Sort order</label>
