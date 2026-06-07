@@ -281,15 +281,15 @@ function CustomerDetailDialog({ customer, onClose }: { customer: Customer; onClo
       <body>
         <h2>${customer.name}</h2>
         <p>Customer code: <b>${customer.code}</b></p>
-        <div id="bc"></div>
+        <p style="margin:8px 0 4px;font-size:12px;color:#666">Scan to identify customer</p>
+        <div id="bc" style="display:flex;justify-content:center"></div>
         <p style="margin-top:24px">Scan to order:</p>
-        <div id="qr"></div>
+        <div id="qr" style="display:flex;justify-content:center"></div>
         <p style="font-size:11px;color:#666">${orderUrl}</p>
-        <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3/dist/JsBarcode.all.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/qrcode@1/build/qrcode.min.js"></script>
         <script>
-          JsBarcode(document.getElementById('bc'),'${customer.code}',{format:'CODE128',height:60});
-          QRCode.toCanvas(document.createElement('canvas'),'${orderUrl}',{width:200},(err,c)=>{document.getElementById('qr').appendChild(c)});
+          QRCode.toCanvas(document.createElement('canvas'),'${customer.code}',{width:180,margin:1},(err,c)=>{document.getElementById('bc').appendChild(c)});
+          QRCode.toCanvas(document.createElement('canvas'),'${orderUrl}',{width:200,margin:1},(err,c)=>{document.getElementById('qr').appendChild(c)});
           setTimeout(()=>window.print(),500);
         </script>
       </body></html>`);
@@ -324,8 +324,8 @@ function CustomerDetailDialog({ customer, onClose }: { customer: Customer; onClo
             </div>
           </div>
           <div className="space-y-3 text-center">
-            <div className="text-xs text-muted-foreground">Barcode (barista scans)</div>
-            <BarcodeSvg value={customer.code} />
+            <div className="text-xs text-muted-foreground">QR code (barista scans)</div>
+            <div className="flex justify-center"><BarcodeSvg value={customer.code} /></div>
             <div className="text-xs text-muted-foreground mt-2">QR (customer scans to order)</div>
             <div className="flex justify-center"><QrCanvas value={orderUrl} size={180} /></div>
             <div className="text-[10px] text-muted-foreground break-all">{orderUrl}</div>
