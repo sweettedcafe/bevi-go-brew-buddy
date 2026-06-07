@@ -10,9 +10,10 @@ import { Switch } from "@/components/ui/switch";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { Users, QrCode, Plus, Search, Star, Printer, Save, ExternalLink } from "lucide-react";
+import { Users, QrCode, Plus, Search, Star, Printer, Save, ExternalLink, Trash2, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { QrCanvas, BarcodeSvg } from "@/components/customers/CodeRenderers";
+import { useAuth } from "@/lib/auth-context";
 
 export const Route = createFileRoute("/_authenticated/customers")({
   component: CustomersPage,
