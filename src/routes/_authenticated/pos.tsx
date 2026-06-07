@@ -183,27 +183,41 @@ function POSPage() {
 
   const subtotal = cart.reduce((s, l) => s + l.unit_price * l.qty, 0);
 
-  const discountAmount = useMemo(() => {
-    if (appliedPromo) return Math.min(appliedPromo.amount, subtotal);
+  // Item-scoped promo amount (stacks with whole-order discounts).
+  const itemPromoAmount = useMemo(() => {
+    const scopedId = appliedPromo?.applies_to_item_id ?? null;
+    if (!scopedId) return 0;
+    const base = cart
+      .filter((l) => !l.bundle_id && l.menu_item_id === scopedId)
+      .reduce((s, l) => s + l.unit_price * l.qty, 0);
+    return Math.min(appliedPromo!.amount, base);
+  }, [appliedPromo, cart]);
+
+  // Whole-order discount (manual OR non-item-scoped promo), computed on subtotal
+  // after item-scoped discount so totals can't go negative.
+  const orderDiscountAmount = useMemo(() => {
+    const baseAfter = Math.max(0, subtotal - itemPromoAmount);
+    if (appliedPromo && !appliedPromo.applies_to_item_id) {
+      return Math.min(appliedPromo.amount, baseAfter);
+    }
     if (manual) {
       const raw = manual.type === "percent"
-        ? subtotal * (manual.value / 100)
+        ? baseAfter * (manual.value / 100)
         : manual.value;
-      return Math.min(Math.max(0, raw), subtotal);
+      return Math.min(Math.max(0, raw), baseAfter);
     }
     return 0;
-  }, [appliedPromo, manual, subtotal]);
+  }, [appliedPromo, manual, subtotal, itemPromoAmount]);
 
+  const discountAmount = itemPromoAmount + orderDiscountAmount;
   const total = Math.max(0, subtotal - discountAmount);
 
   // Per-line discount allocation — ONLY for item-scoped promos.
-  // Whole-order discounts are applied to the subtotal and shown in the order summary,
-  // not split across individual line items.
   const lineDiscounts = useMemo(() => {
     const map: Record<string, number> = {};
-    if (discountAmount <= 0) return map;
+    if (itemPromoAmount <= 0) return map;
     const scopedId = appliedPromo?.applies_to_item_id ?? null;
-    if (!scopedId) return map; // whole-order: skip per-line chips
+    if (!scopedId) return map;
     const eligible = cart.filter(
       (l) => !l.bundle_id && l.menu_item_id === scopedId,
     );
@@ -214,13 +228,13 @@ function POSPage() {
       const lineTotal = l.unit_price * l.qty;
       const share =
         i === eligible.length - 1
-          ? Math.max(0, discountAmount - allocated)
-          : Math.round((lineTotal / base) * discountAmount * 100) / 100;
+          ? Math.max(0, itemPromoAmount - allocated)
+          : Math.round((lineTotal / base) * itemPromoAmount * 100) / 100;
       map[l.lineId] = share;
       allocated += share;
     });
     return map;
-  }, [cart, discountAmount, appliedPromo]);
+  }, [cart, itemPromoAmount, appliedPromo]);
 
   // Customize dialog state
   const [customizing, setCustomizing] = useState<{
@@ -346,7 +360,7 @@ function POSPage() {
   // Auto-apply item-scoped discounts when matching item is in cart.
   // Bundle lines are exempt — bundles already carry their own per-item discount.
   useEffect(() => {
-    if (manual) return;
+    // Item-scoped auto discounts stack on top of whole-order manual discounts.
     const nonBundle = cart.filter((l) => !l.bundle_id);
     const itemIds = new Set(nonBundle.map((l) => l.menu_item_id));
     const scopedIds = (d: DiscountRow) =>
@@ -564,7 +578,7 @@ function POSPage() {
       code: data.code, label: data.name, amount: amt,
       applies_to_item_id: itemId,
     });
-    setManual(null);
+    if (!itemId) setManual(null);
     toast.success(`Promo "${data.name}" applied`);
   }
 
@@ -878,7 +892,9 @@ function POSPage() {
             <div className="flex items-center gap-2 bg-primary/10 rounded px-3 py-2 text-sm">
               <Tag className="h-3 w-3 text-primary" />
               <span className="font-medium">{appliedPromo.code}</span>
-              <span className="text-muted-foreground">−{fmt(discountAmount)}</span>
+              <span className="text-muted-foreground">
+                −{fmt(appliedPromo.applies_to_item_id ? itemPromoAmount : orderDiscountAmount)}
+              </span>
               <Button size="icon" variant="ghost" className="ml-auto h-6 w-6"
                 onClick={() => { setAppliedPromo(null); setPromoCode(""); }}>
                 <X className="h-3 w-3" />
@@ -889,7 +905,7 @@ function POSPage() {
             <div className="flex items-center gap-2 bg-secondary rounded px-3 py-2 text-sm">
               <Tag className="h-3 w-3" />
               <span className="font-medium">{manual.label}</span>
-              <span className="text-muted-foreground">−{fmt(discountAmount)}</span>
+              <span className="text-muted-foreground">−{fmt(orderDiscountAmount)}</span>
               <Button size="icon" variant="ghost" className="ml-auto h-6 w-6" onClick={() => setManual(null)}>
                 <X className="h-3 w-3" />
               </Button>
@@ -933,14 +949,14 @@ function POSPage() {
                       toast.error(`Min subtotal ${fmt(Number(d.min_subtotal))}`);
                       return;
                     }
-                    const amt = d.type === "percent"
-                      ? Math.round(subtotal * Number(d.value)) / 100
-                      : Math.min(Number(d.value), subtotal);
-                    setAppliedPromo({
-                      code: d.code ?? d.name, label: d.name, amount: amt,
-                      applies_to_item_id: null,
-                    });
-                    setManual(null);
+                    // Route whole-order discounts through `manual` so item-scoped
+                    // promos (in `appliedPromo`) can stack on top.
+                    if (d.type === "percent") {
+                      setManual({ type: "percent", value: Number(d.value), label: d.name });
+                    } else {
+                      setManual({ type: "fixed", value: Number(d.value), label: d.name });
+                    }
+                    if (appliedPromo && !appliedPromo.applies_to_item_id) setAppliedPromo(null);
                     toast.success(`${d.name} applied`);
                   }}
                 >
