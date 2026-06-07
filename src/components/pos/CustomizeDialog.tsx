@@ -207,6 +207,47 @@ export function CustomizeDialog({
             </section>
           )}
 
+          {flvs.length > 0 && (
+            <section>
+              <div className="text-xs font-medium text-muted-foreground mb-2">Flavors</div>
+              <div className="space-y-1">
+                {flvs.map((e) => {
+                  const on = flavors.some((x) => x.label === e.label);
+                  return (
+                    <label key={e.label} className="flex items-center gap-2 rounded border p-2 cursor-pointer hover:bg-accent">
+                      <Checkbox checked={on} onCheckedChange={() => toggleIn(flavors, setFlavors, e)} />
+                      <span className="flex-1">{e.label}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {e.price_delta > 0 ? `+${fmt(e.price_delta)}` : "free"}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          {oths.length > 0 && (
+            <section>
+              <div className="text-xs font-medium text-muted-foreground mb-2">Others</div>
+              <div className="space-y-1">
+                {oths.map((e) => {
+                  const on = others.some((x) => x.label === e.label);
+                  return (
+                    <label key={e.label} className="flex items-center gap-2 rounded border p-2 cursor-pointer hover:bg-accent">
+                      <Checkbox checked={on} onCheckedChange={() => toggleIn(others, setOthers, e)} />
+                      <span className="flex-1">{e.label}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {e.price_delta > 0 ? `+${fmt(e.price_delta)}` : "free"}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+
           {options.allow_other && (
             <section>
               <div className="text-xs font-medium text-muted-foreground mb-2">Other</div>
