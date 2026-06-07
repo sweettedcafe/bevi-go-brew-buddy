@@ -12,7 +12,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { AlertTriangle, Upload, Download, Plus, Pencil } from "lucide-react";
+import { AlertTriangle, Upload, Download, Plus, Pencil, PackagePlus } from "lucide-react";
 import { toast } from "sonner";
 import { toCsv, downloadCsv } from "@/lib/csv";
 import { fetchPublicCsv } from "@/lib/fetch-csv.functions";
