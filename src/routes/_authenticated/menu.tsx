@@ -459,6 +459,30 @@ function EditMenuDialog({
             </Select>
           </div>
           <div>
+            <label className="text-xs text-muted-foreground">Owner</label>
+            <div className="flex gap-2">
+              <Select value={f.owner_id || "__none__"} onValueChange={(v) => setF({ ...f, owner_id: v === "__none__" ? "" : v })}>
+                <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">—</SelectItem>
+                  {owners.map((o) => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Button type="button" size="sm" variant="outline"
+                onClick={async () => {
+                  const name = window.prompt("New owner name (e.g. Coffee Bar, Pastry Co.)")?.trim();
+                  if (!name) return;
+                  const { data, error } = await db.from("owners")
+                    .insert({ name }).select("id").single();
+                  if (error) return toast.error(error.message);
+                  setF((cur) => ({ ...cur, owner_id: data.id }));
+                  onOwnersChanged();
+                }}>
+                <Plus className="h-3 w-3" />
+              </Button>
+            </div>
+          </div>
+          <div>
             <label className="text-xs text-muted-foreground">Sort order</label>
             <Input type="number" value={f.sort_order} onChange={(e) => setF({ ...f, sort_order: e.target.value })} />
           </div>
