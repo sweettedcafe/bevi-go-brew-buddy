@@ -331,7 +331,12 @@ function CustomerDetailDialog({ customer, onClose }: { customer: Customer; onClo
             <div className="text-[10px] text-muted-foreground break-all">{orderUrl}</div>
           </div>
         </div>
-        <DialogFooter>
+        <DialogFooter className="gap-2">
+          {canDelete && (
+            <Button variant="destructive" onClick={deleteCustomer} disabled={deleting} className="mr-auto">
+              <Trash2 className="h-3 w-3 mr-1" /> Delete
+            </Button>
+          )}
           <Button variant="outline" onClick={printCard}><Printer className="h-3 w-3 mr-1" />Print card</Button>
           <Button onClick={() => onClose(false)}>Close</Button>
         </DialogFooter>
