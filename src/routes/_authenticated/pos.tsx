@@ -130,15 +130,16 @@ function POSPage() {
     let alive = true;
     (async () => {
       const nowIso = new Date().toISOString();
-      const [{ data: c }, { data: m }, { data: p }, { data: pop }, { data: bs }, { data: bi }, { data: vs }] = await Promise.all([
+      const [{ data: c }, { data: m }, { data: p }, { data: pop }, { data: bs }, { data: bi }, { data: vs }, { data: ds }] = await Promise.all([
         db.from("categories").select("id,name,sort_order,prints_label").eq("is_active", true).order("sort_order"),
         db.from("menu_items").select("*").eq("is_active", true).order("sort_order"),
         db.from("payment_methods").select("*").eq("is_active", true).order("sort_order"),
         db.from("menu_item_popularity").select("menu_item_id,qty_sold").order("qty_sold", { ascending: false }).limit(3),
         db.from("bundles").select("*").eq("is_active", true)
           .or(`ends_at.is.null,ends_at.gt.${nowIso}`),
-        db.from("bundle_items").select("bundle_id,menu_item_id,qty"),
+        db.from("bundle_items").select("bundle_id,menu_item_id,qty,discount_type,discount_value"),
         db.from("menu_item_variants").select("*").eq("is_active", true).order("sort_order"),
+        db.from("discounts").select("*").eq("is_active", true),
       ]);
       if (!alive) return;
       setCats((c ?? []) as Category[]);
@@ -150,7 +151,20 @@ function POSPage() {
         !b.starts_at || new Date(b.starts_at) <= new Date(),
       );
       setBundles(visibleBundles);
-      setBundleItems((bi ?? []) as BundleItem[]);
+      setBundleItems(((bi ?? []) as any[]).map((r) => ({
+        bundle_id: r.bundle_id,
+        menu_item_id: r.menu_item_id,
+        qty: Number(r.qty),
+        discount_type: (r.discount_type ?? "percent") as "percent" | "fixed",
+        discount_value: Number(r.discount_value ?? 0),
+      })));
+      const now = new Date();
+      const okDiscounts = ((ds ?? []) as DiscountRow[]).filter((d) =>
+        (!d.starts_at || new Date(d.starts_at) <= now) &&
+        (!d.ends_at || new Date(d.ends_at) > now) &&
+        (d.max_uses == null || d.uses_count < d.max_uses),
+      );
+      setDiscounts(okDiscounts);
       setLoading(false);
     })();
     return () => { alive = false; };
