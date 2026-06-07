@@ -30,12 +30,14 @@ export function OrderDetailSheet({ orderId, onClose, onChanged, canReverse = tru
   const [busy, setBusy] = useState(false);
 
   async function load() {
-    const [{ data: o }, { data: items }, { data: pays }, { data: pms }] = await Promise.all([
+    const [{ data: o, error: oErr }, { data: items, error: iErr }, { data: pays }, { data: pms }] = await Promise.all([
       db.from("orders").select("*").eq("id", orderId).maybeSingle(),
-      db.from("order_items").select("*").eq("order_id", orderId).order("created_at"),
+      db.from("order_items").select("*").eq("order_id", orderId),
       db.from("order_payments").select("*").eq("order_id", orderId),
       db.from("payment_methods").select("code,label"),
     ]);
+    if (oErr) toast.error(oErr.message);
+    if (iErr) toast.error(iErr.message);
     // reversed qty per parent item
     const parentIds = (items ?? []).map((i: any) => i.id);
     let reversedByParent: Record<string, number> = {};
