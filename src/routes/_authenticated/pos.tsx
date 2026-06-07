@@ -293,7 +293,10 @@ function POSPage() {
       componentsTotal += base * r.qty;
       newLines.push({
         lineId: newLineId(),
-        menu_item_id: it.id, name: it.name,
+        menu_item_id: it.id,
+        variant_id: null,
+        variant_name: null,
+        name: it.name,
         base_price: base, unit_price: base, qty: r.qty,
         customization: null, addon_total: 0,
         notes: `Bundle: ${b.name}`,
