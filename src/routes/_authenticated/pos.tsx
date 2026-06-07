@@ -42,6 +42,8 @@ type Variant = { id: string; menu_item_id: string; name: string; price: number; 
 type CartLine = {
   lineId: string;
   menu_item_id: string;
+  variant_id: string | null;
+  variant_name: string | null;
   name: string;
   base_price: number;
   unit_price: number;
@@ -73,8 +75,10 @@ function POSPage() {
   const isAdmin = primaryRole === "admin" || primaryRole === "developer";
   const [cats, setCats] = useState<Category[]>([]);
   const [items, setItems] = useState<MenuItem[]>([]);
+  const [variants, setVariants] = useState<Variant[]>([]);
   const [pms, setPms] = useState<PMConfig[]>([]);
   const [activeCat, setActiveCat] = useState<string | "all" | "__bundles__">("all");
+  const [variantPick, setVariantPick] = useState<MenuItem | null>(null);
   const [query, setQuery] = useState("");
   const [cart, setCart] = useState<CartLine[]>([]);
   const [orderType, setOrderType] = useState<OrderType>("takeout");
@@ -112,7 +116,7 @@ function POSPage() {
     let alive = true;
     (async () => {
       const nowIso = new Date().toISOString();
-      const [{ data: c }, { data: m }, { data: p }, { data: pop }, { data: bs }, { data: bi }] = await Promise.all([
+      const [{ data: c }, { data: m }, { data: p }, { data: pop }, { data: bs }, { data: bi }, { data: vs }] = await Promise.all([
         db.from("categories").select("id,name,sort_order,prints_label").eq("is_active", true).order("sort_order"),
         db.from("menu_items").select("*").eq("is_active", true).order("sort_order"),
         db.from("payment_methods").select("*").eq("is_active", true).order("sort_order"),
@@ -120,13 +124,14 @@ function POSPage() {
         db.from("bundles").select("*").eq("is_active", true)
           .or(`ends_at.is.null,ends_at.gt.${nowIso}`),
         db.from("bundle_items").select("bundle_id,menu_item_id,qty"),
+        db.from("menu_item_variants").select("*").eq("is_active", true).order("sort_order"),
       ]);
       if (!alive) return;
       setCats((c ?? []) as Category[]);
       setItems((m ?? []) as MenuItem[]);
+      setVariants((vs ?? []) as Variant[]);
       setPms((p ?? []) as PMConfig[]);
       setTopSellers(new Set((pop ?? []).map((r: any) => r.menu_item_id as string)));
-      // Filter bundles that haven't started yet on the client
       const visibleBundles = ((bs ?? []) as Bundle[]).filter((b) =>
         !b.starts_at || new Date(b.starts_at) <= new Date(),
       );
@@ -173,18 +178,33 @@ function POSPage() {
   }
 
   function addItem(it: MenuItem) {
+    if (it.has_variants) {
+      const hasAny = variants.some((v) => v.menu_item_id === it.id);
+      if (!hasAny) { toast.error(`${it.name} has no variants configured`); return; }
+      setVariantPick(it);
+      return;
+    }
     if (hasAnyCustomization(it.options)) {
       setCustomizing({ item: it });
       return;
     }
+    addPlainLine(it, null);
+  }
+
+  function addPlainLine(it: MenuItem, variant: Variant | null) {
     setCart((c) => {
       const sig = customSignature(null, null);
-      const f = c.find((l) => l.menu_item_id === it.id && customSignature(l.customization, l.notes) === sig);
+      const f = c.find((l) => l.menu_item_id === it.id
+        && l.variant_id === (variant?.id ?? null)
+        && customSignature(l.customization, l.notes) === sig);
       if (f) return c.map((l) => l.lineId === f.lineId ? { ...l, qty: l.qty + 1 } : l);
-      const base = Number(it.price);
+      const base = Number(variant?.price ?? it.price);
       return [...c, {
         lineId: newLineId(),
-        menu_item_id: it.id, name: it.name,
+        menu_item_id: it.id,
+        variant_id: variant?.id ?? null,
+        variant_name: variant?.name ?? null,
+        name: variant ? `${it.name} — ${variant.name}` : it.name,
         base_price: base, unit_price: base, qty: 1,
         customization: null, addon_total: 0, notes: null,
       }];
@@ -199,13 +219,11 @@ function POSPage() {
     const unit = base + args.addon;
     const cleanNotes = args.notes.trim() || null;
     setCart((c) => {
-      // If editing an existing line, replace it
       if (args.editingLineId) {
         return c.map((l) => l.lineId === args.editingLineId
           ? { ...l, customization: args.custom, addon_total: args.addon, unit_price: unit, qty: args.qty, notes: cleanNotes }
           : l);
       }
-      // Merge if exact same customization+notes already exists
       const sig = customSignature(args.custom, cleanNotes);
       const dup = c.find((l) =>
         l.menu_item_id === args.item.id &&
@@ -213,12 +231,16 @@ function POSPage() {
       if (dup) return c.map((l) => l.lineId === dup.lineId ? { ...l, qty: l.qty + args.qty } : l);
       return [...c, {
         lineId: newLineId(),
-        menu_item_id: args.item.id, name: args.item.name,
+        menu_item_id: args.item.id,
+        variant_id: null,
+        variant_name: null,
+        name: args.item.name,
         base_price: base, unit_price: unit, qty: args.qty,
         customization: args.custom, addon_total: args.addon, notes: cleanNotes,
       }];
     });
   }
+
 
   const changeQty = (lineId: string, d: number) =>
     setCart((c) => c.map((l) => l.lineId === lineId ? { ...l, qty: l.qty + d } : l).filter((l) => l.qty > 0));
@@ -271,7 +293,10 @@ function POSPage() {
       componentsTotal += base * r.qty;
       newLines.push({
         lineId: newLineId(),
-        menu_item_id: it.id, name: it.name,
+        menu_item_id: it.id,
+        variant_id: null,
+        variant_name: null,
+        name: it.name,
         base_price: base, unit_price: base, qty: r.qty,
         customization: null, addon_total: 0,
         notes: `Bundle: ${b.name}`,
@@ -294,7 +319,8 @@ function POSPage() {
         order_type: orderType,
         customer_name: customerName || null,
         items: cart.map((l) => ({
-          menu_item_id: l.menu_item_id, qty: l.qty,
+          menu_item_id: l.menu_item_id, variant_id: l.variant_id,
+          name: l.name, qty: l.qty,
           unit_price: l.unit_price, addon_total: l.addon_total,
           customization: l.customization, notes: l.notes,
         })),
@@ -338,7 +364,10 @@ function POSPage() {
       const addon = Number(it.addon_total ?? 0);
       return {
         lineId: newLineId(),
-        menu_item_id: it.menu_item_id, name: it.name,
+        menu_item_id: it.menu_item_id,
+        variant_id: it.variant_id ?? null,
+        variant_name: it.variant_name ?? null,
+        name: it.name,
         base_price: unit - addon, unit_price: unit, qty: Number(it.qty),
         customization: (it.customization ?? null) as SelectedCustom | null,
         addon_total: addon,
@@ -532,7 +561,10 @@ function POSPage() {
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
               {filtered.map((it) => {
                 const isPop = topSellers.has(it.id);
-                const customizable = hasAnyCustomization(it.options);
+                const itemVariants = it.has_variants
+                  ? variants.filter((v) => v.menu_item_id === it.id).sort((a,b) => a.sort_order - b.sort_order)
+                  : [];
+                const minPrice = itemVariants.length > 0 ? Math.min(...itemVariants.map((v) => Number(v.price))) : Number(it.price);
                 return (
                   <button key={it.id} onClick={() => addItem(it)}
                     className="relative text-left rounded-lg border bg-card hover:bg-accent hover:border-primary/50 transition-colors p-4 shadow-sm">
@@ -543,8 +575,15 @@ function POSPage() {
                     )}
                     <div className="font-medium leading-tight">{it.name}</div>
                     {it.description && <div className="text-xs text-muted-foreground mt-1 line-clamp-2">{it.description}</div>}
+                    {itemVariants.length > 0 && (
+                      <div className="mt-1 text-[10px] text-muted-foreground">
+                        {itemVariants.map((v) => v.name).join(" · ")}
+                      </div>
+                    )}
                     <div className="mt-3 flex items-end justify-between gap-2">
-                      <div className="font-display text-lg text-primary">{fmt(Number(it.price))}</div>
+                      <div className="font-display text-lg text-primary">
+                        {fmt(minPrice)}{itemVariants.length > 0 ? "+" : ""}
+                      </div>
                     </div>
                   </button>
                 );
@@ -788,7 +827,8 @@ function POSPage() {
             redeem_points: redeemPts,
             notes: null,
             items: cart.map((l) => ({
-              menu_item_id: l.menu_item_id, qty: l.qty,
+              menu_item_id: l.menu_item_id, variant_id: l.variant_id,
+              name: l.name, qty: l.qty,
               unit_price: l.unit_price, addon_total: l.addon_total,
               customization: l.customization, notes: l.notes,
             })),
@@ -899,6 +939,29 @@ function POSPage() {
             setCustomizing(null);
           }}
         />
+      )}
+
+      {variantPick && (
+        <Dialog open onOpenChange={(o) => !o && setVariantPick(null)}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Choose size — {variantPick.name}</DialogTitle>
+            </DialogHeader>
+            <div className="grid gap-2">
+              {variants
+                .filter((v) => v.menu_item_id === variantPick.id)
+                .sort((a,b) => a.sort_order - b.sort_order)
+                .map((v) => (
+                  <button key={v.id}
+                    onClick={() => { addPlainLine(variantPick, v); setVariantPick(null); }}
+                    className="flex items-center justify-between rounded-md border p-3 hover:bg-accent transition-colors">
+                    <span className="font-medium">{v.name}</span>
+                    <span className="font-display text-primary">{fmt(Number(v.price))}</span>
+                  </button>
+                ))}
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );
