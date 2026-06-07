@@ -533,7 +533,7 @@ function EditMenuDialog({
 
 // ============ CSV import/export ============
 const MENU_CSV_COLS = [
-  "name","category","price","description","is_active","sort_order",
+  "product_code","name","category","price","description","is_active","sort_order",
   "ingredient","qty_per_unit","unit",
   "option_group","option_label","option_price","option_default",
 ];
