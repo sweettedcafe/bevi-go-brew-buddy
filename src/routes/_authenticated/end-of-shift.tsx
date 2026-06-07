@@ -33,7 +33,7 @@ type EOS = {
   leave_hours_deducted: number;
   net_worked_hours: number;
   payments: Array<{ method: string; gross: number; change: number; net: number; count: number }>;
-  expenses: Array<{ id: string; description: string; amount: number; category: string | null; created_at: string }>;
+  expenses: Array<{ id: string; description: string; amount: number; quantity?: number | null; unit_price?: number | null; category: string | null; created_at: string }>;
   total_expenses: number;
   breaks: Array<{ id: string; type: "break" | "lunch"; started_at: string; ended_at: string | null }>;
 };
@@ -44,7 +44,8 @@ function EndOfShiftPage() {
 
   // expense form
   const [desc, setDesc] = useState("");
-  const [amount, setAmount] = useState("");
+  const [qty, setQty] = useState("1");
+  const [unitPrice, setUnitPrice] = useState("");
   const [category, setCategory] = useState("");
 
   const refresh = async () => {
@@ -61,15 +62,17 @@ function EndOfShiftPage() {
   useEffect(() => { void refresh(); }, []);
 
   const addExpense = async () => {
-    const a = Number(amount);
+    const q = Number(qty);
+    const up = Number(unitPrice);
     if (!desc.trim()) { toast.error("Description required"); return; }
-    if (Number.isNaN(a) || a < 0) { toast.error("Amount must be a number ≥ 0"); return; }
-    const { error } = await supabase.rpc("tc_add_expense", {
-      p_description: desc.trim(), p_amount: a, p_category: category.trim() || null,
+    if (!Number.isFinite(q) || q <= 0) { toast.error("Quantity must be > 0"); return; }
+    if (!Number.isFinite(up) || up < 0) { toast.error("Unit price must be ≥ 0"); return; }
+    const { error } = await (supabase as any).rpc("tc_add_expense_v2", {
+      p_description: desc.trim(), p_quantity: q, p_unit_price: up, p_category: category.trim() || null,
     });
     if (error) { toast.error(error.message); return; }
     toast.success("Expense saved");
-    setDesc(""); setAmount(""); setCategory("");
+    setDesc(""); setQty("1"); setUnitPrice(""); setCategory("");
     await refresh();
   };
   const deleteExpense = async (id: string) => {
