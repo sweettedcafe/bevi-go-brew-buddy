@@ -127,13 +127,20 @@ function MenuPage() {
         <div className="grid gap-3">
           {items.map((it) => {
             const rs = itemRecipes(it.id);
+            const vs = variants.filter((v) => v.menu_item_id === it.id).sort((a,b) => a.sort_order - b.sort_order);
             return (
               <Card key={it.id} className={`p-4 ${!it.is_active ? "opacity-60" : ""}`}>
                 <div className="flex flex-wrap items-center gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium">{it.name}</span>
+                      {it.product_code && (
+                        <Badge variant="outline" className="text-[10px] font-mono">{it.product_code}</Badge>
+                      )}
                       <Badge variant="secondary">{catName(it.category_id)}</Badge>
+                      {it.has_variants && (
+                        <Badge className="bg-primary/15 text-primary hover:bg-primary/15">variants</Badge>
+                      )}
                       {hasAnyCustomization(it.options) && (
                         <Badge variant="outline" className="text-xs gap-1">
                           <Settings2 className="h-3 w-3" /> customizable
@@ -144,20 +151,39 @@ function MenuPage() {
                     {it.description && (
                       <div className="text-sm text-muted-foreground mt-1">{it.description}</div>
                     )}
-                    {rs.length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {rs.map((r) => {
-                          const ing = invName(r.inventory_item_id);
-                          return (
-                            <Badge key={r.inventory_item_id} variant="outline" className="text-xs">
-                              {ing?.name ?? "—"}: {Number(r.qty_per_unit)} {ing?.unit ?? ""}
-                            </Badge>
-                          );
-                        })}
-                      </div>
+                    {it.has_variants ? (
+                      vs.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {vs.map((v) => {
+                            const ings = vrecipes.filter((x) => x.variant_id === v.id);
+                            return (
+                              <Badge key={v.id} variant="outline" className="text-xs">
+                                {v.name} · {Number(v.price).toFixed(2)} · {ings.length} ing
+                              </Badge>
+                            );
+                          })}
+                        </div>
+                      )
+                    ) : (
+                      rs.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {rs.map((r) => {
+                            const ing = invName(r.inventory_item_id);
+                            return (
+                              <Badge key={r.inventory_item_id} variant="outline" className="text-xs">
+                                {ing?.name ?? "—"}: {Number(r.qty_per_unit)} {ing?.unit ?? ""}
+                              </Badge>
+                            );
+                          })}
+                        </div>
+                      )
                     )}
                   </div>
-                  <div className="font-display text-lg text-primary">{Number(it.price).toFixed(2)}</div>
+                  <div className="font-display text-lg text-primary">
+                    {it.has_variants && vs.length > 0
+                      ? `${Number(vs[0].price).toFixed(2)}+`
+                      : Number(it.price).toFixed(2)}
+                  </div>
                   {isAdmin && (
                     <div className="flex items-center gap-1">
                       <Switch checked={it.is_active} onCheckedChange={() => toggleActive(it)} />
@@ -179,6 +205,8 @@ function MenuPage() {
           cats={cats}
           invs={invs}
           initialRecipes={editing.id ? itemRecipes(editing.id) : []}
+          initialVariants={editing.id ? variants.filter((v) => v.menu_item_id === editing.id) : []}
+          allVariantRecipes={vrecipes}
           onClose={() => setEditing(null)}
           onSaved={() => { setEditing(null); void load(); }}
         />
