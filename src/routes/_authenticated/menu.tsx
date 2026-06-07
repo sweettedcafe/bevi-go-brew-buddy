@@ -626,8 +626,9 @@ function ImportExportButtons({
       const parsed = parseCsv(text);
       if (parsed.length === 0) return toast.error("CSV is empty");
 
-      // Forward-fill name so option/ingredient rows can be blank in name column.
+      // Forward-fill name + product_code so option/ingredient rows can be blank.
       let lastName = "";
+      let lastCode = "";
       type Group = {
         base: Record<string, any> | null;
         ings: { name: string; qty: number }[];
@@ -637,25 +638,24 @@ function ImportExportButtons({
       const groups = new Map<string, Group>();
 
       for (const r of parsed) {
+        const rowCode = String(r.product_code ?? "").trim();
         const rowName = String(r.name ?? "").trim();
+        if (rowCode) lastCode = rowCode;
         if (rowName) lastName = rowName;
-        if (!lastName) continue;
-        const key = lastName.toLowerCase();
+        if (!lastName && !lastCode) continue;
+        const key = (lastCode || lastName).toLowerCase();
         let g = groups.get(key);
         if (!g) {
           g = { base: null, ings: [], sizes: [], milks: [], extras: [] };
           groups.set(key, g);
         }
-        // Capture base on first row that has price/category/etc.
-        if (!g.base && (rowName || r.price || r.category || r.description || r.is_active || r.sort_order)) {
-          g.base = { ...r, name: lastName };
+        if (!g.base && (rowName || r.price || r.category || r.description || r.is_active || r.sort_order || rowCode)) {
+          g.base = { ...r, name: lastName, product_code: lastCode };
         }
-        // Ingredient row
         const ingName = String(r.ingredient ?? "").trim();
         if (ingName && Number(r.qty_per_unit) > 0) {
           g.ings.push({ name: ingName, qty: Number(r.qty_per_unit) });
         }
-        // Option row
         const grp = String(r.option_group ?? "").trim().toLowerCase();
         const lbl = String(r.option_label ?? "").trim();
         if (grp && lbl) {
@@ -680,6 +680,7 @@ function ImportExportButtons({
       const catByName = new Map(cats.map((c) => [c.name.toLowerCase(), c.id]));
       const invByName = new Map(invs.map((i) => [i.name.toLowerCase(), i.id]));
       const itemByName = new Map(items.map((i) => [i.name.toLowerCase(), i]));
+      const itemByCode = new Map(items.filter((i) => i.product_code).map((i) => [i.product_code!.toLowerCase(), i]));
 
       let created = 0, updated = 0, skipped = 0;
       const unknownIngs = new Set<string>();
@@ -687,7 +688,8 @@ function ImportExportButtons({
       for (const [, g] of groups) {
         const baseRow = g.base ?? {};
         const name = String(baseRow.name ?? "").trim();
-        if (!name) { skipped++; continue; }
+        const code = String(baseRow.product_code ?? "").trim();
+        if (!name && !code) { skipped++; continue; }
         const catId = catByName.get(String(baseRow.category ?? "").toLowerCase()) ?? null;
 
         const opts: MenuOptions = {
@@ -702,7 +704,7 @@ function ImportExportButtons({
           || g.allow_other || g.size_required;
 
         const payload: any = {
-          name,
+          name: name || (code ? code : "Unnamed"),
           description: String(baseRow.description ?? "").trim() || null,
           price: Number(baseRow.price) || 0,
           category_id: catId,
@@ -710,7 +712,9 @@ function ImportExportButtons({
           sort_order: Number(baseRow.sort_order) || 0,
           options: hasOpts ? opts : emptyOptions(),
         };
-        const existing = itemByName.get(name.toLowerCase());
+        // Match by product_code first, then by name
+        const existing = (code && itemByCode.get(code.toLowerCase()))
+          || (name && itemByName.get(name.toLowerCase())) || null;
         let id: string;
         if (existing) {
           const { error } = await db.from("menu_items").update(payload).eq("id", existing.id);
@@ -718,7 +722,9 @@ function ImportExportButtons({
           id = existing.id;
           updated++;
         } else {
-          const { data, error } = await db.from("menu_items").insert(payload).select("id").single();
+          // Preserve incoming product_code if provided (must be unique)
+          const insertPayload = code ? { ...payload, product_code: code } : payload;
+          const { data, error } = await db.from("menu_items").insert(insertPayload).select("id").single();
           if (error) { skipped++; continue; }
           id = data.id;
           created++;
