@@ -52,6 +52,7 @@ type CartLine = {
   customization: SelectedCustom | null;
   addon_total: number;
   notes: string | null;
+  bundle_id?: string | null;
 };
 type OrderType = "dine_in" | "takeout" | "delivery";
 type PMConfig = {
