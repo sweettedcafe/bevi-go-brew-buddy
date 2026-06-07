@@ -1,119 +1,78 @@
-# Variants, Product IDs, Smart Import & Pack-Based Inventory
+# Unified Customization, Owners, Void/Refund Accounting, Barista Actions & EOS Expenses
 
-This is a large, cross-cutting change spanning the database, Menu, Recipe, POS, Import, and Inventory modules. I'll roll it out in phases so each piece is verifiable before the next.
-
----
-
-## 1. Database schema changes (migration)
-
-**Menu items**
-- Add `product_code TEXT UNIQUE` (e.g. `MENU-000001`) — auto-generated via sequence + trigger. Permanent; never changes when name changes.
-- Add `has_variants BOOLEAN DEFAULT false`.
-- Backfill `product_code` for all existing menu items.
-
-**New table: `menu_item_variants`**
-```
-id UUID PK
-menu_item_id UUID FK -> menu_items (cascade)
-name TEXT             -- "12oz", "16oz", "22oz"
-price NUMERIC         -- per-variant price
-sort_order INT
-is_active BOOLEAN
-created_at, updated_at
-```
-Grants + RLS mirroring `menu_items`.
-
-**New table: `variant_recipe_items`** (per-variant recipe)
-```
-id UUID PK
-variant_id UUID FK -> menu_item_variants (cascade)
-inventory_item_id UUID FK -> inventory_items
-qty NUMERIC          -- in inventory item's base unit (supports decimals)
-```
-Falls back to the existing `recipe_items` table when a menu item has no variants (backward compatible).
-
-**Inventory items — pack conversion**
-- Already has `pack_size` and `pack_label`. Add:
-  - `purchase_unit TEXT` (e.g. "pack", "bag", "bottle") — optional label.
-  - `units_per_pack NUMERIC` — explicit conversion factor (mirrors `pack_size` but kept for clarity; will alias).
-- Add RPC `inventory_add_packs(p_item_id uuid, p_packs numeric)` that:
-  - Computes `added = packs * pack_size`.
-  - Increments `stock_qty` and `full_stock_qty` by `added` (replenishment grows the target too, per spec).
-
-**Order items** — add `variant_id UUID NULL` so completed orders deduct from the correct variant recipe and reports stay accurate.
-
-**Inventory deduction trigger** updated to:
-- If `order_items.variant_id` is set → use `variant_recipe_items`.
-- Else → fall back to legacy `recipe_items`.
+Six related changes across POS, Menu, Reports, History (Today's Orders), and End of Shift.
 
 ---
 
-## 2. Menu & Recipe admin UI (`/menu`)
+## 1. POS — Single unified customize dialog
 
-- New "Variants" section inside the menu item editor (visible when `has_variants` is on).
-- For each variant: name, price, active toggle, and an inline recipe editor (ingredient + qty in the inventory item's base unit, decimals allowed).
-- "Add variant" / "Remove variant" controls.
-- Display the auto-generated `product_code` (read-only) at the top of each item card.
+Today, picking a size closes the variant picker and skips the milk/extras/notes step.
 
-Legacy single-recipe editor remains for items without variants.
+- Merge `variantPick` and `CustomizeDialog` into one dialog opened when an item has **either** variants **or** any customization (`hasAnyCustomization(menu.options)`).
+- Layout (one form, one Add-to-cart button):
+  1. **Size** section (radio list) — only if `has_variants`. Required when shown. Pre-selects the first active variant; price line updates live.
+  2. **Milk** section — if `options.milks?.length`.
+  3. **Extras** section (checkboxes) — if `options.extras?.length`.
+  4. **Other add-on** (label + price) — if `allow_other`.
+  5. **Special instructions** (textarea) — if `allow_notes`.
+  6. **Quantity** stepper + live total preview.
+- Submit writes one cart line with `variant_id`, `unit_price = variant.price + addonTotal`, `custom`, and `notes`.
+- Backward compatible: items with no variants and no options still bypass the dialog.
 
----
+## 2. Menu & Recipes — Delete + Owner
 
-## 3. POS (`/pos`)
+- **Delete**: visible to `admin` and `developer` only. Confirm dialog → soft delete (`is_active=false`) if the item has historical `order_items`; hard delete otherwise. Same control for variants (inline trash icon).
+- **Owner field**: add `menu_items.owner TEXT` (free text, e.g. "Coffee Bar", "Pastry Co."). Editor shows a combobox populated with distinct existing owners + free text. Default null → displayed as "—".
+- Migration: `ALTER TABLE menu_items ADD COLUMN owner TEXT;` + index.
 
-- Render one tile per menu item (no per-size duplicates).
-- On tap:
-  - If `has_variants` → open size-picker dialog listing active variants with their prices. Selecting one adds the line with `variant_id` + variant price.
-  - Else → current behavior.
-- Cart line shows `Item Name — Variant`.
-- Checkout writes `variant_id` into `order_items`; inventory trigger handles the rest.
+## 3. Reports — Owner filter + per-item refund/void
 
----
+- **Per-item report**: add an **Owner** dropdown filter (distinct owners). Show an `Owner` column and a per-owner subtotal section.
+- Add **Refund** and **Void** buttons per item row (admin/developer only) that open the same dialogs used in History — see §4.
 
-## 4. Import with dedupe confirmation
+## 4. Void / Refund duplication for accounting
 
-- Menu import CSV: accept `product_code` as primary key, `name` as fallback.
-- Pre-import scan returns:
-  - `new_count`, `matched_count`, `update_count`, plus a sample diff list.
-- New confirmation modal: "X new, Y to update, Z unchanged — Proceed?". Import only runs after explicit confirm.
-- Same dedupe model added to inventory import (already keyed by name; will additionally accept an `item_code` later — out of scope for this pass unless trivial).
+Currently void/refund just flips status. Per client: keep the original row, plus insert a **mirror negative transaction** so every event is visible in reports.
 
----
+- New columns on `orders`: `parent_order_id UUID NULL`, `txn_kind TEXT DEFAULT 'sale'` (`sale | void | refund`).
+- New RPCs:
+  - `pos_void_order(p_order_id uuid, p_reason text)` — sets original `status='voided'`, then inserts a new order with `txn_kind='void'`, `parent_order_id=original`, negated `subtotal/discount/total`, mirror `order_items` with negative `qty` and negative `line_total`, mirror `order_payments` with negative `amount`. Reverses inventory (re-adds stock based on variant recipe).
+  - `pos_refund_order_item(p_order_item_id uuid, p_qty numeric, p_reason text)` — partial-qty refund; inserts a void/refund order containing only the refunded items with negative quantities. Stock re-added.
+  - `pos_void_order_item(...)` — same shape but `txn_kind='void'`.
+- Reports automatically reflect mirrors because they sum signed `total`/`line_total`. Add a **Transaction kind** column and color-coded badge.
 
-## 5. Inventory module enhancements
+## 5. Barista — Today's Orders per-item void/refund
 
-- "Add stock" quick action on each row: enter number of packs → calls `inventory_add_packs` RPC → realtime UI update.
-- Editor exposes `pack_size` / `pack_label` / `purchase_unit` clearly with a live preview ("1 pack = 250 ml → 2 packs = 500 ml").
-- Progress bar already uses `stock_qty / full_stock_qty`; verify it recomputes on realtime change (already wired via `useRealtime`).
-- All numeric fields accept decimals.
+- In `history.tsx` (Today's Orders), make each row clickable → opens an **Order Detail** sheet showing line items, payments, totals.
+- Each line item has **Void** and **Refund** buttons (qty selector defaults to full qty, reason required). Available to `barista`, `admin`, `developer`.
+- Header-level **Void entire order** also available.
+- All actions call the RPCs from §4 → realtime list refresh.
 
----
+## 6. End Of Shift — Expense qty × unit price
 
-## 6. Validation & safety
-
-- Block POS add-to-cart if a variant has no recipe items (toast: "Recipe not configured for {size}").
-- Block menu import row if `pack_size`/conversion missing on referenced ingredients.
-- Unique constraint on `(menu_item_id, lower(name))` for variants to prevent duplicate sizes.
-- All deductions remain transactional inside the existing trigger.
-
----
-
-## Rollout order (each phase independently testable)
-
-1. Migration: `product_code`, variant tables, `inventory_add_packs` RPC, trigger update, `order_items.variant_id`.
-2. Menu admin: variant editor + product code display.
-3. POS: size picker + variant-aware cart/checkout.
-4. Import: scan + confirmation modal.
-5. Inventory: add-packs action + clearer pack UI.
-6. QA pass + backward-compat check on existing items.
+- Add `quantity NUMERIC DEFAULT 1` and `unit_price NUMERIC` to `eos_expenses` (or current expense table — to confirm during impl).
+- Expense form: `Item | Qty | Unit price | Total (computed, read-only) | Notes`. Existing rows backfilled (`quantity=1`, `unit_price=amount`).
+- EOS summary and report use computed total = `quantity * unit_price` (keep `amount` synced via trigger for backward compatibility).
 
 ---
 
-## Technical notes
+## Rollout order
 
-- `product_code` generated by Postgres sequence `menu_item_code_seq` + `BEFORE INSERT` trigger formatting `MENU-` + `lpad(nextval, 6, '0')`.
-- Backward compatibility: items with `has_variants=false` continue to use `recipe_items` and a single `menu_items.price`. No data migration required for existing menu rows beyond backfilling `product_code`.
-- Realtime: existing `useRealtime("inventory_items", …)` covers stock updates; add subscriptions to `menu_item_variants` on the menu page.
-- All numeric columns use `NUMERIC` (not `INT`) to support decimals.
+1. **Migration** (`supabase_phase16_schema.sql`): `menu_items.owner`, `orders.parent_order_id`, `orders.txn_kind`, expense `quantity`/`unit_price`, new void/refund RPCs.
+2. POS unified dialog.
+3. Menu owner + delete.
+4. History order-detail sheet + per-item void/refund (barista access).
+5. Reports owner filter + per-item void/refund (admin).
+6. EOS expense qty/unit price form.
 
-Shall I proceed with Phase 1 (the migration)?
+Each phase is independently testable; nothing breaks existing data (all new columns are nullable / defaulted, RPCs are additive).
+
+---
+
+## Open questions (please confirm before I start)
+
+1. **Owner list** — free-text field with autocomplete of past owners, or a managed `owners` table with its own admin page? Free text is faster; managed table is cleaner for long-term reporting.
+2. **Void/refund permissions on barista** — confirm baristas may void **and** refund (full + partial), or only refund?
+3. **Expense backfill** — OK to set existing rows to `quantity=1, unit_price=amount`?
+
+Reply with answers (or "go with defaults: free-text owner, baristas can void+refund, backfill qty=1") and I'll start with the migration.
