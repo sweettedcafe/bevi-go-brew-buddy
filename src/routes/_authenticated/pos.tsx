@@ -360,7 +360,7 @@ function POSPage() {
   // Auto-apply item-scoped discounts when matching item is in cart.
   // Bundle lines are exempt — bundles already carry their own per-item discount.
   useEffect(() => {
-    if (manual) return;
+    // Item-scoped auto discounts stack on top of whole-order manual discounts.
     const nonBundle = cart.filter((l) => !l.bundle_id);
     const itemIds = new Set(nonBundle.map((l) => l.menu_item_id));
     const scopedIds = (d: DiscountRow) =>
