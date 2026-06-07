@@ -96,27 +96,41 @@ export function CameraScannerDialog({
         });
         scannerRef.current = scanner;
 
-        // Try back camera first; if that fails, fall back to any available camera.
-        const config = { fps: 10, qrbox: { width: 260, height: 180 }, aspectRatio: 1.4 };
+        const config = { fps: 10, qrbox: { width: 260, height: 260 }, aspectRatio: 1.0 };
         const onDecode = (decoded: string) => {
           if (cancelled) return;
           onDetectedRef.current(decoded.trim());
         };
 
-        try {
-          await scanner.start(
-            { facingMode: { ideal: "environment" } },
-            config,
-            onDecode,
-            () => {},
-          );
-        } catch {
-          // Fallback: enumerate and pick the first camera
-          const cams = await Html5Qrcode.getCameras().catch(() => []);
-          if (!cams || cams.length === 0) throw new Error("No camera found");
-          const back = cams.find((c) => /back|rear|environment/i.test(c.label)) ?? cams[0];
-          await scanner.start(back.id, config, onDecode, () => {});
-        }
+        // Enumerate available cameras first — works on desktops without
+        // an environment-facing camera, and lets us prefer the back camera.
+        const cams = await Html5Qrcode.getCameras().catch(() => [] as any[]);
+        const tryStart = async () => {
+          if (cams && cams.length > 0) {
+            const back =
+              cams.find((c: any) => /back|rear|environment/i.test(c.label)) ?? cams[0];
+            try {
+              await scanner.start(back.id, config, onDecode, () => {});
+              return;
+            } catch {
+              // try the next available camera, if any
+              for (const c of cams) {
+                if (c.id === back.id) continue;
+                try {
+                  await scanner.start(c.id, config, onDecode, () => {});
+                  return;
+                } catch {}
+              }
+            }
+          }
+          // Last resort: constraint-based start
+          try {
+            await scanner.start({ facingMode: { ideal: "environment" } }, config, onDecode, () => {});
+            return;
+          } catch {}
+          await scanner.start({ facingMode: "user" }, config, onDecode, () => {});
+        };
+        await tryStart();
       } catch (e: any) {
         const msg = e?.message ?? "Camera unavailable";
         setErrorMsg(msg);
