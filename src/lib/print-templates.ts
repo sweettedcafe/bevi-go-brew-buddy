@@ -16,6 +16,7 @@ export type ReceiptData = {
   subtotal: number;
   discountLabel: string | null;
   discountAmount: number;
+  discounts?: { label: string; amount: number }[];
   total: number;
   payments: ReceiptPayment[];
   change: number;
