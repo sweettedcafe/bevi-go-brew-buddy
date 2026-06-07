@@ -1,6 +1,5 @@
 import { useEffect, useRef } from "react";
 import QRCode from "qrcode";
-import JsBarcode from "jsbarcode";
 
 export function QrCanvas({ value, size = 200 }: { value: string; size?: number }) {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -12,16 +11,14 @@ export function QrCanvas({ value, size = 200 }: { value: string; size?: number }
   return <canvas ref={ref} className="rounded bg-white p-2" />;
 }
 
-export function BarcodeSvg({ value, height = 60 }: { value: string; height?: number }) {
-  const ref = useRef<SVGSVGElement>(null);
-  useEffect(() => {
-    if (ref.current && value) {
-      try {
-        JsBarcode(ref.current, value, {
-          format: "CODE128", height, displayValue: true, fontSize: 14, margin: 4,
-        });
-      } catch { /* ignore */ }
-    }
-  }, [value, height]);
-  return <svg ref={ref} className="bg-white rounded" />;
+// Kept for backwards compatibility — now renders the value as a QR code
+// so it's scannable by any phone camera (Google Lens, iOS camera, etc.).
+export function BarcodeSvg({ value, size = 180 }: { value: string; height?: number; size?: number }) {
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <QrCanvas value={value} size={size} />
+      <div className="font-mono text-xs tracking-widest">{value}</div>
+    </div>
+  );
 }
+
