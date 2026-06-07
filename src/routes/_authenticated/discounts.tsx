@@ -33,10 +33,15 @@ type Discount = {
   ends_at: string | null;
   is_active: boolean;
   applies_to_item_id: string | null;
+  applies_to_item_ids: string[] | null;
 };
 type MenuItemLite = { id: string; name: string };
 
 const db = supabase as any;
+
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Check, ChevronsUpDown } from "lucide-react";
 
 function DiscountsPage() {
   const { primaryRole } = useAuth();
