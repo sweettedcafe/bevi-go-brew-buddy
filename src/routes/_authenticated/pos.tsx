@@ -213,28 +213,34 @@ function POSPage() {
 
   function addCustomizedLine(args: {
     item: MenuItem; custom: SelectedCustom; addon: number; qty: number; notes: string;
+    variant: { id: string; name: string; price: number } | null;
     editingLineId?: string;
   }) {
-    const base = Number(args.item.price);
+    const base = Number(args.variant?.price ?? args.item.price);
     const unit = base + args.addon;
     const cleanNotes = args.notes.trim() || null;
+    const variantId = args.variant?.id ?? null;
+    const variantName = args.variant?.name ?? null;
+    const displayName = args.variant ? `${args.item.name} — ${args.variant.name}` : args.item.name;
     setCart((c) => {
       if (args.editingLineId) {
         return c.map((l) => l.lineId === args.editingLineId
-          ? { ...l, customization: args.custom, addon_total: args.addon, unit_price: unit, qty: args.qty, notes: cleanNotes }
+          ? { ...l, customization: args.custom, addon_total: args.addon, unit_price: unit, qty: args.qty, notes: cleanNotes,
+              variant_id: variantId, variant_name: variantName, name: displayName, base_price: base }
           : l);
       }
       const sig = customSignature(args.custom, cleanNotes);
       const dup = c.find((l) =>
         l.menu_item_id === args.item.id &&
+        l.variant_id === variantId &&
         customSignature(l.customization, l.notes) === sig);
       if (dup) return c.map((l) => l.lineId === dup.lineId ? { ...l, qty: l.qty + args.qty } : l);
       return [...c, {
         lineId: newLineId(),
         menu_item_id: args.item.id,
-        variant_id: null,
-        variant_name: null,
-        name: args.item.name,
+        variant_id: variantId,
+        variant_name: variantName,
+        name: displayName,
         base_price: base, unit_price: unit, qty: args.qty,
         customization: args.custom, addon_total: args.addon, notes: cleanNotes,
       }];
