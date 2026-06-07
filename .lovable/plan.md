@@ -1,71 +1,119 @@
+# Variants, Product IDs, Smart Import & Pack-Based Inventory
 
-## 1. Fixes (small, fast)
+This is a large, cross-cutting change spanning the database, Menu, Recipe, POS, Import, and Inventory modules. I'll roll it out in phases so each piece is verifiable before the next.
 
-**Customers page — `customer_self_register` missing**
-The current RPC in `supabase_phase8_schema.sql` is defined as `(p_name, p_phone, p_email)` but PostgREST is being called as `(p_email, p_name, p_phone)` and reporting the function is missing. Migration will:
-- Drop and recreate `public.customer_self_register(p_name text, p_phone text, p_email text)` with `SECURITY DEFINER`, default-null params, and explicit grants to `anon` + `authenticated`.
-- Ensure `customers`, `loyalty_settings` tables + grants exist (idempotent guards on phase 8).
-- Confirm loyalty editor already exists in `customers.tsx` — no code change needed there.
+---
 
-## 2. Staff & Roles — assign by email
+## 1. Database schema changes (migration)
 
-- New server fn `src/lib/staff.functions.ts`:
-  - `listStaffAssignments()` → joins `user_roles` with `auth.users` via `supabaseAdmin` and returns `{ user_id, email, role }[]`.
-  - `assignRoleByEmail({ email, role })` → looks up user_id in `auth.users`, errors with "no account found, ask them to register first" if missing, otherwise inserts into `user_roles` (idempotent).
-  - `removeRole({ user_id, role })`.
-  - All `.middleware([requireSupabaseAuth])` + server-side check that caller has `developer` or `admin`.
-- `src/routes/_authenticated/staff.tsx`: replace UUID input with **email** input. Table shows email + role badge + remove button. Developer-only can assign `developer`.
+**Menu items**
+- Add `product_code TEXT UNIQUE` (e.g. `MENU-000001`) — auto-generated via sequence + trigger. Permanent; never changes when name changes.
+- Add `has_variants BOOLEAN DEFAULT false`.
+- Backfill `product_code` for all existing menu items.
 
-## 3. Reports module — full build
+**New table: `menu_item_variants`**
+```
+id UUID PK
+menu_item_id UUID FK -> menu_items (cascade)
+name TEXT             -- "12oz", "16oz", "22oz"
+price NUMERIC         -- per-variant price
+sort_order INT
+is_active BOOLEAN
+created_at, updated_at
+```
+Grants + RLS mirroring `menu_items`.
 
-New routes under `src/routes/_authenticated/reports.tsx` (replace ComingSoon) with three tabs:
+**New table: `variant_recipe_items`** (per-variant recipe)
+```
+id UUID PK
+variant_id UUID FK -> menu_item_variants (cascade)
+inventory_item_id UUID FK -> inventory_items
+qty NUMERIC          -- in inventory item's base unit (supports decimals)
+```
+Falls back to the existing `recipe_items` table when a menu item has no variants (backward compatible).
 
-### Tab A — Per-order
-Columns (toggleable): order #, date/time, customer, cashier, items count, subtotal, discount, payment method, payment fee, total, status, refund/void buttons.
-- Filters: date range, customer (search), order ID, cashier.
-- Row click → drawer with full order details (line items, customizations, special instructions, totals breakdown).
-- **Refund** button (status=paid) → confirm dialog → calls `pos_refund_order(order_id)` RPC: sets `status='refunded'`, restores inventory via `pos_restock_order`, reverses `points_earned` / re-credits `points_redeemed` on the customer.
-- **Void** button (status in paid/held) → calls `pos_void_order(order_id)`: same effect, sets `status='voided'`.
+**Inventory items — pack conversion**
+- Already has `pack_size` and `pack_label`. Add:
+  - `purchase_unit TEXT` (e.g. "pack", "bag", "bottle") — optional label.
+  - `units_per_pack NUMERIC` — explicit conversion factor (mirrors `pack_size` but kept for clarity; will alias).
+- Add RPC `inventory_add_packs(p_item_id uuid, p_packs numeric)` that:
+  - Computes `added = packs * pack_size`.
+  - Increments `stock_qty` and `full_stock_qty` by `added` (replenishment grows the target too, per spec).
 
-### Tab B — Per-item
-Aggregated by menu item across the filter range: item name, category, qty sold, gross revenue (no discount/fees columns). Same filters minus payment-specific ones.
+**Order items** — add `variant_id UUID NULL` so completed orders deduct from the correct variant recipe and reports stay accurate.
 
-### Tab C — Discounts & Promotions
-List of every order that had `discount_amount > 0` or applied promo, with discount type/code, amount, order #, customer, total.
+**Inventory deduction trigger** updated to:
+- If `order_items.variant_id` is set → use `variant_recipe_items`.
+- Else → fall back to legacy `recipe_items`.
 
-### Customizable columns
-- Per-tab column visibility stored in `localStorage` under `bevi.reports.cols.<tab>`.
-- Settings popover with checkbox list.
+---
 
-### Exports
-- Per-tab **Export CSV** (instant, no auth needed).
-- **Export to Google Sheets** → opens connector-link prompt if not linked; calls server fn `exportReportToSheet` which creates a new spreadsheet via Sheets API gateway and writes the filtered rows.
+## 2. Menu & Recipe admin UI (`/menu`)
 
-## 4. Google Sheets auto-sync on every order
+- New "Variants" section inside the menu item editor (visible when `has_variants` is on).
+- For each variant: name, price, active toggle, and an inline recipe editor (ingredient + qty in the inventory item's base unit, decimals allowed).
+- "Add variant" / "Remove variant" controls.
+- Display the auto-generated `product_code` (read-only) at the top of each item card.
 
-- Add `google_sheets` settings row to a new `integration_settings` table: `{ id=1, sheets_spreadsheet_id text, sheets_enabled bool, sheets_sheet_name text }`. Admin-editable from Reports → Settings.
-- New server fn `appendOrderToSheet(orderId)` (admin-elevated, uses connector gateway `https://connector-gateway.lovable.dev/google_sheets/v4`).
-- Wire it to fire after order creation: extend `pos_create_order` flow on the client (in `pos.tsx` after success) to call `appendOrderToSheet({ data: { orderId } })` if `sheets_enabled`. Best-effort, errors toast but don't fail order.
-- Requires user to link **Google Sheets** connector via `standard_connectors--connect` — I'll trigger that flow when they enable auto-sync.
+Legacy single-recipe editor remains for items without variants.
 
-## Files
+---
 
-**New**
-- `supabase_phase9_schema.sql`
-- `src/lib/staff.functions.ts`
-- `src/lib/reports.functions.ts` (per-order/per-item/discounts data + refund/void + sheets sync)
-- `src/components/reports/OrderDetailDrawer.tsx`
-- `src/components/reports/ColumnsPicker.tsx`
+## 3. POS (`/pos`)
 
-**Edited**
-- `src/routes/_authenticated/staff.tsx` (email assign)
-- `src/routes/_authenticated/reports.tsx` (full module)
-- `src/routes/_authenticated/pos.tsx` (post-order hook to sheets)
-- `src/start.ts` (verify `attachSupabaseAuth` is in `functionMiddleware`)
+- Render one tile per menu item (no per-size duplicates).
+- On tap:
+  - If `has_variants` → open size-picker dialog listing active variants with their prices. Selecting one adds the line with `variant_id` + variant price.
+  - Else → current behavior.
+- Cart line shows `Item Name — Variant`.
+- Checkout writes `variant_id` into `order_items`; inventory trigger handles the rest.
 
-## Order of operations
-1. Write `supabase_phase9_schema.sql` (you run it in SQL editor) — includes the `customer_self_register` fix so the Customers add dialog stops erroring immediately.
-2. Build Staff-by-email + Reports module + refund/void.
-3. Trigger Google Sheets connector prompt; finish auto-sync wiring after you link it.
+---
 
-Ready to implement on your go-ahead.
+## 4. Import with dedupe confirmation
+
+- Menu import CSV: accept `product_code` as primary key, `name` as fallback.
+- Pre-import scan returns:
+  - `new_count`, `matched_count`, `update_count`, plus a sample diff list.
+- New confirmation modal: "X new, Y to update, Z unchanged — Proceed?". Import only runs after explicit confirm.
+- Same dedupe model added to inventory import (already keyed by name; will additionally accept an `item_code` later — out of scope for this pass unless trivial).
+
+---
+
+## 5. Inventory module enhancements
+
+- "Add stock" quick action on each row: enter number of packs → calls `inventory_add_packs` RPC → realtime UI update.
+- Editor exposes `pack_size` / `pack_label` / `purchase_unit` clearly with a live preview ("1 pack = 250 ml → 2 packs = 500 ml").
+- Progress bar already uses `stock_qty / full_stock_qty`; verify it recomputes on realtime change (already wired via `useRealtime`).
+- All numeric fields accept decimals.
+
+---
+
+## 6. Validation & safety
+
+- Block POS add-to-cart if a variant has no recipe items (toast: "Recipe not configured for {size}").
+- Block menu import row if `pack_size`/conversion missing on referenced ingredients.
+- Unique constraint on `(menu_item_id, lower(name))` for variants to prevent duplicate sizes.
+- All deductions remain transactional inside the existing trigger.
+
+---
+
+## Rollout order (each phase independently testable)
+
+1. Migration: `product_code`, variant tables, `inventory_add_packs` RPC, trigger update, `order_items.variant_id`.
+2. Menu admin: variant editor + product code display.
+3. POS: size picker + variant-aware cart/checkout.
+4. Import: scan + confirmation modal.
+5. Inventory: add-packs action + clearer pack UI.
+6. QA pass + backward-compat check on existing items.
+
+---
+
+## Technical notes
+
+- `product_code` generated by Postgres sequence `menu_item_code_seq` + `BEFORE INSERT` trigger formatting `MENU-` + `lpad(nextval, 6, '0')`.
+- Backward compatibility: items with `has_variants=false` continue to use `recipe_items` and a single `menu_items.price`. No data migration required for existing menu rows beyond backfilling `product_code`.
+- Realtime: existing `useRealtime("inventory_items", …)` covers stock updates; add subscriptions to `menu_item_variants` on the menu page.
+- All numeric columns use `NUMERIC` (not `INT`) to support decimals.
+
+Shall I proceed with Phase 1 (the migration)?
