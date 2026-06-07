@@ -578,7 +578,7 @@ function POSPage() {
       code: data.code, label: data.name, amount: amt,
       applies_to_item_id: itemId,
     });
-    setManual(null);
+    if (!itemId) setManual(null);
     toast.success(`Promo "${data.name}" applied`);
   }
 
