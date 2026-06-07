@@ -242,8 +242,9 @@ function ReportsPage() {
   const totals = useMemo(() => {
     let gross = 0, disc = 0, net = 0, count = 0;
     for (const o of orders) {
-      if (o.status === "voided" || o.status === "refunded") continue;
-      gross += Number(o.subtotal); disc += Number(o.discount_total); net += Number(o.total); count++;
+      // Signed totals: sale rows are positive, void/refund mirrors are negative.
+      gross += Number(o.subtotal); disc += Number(o.discount_total); net += Number(o.total);
+      if ((o.txn_kind ?? "sale") === "sale" && o.status !== "voided" && o.status !== "refunded") count++;
     }
     return { gross, disc, net, count };
   }, [orders]);
