@@ -33,7 +33,10 @@ type Loyalty = {
 };
 
 function CustomersPage() {
+  const { hasRole } = useAuth();
+  const isDev = hasRole("developer");
   const [list, setList] = useState<Customer[]>([]);
+  const [deletedList, setDeletedList] = useState<Customer[]>([]);
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
@@ -43,14 +46,25 @@ function CustomersPage() {
   async function load() {
     setLoading(true);
     const [{ data: c }, { data: l }] = await Promise.all([
-      db.from("customers").select("*").order("created_at", { ascending: false }),
+      db.from("customers").select("*").is("deleted_at", null).order("created_at", { ascending: false }),
       db.from("loyalty_settings").select("*").eq("id", 1).maybeSingle(),
     ]);
     setList((c ?? []) as Customer[]);
     if (l) setLoyalty(l as Loyalty);
+    if (isDev) {
+      const { data: d } = await db.rpc("dev_list_deleted_customers");
+      setDeletedList((d ?? []) as Customer[]);
+    }
     setLoading(false);
   }
   useEffect(() => { load(); }, []);
+
+  async function restoreCustomer(id: string) {
+    const { error } = await db.rpc("dev_restore_customer", { p_id: id });
+    if (error) { toast.error(error.message); return; }
+    toast.success("Customer restored");
+    load();
+  }
 
   const filtered = q.trim()
     ? list.filter((c) =>
