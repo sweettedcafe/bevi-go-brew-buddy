@@ -71,11 +71,13 @@ function DiscountsPage() {
       min_subtotal: 0, max_uses: null, uses_count: 0,
       starts_at: null, ends_at: null, is_active: true,
       applies_to_item_id: null,
+      applies_to_item_ids: [],
     });
     setOpen(true);
   }
 
   async function save(d: Discount) {
+    const ids = (d.applies_to_item_ids ?? []).filter(Boolean);
     const payload = {
       code: d.code?.trim() ? d.code.trim().toUpperCase() : null,
       name: d.name.trim(),
@@ -86,7 +88,8 @@ function DiscountsPage() {
       starts_at: d.starts_at || null,
       ends_at: d.ends_at || null,
       is_active: d.is_active,
-      applies_to_item_id: d.applies_to_item_id || null,
+      applies_to_item_id: ids[0] ?? null, // keep legacy column in sync
+      applies_to_item_ids: ids,
     };
     if (!payload.name) { toast.error("Name required"); return; }
     const { error } = d.id
