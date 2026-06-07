@@ -1,6 +1,5 @@
 import { useEffect, useRef } from "react";
 import QRCode from "qrcode";
-import JsBarcode from "jsbarcode";
 
 export function QrCanvas({ value, size = 200 }: { value: string; size?: number }) {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -23,5 +22,3 @@ export function BarcodeSvg({ value, size = 180 }: { value: string; height?: numb
   );
 }
 
-// Suppress unused-import warning for JsBarcode kept for potential future use.
-void JsBarcode;
