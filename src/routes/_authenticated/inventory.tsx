@@ -193,6 +193,9 @@ function InventoryPage() {
                   </div>
                   {isAdmin && (
                     <div className="flex items-center gap-1">
+                      <Button size="sm" variant="outline" onClick={() => setRestock(r)}>
+                        <PackagePlus className="h-3.5 w-3.5 mr-1" /> Add packs
+                      </Button>
                       <Switch checked={r.is_active} onCheckedChange={() => toggleActive(r)} />
                       <Button size="icon" variant="ghost" onClick={() => setEditing(r)}>
                         <Pencil className="h-3.5 w-3.5" />
