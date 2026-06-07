@@ -522,11 +522,12 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function StatusBadge({ s }: { s: string }) {
+function StatusBadge({ s, k }: { s: string; k?: string }) {
+  const effective = (k && k !== "sale") ? (k === "void" ? "voided" : "refunded") : s;
   const map: Record<string, string> = {
     completed: "default", on_hold: "secondary", voided: "destructive", refunded: "outline", open: "secondary",
   };
-  return <Badge variant={(map[s] ?? "secondary") as any} className="capitalize">{s.replace("_", " ")}</Badge>;
+  return <Badge variant={(map[effective] ?? "secondary") as any} className="capitalize">{effective.replace("_", " ")}</Badge>;
 }
 
 function ColumnsPicker({ cols, value, onChange }: {
