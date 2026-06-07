@@ -33,10 +33,15 @@ type Discount = {
   ends_at: string | null;
   is_active: boolean;
   applies_to_item_id: string | null;
+  applies_to_item_ids: string[] | null;
 };
 type MenuItemLite = { id: string; name: string };
 
 const db = supabase as any;
+
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Check, ChevronsUpDown } from "lucide-react";
 
 function DiscountsPage() {
   const { primaryRole } = useAuth();
@@ -66,11 +71,13 @@ function DiscountsPage() {
       min_subtotal: 0, max_uses: null, uses_count: 0,
       starts_at: null, ends_at: null, is_active: true,
       applies_to_item_id: null,
+      applies_to_item_ids: [],
     });
     setOpen(true);
   }
 
   async function save(d: Discount) {
+    const ids = (d.applies_to_item_ids ?? []).filter(Boolean);
     const payload = {
       code: d.code?.trim() ? d.code.trim().toUpperCase() : null,
       name: d.name.trim(),
@@ -81,7 +88,8 @@ function DiscountsPage() {
       starts_at: d.starts_at || null,
       ends_at: d.ends_at || null,
       is_active: d.is_active,
-      applies_to_item_id: d.applies_to_item_id || null,
+      applies_to_item_id: ids[0] ?? null, // keep legacy column in sync
+      applies_to_item_ids: ids,
     };
     if (!payload.name) { toast.error("Name required"); return; }
     const { error } = d.id
@@ -276,22 +284,16 @@ function DiscountDialog({
           </div>
           <div>
             <label className="text-xs text-muted-foreground">
-              Applies to (leave blank = whole order)
+              Applies to (leave blank = whole order — pick multiple items to scope)
             </label>
-            <Select
-              value={d.applies_to_item_id ?? "__all__"}
-              onValueChange={(v) => setD({ ...d, applies_to_item_id: v === "__all__" ? null : v })}
-            >
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">Whole order (subtotal)</SelectItem>
-                {menuItems.map((m) => (
-                  <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <MultiItemPicker
+              menuItems={menuItems}
+              selected={d.applies_to_item_ids ?? []}
+              onChange={(ids) => setD({ ...d, applies_to_item_ids: ids, applies_to_item_id: ids[0] ?? null })}
+            />
             <p className="text-[11px] text-muted-foreground mt-1">
-              If an item is selected, the discount only reduces that specific item's line in the POS.
+              If items are selected, the discount only reduces those items' lines in the POS.
+              Bundle items are excluded — bundles already carry their own discounts.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -306,5 +308,56 @@ function DiscountDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function MultiItemPicker({
+  menuItems, selected, onChange,
+}: {
+  menuItems: MenuItemLite[];
+  selected: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  const selectedSet = new Set(selected);
+  const label = selected.length === 0
+    ? "Whole order (subtotal)"
+    : selected.length === 1
+      ? (menuItems.find((m) => m.id === selected[0])?.name ?? "1 item")
+      : `${selected.length} items selected`;
+  function toggle(id: string) {
+    const next = new Set(selectedSet);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    onChange([...next]);
+  }
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="outline" className="w-full justify-between font-normal">
+          <span className="truncate">{label}</span>
+          <ChevronsUpDown className="h-3 w-3 ml-2 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[320px] p-0 max-h-[300px] overflow-y-auto">
+        <button
+          type="button"
+          className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-accent border-b"
+          onClick={() => onChange([])}
+        >
+          {selected.length === 0 ? <Check className="h-3 w-3" /> : <span className="w-3" />}
+          Whole order (clear selection)
+        </button>
+        {menuItems.map((m) => (
+          <button
+            key={m.id}
+            type="button"
+            className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-accent text-left"
+            onClick={() => toggle(m.id)}
+          >
+            <Checkbox checked={selectedSet.has(m.id)} className="pointer-events-none" />
+            <span className="truncate">{m.name}</span>
+          </button>
+        ))}
+      </PopoverContent>
+    </Popover>
   );
 }

@@ -52,6 +52,7 @@ type CartLine = {
   customization: SelectedCustom | null;
   addon_total: number;
   notes: string | null;
+  bundle_id?: string | null;
 };
 type OrderType = "dine_in" | "takeout" | "delivery";
 type PMConfig = {
@@ -76,6 +77,7 @@ type DiscountRow = {
   min_subtotal: number; max_uses: number | null; uses_count: number;
   starts_at: string | null; ends_at: string | null; is_active: boolean;
   applies_to_item_id: string | null;
+  applies_to_item_ids: string[] | null;
 };
 
 const db = supabase as any;
@@ -316,25 +318,29 @@ function POSPage() {
   }, [posSettings.scanEnabled, posSettings.scanAutoFocus, cart.length, checkoutOpen, holdOpen, todayOpen]);
 
   // Auto-apply item-scoped discounts when matching item is in cart.
-  // If an item-scoped promo is currently applied and its item leaves the cart, clear it.
+  // Bundle lines are exempt — bundles already carry their own per-item discount.
   useEffect(() => {
-    if (manual) return; // manager override wins
-    const itemIds = new Set(cart.map((l) => l.menu_item_id));
-    // clear stale item-scoped promo
+    if (manual) return;
+    const nonBundle = cart.filter((l) => !l.bundle_id);
+    const itemIds = new Set(nonBundle.map((l) => l.menu_item_id));
+    const scopedIds = (d: DiscountRow) =>
+      (d.applies_to_item_ids && d.applies_to_item_ids.length > 0)
+        ? d.applies_to_item_ids
+        : (d.applies_to_item_id ? [d.applies_to_item_id] : []);
     if (appliedPromo?.applies_to_item_id && !itemIds.has(appliedPromo.applies_to_item_id)) {
       setAppliedPromo(null);
       return;
     }
-    // skip if a non-item promo is already applied
     if (appliedPromo && !appliedPromo.applies_to_item_id) return;
-    // find best matching item-scoped discount
-    const match = discounts.find((d) =>
-      d.applies_to_item_id && itemIds.has(d.applies_to_item_id),
-    );
+    const match = discounts.find((d) => {
+      const ids = scopedIds(d);
+      return ids.length > 0 && ids.some((i) => itemIds.has(i));
+    });
     if (!match) return;
-    if (appliedPromo?.applies_to_item_id === match.applies_to_item_id) return;
-    const base = cart
-      .filter((l) => l.menu_item_id === match.applies_to_item_id)
+    const matchIds = scopedIds(match);
+    if (appliedPromo && matchIds.includes(appliedPromo.applies_to_item_id ?? "")) return;
+    const base = nonBundle
+      .filter((l) => matchIds.includes(l.menu_item_id))
       .reduce((s, l) => s + l.unit_price * l.qty, 0);
     if (base <= 0) return;
     const amt = match.type === "percent"
@@ -344,7 +350,7 @@ function POSPage() {
       code: match.code ?? match.name,
       label: match.name,
       amount: amt,
-      applies_to_item_id: match.applies_to_item_id,
+      applies_to_item_id: matchIds[0],
     });
   }, [cart, discounts, manual, appliedPromo]);
 
