@@ -700,6 +700,11 @@ function POSPage() {
                   inputMode="numeric"
                   disabled={scanBusy}
                 />
+                <Button type="button" variant="outline" size="sm"
+                  onClick={() => setCameraOpen(true)} disabled={scanBusy}
+                  title="Scan with camera">
+                  <Camera className="h-4 w-4" />
+                </Button>
                 <Button type="submit" variant="outline" size="sm" disabled={scanBusy || !scanInput.trim()}>
                   Find
                 </Button>
