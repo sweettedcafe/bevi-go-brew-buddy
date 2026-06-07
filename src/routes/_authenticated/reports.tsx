@@ -486,8 +486,14 @@ function ReportsPage() {
         </TabsContent>
       </Tabs>
 
-      {detailId && <OrderDetailDialog id={detailId} staffEmails={staffEmails}
-        onClose={() => setDetailId(null)} />}
+      {detailId && (
+        <OrderDetailSheet
+          orderId={detailId}
+          canReverse={canRefund}
+          onClose={() => setDetailId(null)}
+          onChanged={loadAll}
+        />
+      )}
     </div>
   );
 }
@@ -498,7 +504,13 @@ function fmt(v: any, key: string) {
   if (key === "subtotal" || key === "discount_total" || key === "total" || key === "fee_amount")
     return `₱${Number(v).toFixed(2)}`;
   if (key === "order_no") return `#${String(v).padStart(3, "0")}`;
+  if (key === "txn_kind") return String(v ?? "sale");
   return String(v);
+}
+
+function TxnBadge({ k }: { k: string }) {
+  const map: Record<string, string> = { sale: "default", void: "destructive", refund: "outline" };
+  return <Badge variant={(map[k] ?? "secondary") as any} className="capitalize">{k}</Badge>;
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
