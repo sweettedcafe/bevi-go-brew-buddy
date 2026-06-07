@@ -871,7 +871,7 @@ function POSPage() {
 
         {/* Promo + manual discount */}
         <div className="px-4 pt-3 pb-2 border-t space-y-2">
-          {appliedPromo ? (
+          {appliedPromo && (
             <div className="flex items-center gap-2 bg-primary/10 rounded px-3 py-2 text-sm">
               <Tag className="h-3 w-3 text-primary" />
               <span className="font-medium">{appliedPromo.code}</span>
@@ -881,7 +881,8 @@ function POSPage() {
                 <X className="h-3 w-3" />
               </Button>
             </div>
-          ) : manual ? (
+          )}
+          {manual && (
             <div className="flex items-center gap-2 bg-secondary rounded px-3 py-2 text-sm">
               <Tag className="h-3 w-3" />
               <span className="font-medium">{manual.label}</span>
@@ -890,72 +891,71 @@ function POSPage() {
                 <X className="h-3 w-3" />
               </Button>
             </div>
-          ) : (
-            <div className="space-y-2">
-              <div className="flex gap-2">
-                <Input placeholder="Promo code" value={promoCode}
-                  onChange={(e) => setPromoCode(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && applyPromo()} />
-                <Button variant="outline" onClick={() => applyPromo()} disabled={cart.length === 0}>Apply</Button>
-              </div>
-              {(() => {
-                const codeOpts = discounts.filter((d) => !!d.code);
-                if (codeOpts.length === 0) return null;
-                return (
-                  <Select value="" onValueChange={(code) => { if (cart.length === 0) return; applyPromo(code); }}>
-                    <SelectTrigger className="h-9">
-                      <SelectValue placeholder="Select promo code…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {codeOpts.map((d) => (
-                        <SelectItem key={d.id} value={d.code as string}>
-                          {d.code} — {d.name} ({d.type === "percent" ? `${d.value}%` : `−${Number(d.value).toFixed(2)}`})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                );
-              })()}
-              {(() => {
-                const opts = discounts.filter((d) => !d.applies_to_item_id);
-                if (opts.length === 0) return null;
-                return (
-                  <Select
-                    value=""
-                    onValueChange={(id) => {
-                      const d = opts.find((x) => x.id === id);
-                      if (!d || cart.length === 0) return;
-                      if (d.min_subtotal && subtotal < Number(d.min_subtotal)) {
-                        toast.error(`Min subtotal ${fmt(Number(d.min_subtotal))}`);
-                        return;
-                      }
-                      const amt = d.type === "percent"
-                        ? Math.round(subtotal * Number(d.value)) / 100
-                        : Math.min(Number(d.value), subtotal);
-                      setAppliedPromo({
-                        code: d.code ?? d.name, label: d.name, amount: amt,
-                        applies_to_item_id: null,
-                      });
-                      setManual(null);
-                      toast.success(`${d.name} applied`);
-                    }}
-                  >
-                    <SelectTrigger className="h-9">
-                      <SelectValue placeholder="Select discount (Senior, PWD…)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {opts.map((d) => (
-                        <SelectItem key={d.id} value={d.id}>
-                          {d.name} · {d.type === "percent" ? `${d.value}%` : `−${Number(d.value).toFixed(2)}`}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                );
-              })()}
-            </div>
           )}
-          {isAdmin && !appliedPromo && !manual && cart.length > 0 && (
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <Input placeholder="Promo code" value={promoCode}
+                onChange={(e) => setPromoCode(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && applyPromo()} />
+              <Button variant="outline" onClick={() => applyPromo()} disabled={cart.length === 0}>Apply</Button>
+            </div>
+            {(() => {
+              const codeOpts = discounts.filter((d) => !!d.code);
+              if (codeOpts.length === 0) return null;
+              return (
+                <Select value="" onValueChange={(code) => { if (cart.length === 0) return; applyPromo(code); }}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="Select promo code…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {codeOpts.map((d) => (
+                      <SelectItem key={d.id} value={d.code as string}>
+                        {d.code} — {d.name} ({d.type === "percent" ? `${d.value}%` : `−${Number(d.value).toFixed(2)}`})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              );
+            })()}
+            {(() => {
+              const opts = discounts.filter((d) => !d.applies_to_item_id);
+              if (opts.length === 0) return null;
+              return (
+                <Select
+                  value=""
+                  onValueChange={(id) => {
+                    const d = opts.find((x) => x.id === id);
+                    if (!d || cart.length === 0) return;
+                    if (d.min_subtotal && subtotal < Number(d.min_subtotal)) {
+                      toast.error(`Min subtotal ${fmt(Number(d.min_subtotal))}`);
+                      return;
+                    }
+                    const amt = d.type === "percent"
+                      ? Math.round(subtotal * Number(d.value)) / 100
+                      : Math.min(Number(d.value), subtotal);
+                    setAppliedPromo({
+                      code: d.code ?? d.name, label: d.name, amount: amt,
+                      applies_to_item_id: null,
+                    });
+                    setManual(null);
+                    toast.success(`${d.name} applied`);
+                  }}
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="Select discount (Senior, PWD…)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {opts.map((d) => (
+                      <SelectItem key={d.id} value={d.id}>
+                        {d.name} · {d.type === "percent" ? `${d.value}%` : `−${Number(d.value).toFixed(2)}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              );
+            })()}
+          </div>
+          {isAdmin && !manual && cart.length > 0 && (
             <ManualDiscountControl subtotal={subtotal} onApply={setManual} />
           )}
         </div>
