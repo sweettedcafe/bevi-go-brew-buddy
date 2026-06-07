@@ -757,6 +757,29 @@ function POSPage() {
                   </div>
                 </div>
               )}
+
+              {customer.top_items && customer.top_items.length > 0 && (
+                <div className="pt-1 border-t border-border/50">
+                  <div className="text-[11px] text-muted-foreground mb-1 flex items-center gap-1">
+                    <Sparkles className="h-3 w-3" /> Most ordered — ask if they want “the usual”
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {customer.top_items.slice(0, 5).map((t) => {
+                      const it = items.find((x) => x.id === t.menu_item_id);
+                      return (
+                        <Button key={t.menu_item_id} size="sm" variant="outline"
+                          className="h-7 text-[11px] gap-1"
+                          disabled={!it}
+                          onClick={() => it && addItem(it)}
+                          title={`Ordered ${t.qty}× before`}>
+                          <Plus className="h-3 w-3" /> {t.name}
+                          <span className="text-muted-foreground">×{t.qty}</span>
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </Card>
           )}
         </div>
