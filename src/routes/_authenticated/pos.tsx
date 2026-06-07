@@ -179,9 +179,9 @@ function POSPage() {
 
   function addItem(it: MenuItem) {
     if (it.has_variants) {
-      const hasAny = variants.some((v) => v.menu_item_id === it.id);
+      const hasAny = variants.some((v) => v.menu_item_id === it.id && v.is_active !== false);
       if (!hasAny) { toast.error(`${it.name} has no variants configured`); return; }
-      setVariantPick(it);
+      setCustomizing({ item: it });
       return;
     }
     if (hasAnyCustomization(it.options)) {
