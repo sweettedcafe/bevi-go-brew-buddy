@@ -504,9 +504,10 @@ function POSPage() {
     }
   }
 
-  async function applyPromo() {
-    const code = promoCode.trim().toUpperCase();
+  async function applyPromo(overrideCode?: string) {
+    const code = (overrideCode ?? promoCode).trim().toUpperCase();
     if (!code) return;
+    setPromoCode(code);
     const { data, error } = await db
       .from("discounts").select("*")
       .eq("code", code).eq("is_active", true).maybeSingle();
@@ -861,8 +862,26 @@ function POSPage() {
                 <Input placeholder="Promo code" value={promoCode}
                   onChange={(e) => setPromoCode(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && applyPromo()} />
-                <Button variant="outline" onClick={applyPromo} disabled={cart.length === 0}>Apply</Button>
+                <Button variant="outline" onClick={() => applyPromo()} disabled={cart.length === 0}>Apply</Button>
               </div>
+              {(() => {
+                const codeOpts = discounts.filter((d) => !!d.code);
+                if (codeOpts.length === 0) return null;
+                return (
+                  <Select value="" onValueChange={(code) => { if (cart.length === 0) return; applyPromo(code); }}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Select promo code…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {codeOpts.map((d) => (
+                        <SelectItem key={d.id} value={d.code as string}>
+                          {d.code} — {d.name} ({d.type === "percent" ? `${d.value}%` : `−${Number(d.value).toFixed(2)}`})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                );
+              })()}
               {(() => {
                 const opts = discounts.filter((d) => !d.applies_to_item_id);
                 if (opts.length === 0) return null;
