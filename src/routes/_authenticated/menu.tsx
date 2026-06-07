@@ -272,22 +272,26 @@ function MenuPage() {
 }
 
 function EditMenuDialog({
-  item, cats, invs, initialRecipes, initialVariants, allVariantRecipes, onClose, onSaved,
+  item, cats, owners, invs, initialRecipes, initialVariants, allVariantRecipes,
+  onClose, onSaved, onOwnersChanged,
 }: {
   item: Item;
   cats: Cat[];
+  owners: Owner[];
   invs: Inv[];
   initialRecipes: Recipe[];
   initialVariants: Variant[];
   allVariantRecipes: VariantRecipe[];
   onClose: () => void;
   onSaved: () => void;
+  onOwnersChanged: () => void;
 }) {
   const [f, setF] = useState({
     name: item.name,
     description: item.description ?? "",
     price: String(item.price),
     category_id: item.category_id ?? "",
+    owner_id: item.owner_id ?? "",
     is_active: item.is_active,
     has_variants: item.has_variants,
     sort_order: String(item.sort_order),
