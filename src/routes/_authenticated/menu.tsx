@@ -543,7 +543,7 @@ const EMPTY_SUB = {
   option_group: "", option_label: "", option_price: "", option_default: "",
 };
 const EMPTY_BASE = {
-  name: "", category: "", price: "", description: "", is_active: "", sort_order: "",
+  product_code: "", name: "", category: "", price: "", description: "", is_active: "", sort_order: "",
 };
 
 function ImportExportButtons({
