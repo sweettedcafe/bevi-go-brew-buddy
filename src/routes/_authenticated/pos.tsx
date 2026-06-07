@@ -110,17 +110,20 @@ function POSPage() {
   const [topSellers, setTopSellers] = useState<Set<string>>(new Set());
   const [bundles, setBundles] = useState<Bundle[]>([]);
   const [bundleItems, setBundleItems] = useState<BundleItem[]>([]);
+  const [discounts, setDiscounts] = useState<DiscountRow[]>([]);
 
   // Barcode / customer loyalty
   type LoyaltyCustomer = {
     id: string; code: string; name: string; phone: string | null; points: number;
     recent_orders: Array<{ id: string; order_no: number; created_at: string; total: number; status: string }>;
+    top_items?: Array<{ menu_item_id: string; name: string; qty: number; last_at: string }>;
   };
   const posSettings = useMemo(() => loadPosSettings(), []);
   const [customer, setCustomer] = useState<LoyaltyCustomer | null>(null);
   const [scanInput, setScanInput] = useState("");
   const [scanBusy, setScanBusy] = useState(false);
   const [redeem, setRedeem] = useState<string>("");
+  const [cameraOpen, setCameraOpen] = useState(false);
   const scanRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
