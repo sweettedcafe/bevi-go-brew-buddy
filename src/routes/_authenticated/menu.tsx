@@ -34,10 +34,12 @@ type Item = {
   is_active: boolean;
   has_variants: boolean;
   category_id: string | null;
+  owner_id: string | null;
   sort_order: number;
   options: MenuOptions | null;
 };
 type Cat = { id: string; name: string };
+type Owner = { id: string; name: string; is_active: boolean };
 type Inv = { id: string; name: string; unit: string; is_active: boolean };
 type Recipe = { menu_item_id: string; inventory_item_id: string; qty_per_unit: number };
 type Variant = {
