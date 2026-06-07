@@ -387,7 +387,7 @@ function POSPage() {
       ? Math.round(base * Number(match.value)) / 100
       : Math.min(Number(match.value), base);
     setAppliedPromo({
-      code: match.code ?? match.name,
+      code: match.code ?? null,
       label: match.name,
       amount: amt,
       applies_to_item_id: matchIds[0],
