@@ -363,7 +363,10 @@ function POSPage() {
       const addon = Number(it.addon_total ?? 0);
       return {
         lineId: newLineId(),
-        menu_item_id: it.menu_item_id, name: it.name,
+        menu_item_id: it.menu_item_id,
+        variant_id: it.variant_id ?? null,
+        variant_name: it.variant_name ?? null,
+        name: it.name,
         base_price: unit - addon, unit_price: unit, qty: Number(it.qty),
         customization: (it.customization ?? null) as SelectedCustom | null,
         addon_total: addon,
