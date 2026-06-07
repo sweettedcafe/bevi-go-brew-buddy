@@ -30,35 +30,58 @@ type Bundle = {
   ends_at: string | null;
   is_active: boolean;
 };
-type BundleItem = { id?: string; bundle_id?: string; menu_item_id: string; qty: number };
-type MenuItem = { id: string; name: string; price: number };
+type BundleItem = {
+  id?: string;
+  bundle_id?: string;
+  menu_item_id: string;
+  qty: number;
+  discount_type: "percent" | "fixed";
+  discount_value: number;
+};
+type MenuItem = { id: string; name: string; price: number; owner_id: string | null };
+type Owner = { id: string; name: string };
 
 const db = supabase as any;
+
+function discountedUnit(item: MenuItem | undefined, type: "percent" | "fixed", value: number) {
+  if (!item) return 0;
+  const p = Number(item.price);
+  if (type === "percent") return Math.max(0, p - p * (Number(value) || 0) / 100);
+  return Math.max(0, p - (Number(value) || 0));
+}
 
 function BundlesPage() {
   const { primaryRole } = useAuth();
   const isAdmin = primaryRole === "admin" || primaryRole === "developer";
   const [bundles, setBundles] = useState<Bundle[]>([]);
   const [items, setItems] = useState<MenuItem[]>([]);
+  const [owners, setOwners] = useState<Owner[]>([]);
   const [bItems, setBItems] = useState<BundleItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Bundle | null>(null);
 
   async function load() {
     setLoading(true);
-    const [{ data: b }, { data: m }, { data: bi }] = await Promise.all([
+    const [{ data: b }, { data: m }, { data: bi }, { data: o }] = await Promise.all([
       db.from("bundles").select("*").order("created_at", { ascending: false }),
-      db.from("menu_items").select("id,name,price").eq("is_active", true).order("name"),
+      db.from("menu_items").select("id,name,price,owner_id").eq("is_active", true).order("name"),
       db.from("bundle_items").select("*"),
+      db.from("owners").select("id,name").order("name"),
     ]);
     setBundles((b ?? []) as Bundle[]);
     setItems((m ?? []) as MenuItem[]);
-    setBItems((bi ?? []) as BundleItem[]);
+    setBItems(((bi ?? []) as any[]).map((r) => ({
+      ...r,
+      discount_type: (r.discount_type ?? "percent") as "percent" | "fixed",
+      discount_value: Number(r.discount_value ?? 0),
+    })));
+    setOwners((o ?? []) as Owner[]);
     setLoading(false);
   }
   useEffect(() => { void load(); }, []);
 
-  const itemName = (id: string) => items.find((x) => x.id === id)?.name ?? "—";
+  const itemById = (id: string) => items.find((x) => x.id === id);
+  const ownerName = (id: string | null) => id ? (owners.find((x) => x.id === id)?.name ?? "—") : "—";
   const bItemsFor = (id: string) => bItems.filter((x) => x.bundle_id === id);
   const isExpired = (b: Bundle) => b.ends_at && new Date(b.ends_at) < new Date();
 
@@ -82,7 +105,7 @@ function BundlesPage() {
         <div className="flex-1">
           <h1 className="text-2xl sm:text-3xl font-display">Bundles</h1>
           <p className="text-sm text-muted-foreground">
-            Combo offers shown in the POS. Bundles past their expiry date are automatically hidden.
+            Set a discount per item (% or fixed) — the bundle price auto-computes from the sum.
           </p>
         </div>
         {isAdmin && (
@@ -114,12 +137,31 @@ function BundlesPage() {
                       {expired && <Badge variant="destructive">expired</Badge>}
                     </div>
                     {b.description && <div className="text-sm text-muted-foreground">{b.description}</div>}
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {its.map((x) => (
-                        <Badge key={x.id} variant="secondary" className="text-xs">
-                          {itemName(x.menu_item_id)} × {x.qty}
-                        </Badge>
-                      ))}
+                    <div className="mt-2 space-y-1">
+                      {its.map((x) => {
+                        const it = itemById(x.menu_item_id);
+                        const unit = discountedUnit(it, x.discount_type, x.discount_value);
+                        const orig = Number(it?.price ?? 0);
+                        return (
+                          <div key={x.id} className="flex items-center justify-between text-xs gap-2">
+                            <div className="flex items-center gap-1 min-w-0">
+                              <span className="truncate">{it?.name ?? "—"} × {x.qty}</span>
+                              <Badge variant="outline" className="text-[10px] shrink-0">{ownerName(it?.owner_id ?? null)}</Badge>
+                            </div>
+                            <div className="shrink-0 text-muted-foreground">
+                              {x.discount_value > 0 && (
+                                <span className="line-through mr-1">{orig.toFixed(2)}</span>
+                              )}
+                              <span className="text-primary font-medium">{unit.toFixed(2)}</span>
+                              {x.discount_value > 0 && (
+                                <span className="ml-1 text-[10px]">
+                                  −{x.discount_type === "percent" ? `${x.discount_value}%` : x.discount_value.toFixed(2)}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                     <div className="text-xs text-muted-foreground mt-2">
                       {b.starts_at && <>Starts: {new Date(b.starts_at).toLocaleString()}<br /></>}
@@ -151,6 +193,7 @@ function BundlesPage() {
         <EditBundleDialog
           bundle={editing}
           items={items}
+          owners={owners}
           initialItems={editing.id ? bItemsFor(editing.id) : []}
           onClose={() => setEditing(null)}
           onSaved={() => { setEditing(null); void load(); }}
@@ -161,10 +204,11 @@ function BundlesPage() {
 }
 
 function EditBundleDialog({
-  bundle, items, initialItems, onClose, onSaved,
+  bundle, items, owners, initialItems, onClose, onSaved,
 }: {
   bundle: Bundle;
   items: MenuItem[];
+  owners: Owner[];
   initialItems: BundleItem[];
   onClose: () => void;
   onSaved: () => void;
@@ -172,20 +216,39 @@ function EditBundleDialog({
   const [f, setF] = useState({
     name: bundle.name,
     description: bundle.description ?? "",
-    price: String(bundle.price),
     starts_at: bundle.starts_at ? bundle.starts_at.slice(0, 16) : "",
     ends_at: bundle.ends_at ? bundle.ends_at.slice(0, 16) : "",
     is_active: bundle.is_active,
   });
-  const [rows, setRows] = useState<Array<{ menu_item_id: string; qty: string }>>(
-    initialItems.map((x) => ({ menu_item_id: x.menu_item_id, qty: String(x.qty) })),
+  const [rows, setRows] = useState<Array<{
+    menu_item_id: string; qty: string;
+    discount_type: "percent" | "fixed"; discount_value: string;
+  }>>(
+    initialItems.map((x) => ({
+      menu_item_id: x.menu_item_id,
+      qty: String(x.qty),
+      discount_type: x.discount_type,
+      discount_value: String(x.discount_value),
+    })),
   );
   const [saving, setSaving] = useState(false);
+
+  const ownerName = (id: string | null) => id ? (owners.find((x) => x.id === id)?.name ?? "—") : "—";
 
   const componentTotal = useMemo(() =>
     rows.reduce((s, r) => {
       const it = items.find((x) => x.id === r.menu_item_id);
       return s + (it ? Number(it.price) * (Number(r.qty) || 0) : 0);
+    }, 0),
+  [rows, items]);
+
+  // auto-computed bundle price = sum of discounted units * qty
+  const computedPrice = useMemo(() =>
+    rows.reduce((s, r) => {
+      const it = items.find((x) => x.id === r.menu_item_id);
+      if (!it) return s;
+      const unit = discountedUnit(it, r.discount_type, Number(r.discount_value) || 0);
+      return s + unit * (Number(r.qty) || 0);
     }, 0),
   [rows, items]);
 
@@ -197,7 +260,7 @@ function EditBundleDialog({
     const payload = {
       name: f.name.trim(),
       description: f.description.trim() || null,
-      price: Number(f.price) || 0,
+      price: Number(computedPrice.toFixed(2)),
       starts_at: f.starts_at || null,
       ends_at: f.ends_at || null,
       is_active: f.is_active,
@@ -213,7 +276,11 @@ function EditBundleDialog({
     }
     await db.from("bundle_items").delete().eq("bundle_id", id);
     const ins = rows.map((r) => ({
-      bundle_id: id, menu_item_id: r.menu_item_id, qty: Number(r.qty),
+      bundle_id: id,
+      menu_item_id: r.menu_item_id,
+      qty: Number(r.qty),
+      discount_type: r.discount_type,
+      discount_value: Number(r.discount_value) || 0,
     }));
     const { error: e2 } = await db.from("bundle_items").insert(ins);
     if (e2) { setSaving(false); return toast.error(e2.message); }
@@ -224,7 +291,7 @@ function EditBundleDialog({
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{bundle.id ? "Edit bundle" : "New bundle"}</DialogTitle>
         </DialogHeader>
@@ -238,14 +305,11 @@ function EditBundleDialog({
             <label className="text-xs text-muted-foreground">Description</label>
             <Textarea rows={2} value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} />
           </div>
-          <div>
-            <label className="text-xs text-muted-foreground">Bundle price</label>
-            <Input type="number" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} />
-          </div>
-          <div className="flex items-center gap-2 mt-5">
+          <div className="flex items-center gap-2">
             <Switch checked={f.is_active} onCheckedChange={(v) => setF({ ...f, is_active: v })} />
             <span className="text-sm">Active</span>
           </div>
+          <div />
           <div>
             <label className="text-xs text-muted-foreground">Starts at (optional)</label>
             <Input type="datetime-local" value={f.starts_at}
@@ -262,7 +326,9 @@ function EditBundleDialog({
           <div className="flex items-center justify-between mb-2">
             <h3 className="font-medium text-sm">Items in this bundle</h3>
             <Button size="sm" variant="outline"
-              onClick={() => setRows((a) => [...a, { menu_item_id: "", qty: "1" }])}>
+              onClick={() => setRows((a) => [...a, {
+                menu_item_id: "", qty: "1", discount_type: "percent", discount_value: "0",
+              }])}>
               <Plus className="h-3 w-3 mr-1" /> Add item
             </Button>
           </div>
@@ -270,32 +336,67 @@ function EditBundleDialog({
             <div className="text-xs text-muted-foreground py-2">No items selected.</div>
           ) : (
             <div className="space-y-2">
-              {rows.map((r, i) => (
-                <div key={i} className="flex gap-2 items-center">
-                  <Select value={r.menu_item_id}
-                    onValueChange={(v) => setRows((arr) => arr.map((x, k) => k === i ? { ...x, menu_item_id: v } : x))}>
-                    <SelectTrigger className="flex-1"><SelectValue placeholder="Pick item" /></SelectTrigger>
-                    <SelectContent>
-                      {items.map((it) => (
-                        <SelectItem key={it.id} value={it.id}>{it.name} ({Number(it.price).toFixed(2)})</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Input className="w-20" type="number" value={r.qty}
-                    onChange={(e) => setRows((arr) => arr.map((x, k) => k === i ? { ...x, qty: e.target.value } : x))} />
-                  <Button size="icon" variant="ghost"
-                    onClick={() => setRows((arr) => arr.filter((_, k) => k !== i))}>
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              ))}
+              {rows.map((r, i) => {
+                const it = items.find((x) => x.id === r.menu_item_id);
+                const unit = discountedUnit(it, r.discount_type, Number(r.discount_value) || 0);
+                return (
+                  <div key={i} className="border rounded-md p-2 space-y-2">
+                    <div className="flex gap-2 items-center">
+                      <Select value={r.menu_item_id}
+                        onValueChange={(v) => setRows((arr) => arr.map((x, k) => k === i ? { ...x, menu_item_id: v } : x))}>
+                        <SelectTrigger className="flex-1"><SelectValue placeholder="Pick item" /></SelectTrigger>
+                        <SelectContent>
+                          {items.map((mi) => (
+                            <SelectItem key={mi.id} value={mi.id}>
+                              {mi.name} ({Number(mi.price).toFixed(2)})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Input className="w-16" type="number" value={r.qty}
+                        onChange={(e) => setRows((arr) => arr.map((x, k) => k === i ? { ...x, qty: e.target.value } : x))} />
+                      <Button size="icon" variant="ghost"
+                        onClick={() => setRows((arr) => arr.filter((_, k) => k !== i))}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                    <div className="flex gap-2 items-center text-xs">
+                      <span className="text-muted-foreground w-14">Discount</span>
+                      <Select value={r.discount_type}
+                        onValueChange={(v) => setRows((arr) => arr.map((x, k) => k === i ? { ...x, discount_type: v as "percent" | "fixed" } : x))}>
+                        <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="percent">%</SelectItem>
+                          <SelectItem value="fixed">Fixed</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Input className="w-24" type="number" value={r.discount_value}
+                        onChange={(e) => setRows((arr) => arr.map((x, k) => k === i ? { ...x, discount_value: e.target.value } : x))} />
+                      <div className="ml-auto flex items-center gap-2">
+                        <Badge variant="outline" className="text-[10px]">{ownerName(it?.owner_id ?? null)}</Badge>
+                        <span className="text-muted-foreground">
+                          unit: <span className="text-primary font-medium">{unit.toFixed(2)}</span>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
-          <div className="mt-2 text-xs text-muted-foreground">
-            Components total: {componentTotal.toFixed(2)} · Bundle save:{" "}
-            <span className="text-primary">
-              {Math.max(0, componentTotal - (Number(f.price) || 0)).toFixed(2)}
-            </span>
+          <div className="mt-3 border-t pt-2 text-xs space-y-1">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Components MSRP</span>
+              <span>{componentTotal.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Customer saves</span>
+              <span className="text-primary">{Math.max(0, componentTotal - computedPrice).toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-sm font-medium pt-1 border-t">
+              <span>Bundle price (auto)</span>
+              <span className="text-primary font-display text-base">{computedPrice.toFixed(2)}</span>
+            </div>
           </div>
         </div>
 

@@ -12,7 +12,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Trash2, Plus, Minus, ShoppingCart, Coffee, Search, X, Tag, Pause, PlayCircle, ClipboardList, Star, Printer, ScanLine, UserCircle2 } from "lucide-react";
+import { Trash2, Plus, Minus, ShoppingCart, Coffee, Search, X, Tag, Pause, PlayCircle, ClipboardList, Star, Printer, ScanLine, UserCircle2, Camera, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { loadPrintSettings } from "@/lib/print-settings";
 import { loadPosSettings } from "@/lib/pos-settings";
@@ -21,6 +21,7 @@ import { receiptHTML, labelsHTML, type DrinkLabel } from "@/lib/print-templates"
 import { reprintReceiptById, reprintLabelsById } from "@/lib/reprint";
 import { randomQuote } from "@/lib/quotes";
 import { CustomizeDialog } from "@/components/pos/CustomizeDialog";
+import { CameraScannerDialog } from "@/components/pos/CameraScannerDialog";
 import {
   type MenuOptions, type SelectedCustom,
   hasAnyCustomization, addonTotal, customSignature, describeCustom,
@@ -65,7 +66,17 @@ type Bundle = {
   id: string; name: string; description: string | null; price: number;
   starts_at: string | null; ends_at: string | null; is_active: boolean;
 };
-type BundleItem = { bundle_id: string; menu_item_id: string; qty: number };
+type BundleItem = {
+  bundle_id: string; menu_item_id: string; qty: number;
+  discount_type: "percent" | "fixed"; discount_value: number;
+};
+type DiscountRow = {
+  id: string; code: string | null; name: string;
+  type: "percent" | "fixed"; value: number;
+  min_subtotal: number; max_uses: number | null; uses_count: number;
+  starts_at: string | null; ends_at: string | null; is_active: boolean;
+  applies_to_item_id: string | null;
+};
 
 const db = supabase as any;
 const fmt = (n: number) => n.toFixed(2);
@@ -99,32 +110,36 @@ function POSPage() {
   const [topSellers, setTopSellers] = useState<Set<string>>(new Set());
   const [bundles, setBundles] = useState<Bundle[]>([]);
   const [bundleItems, setBundleItems] = useState<BundleItem[]>([]);
+  const [discounts, setDiscounts] = useState<DiscountRow[]>([]);
 
   // Barcode / customer loyalty
   type LoyaltyCustomer = {
     id: string; code: string; name: string; phone: string | null; points: number;
     recent_orders: Array<{ id: string; order_no: number; created_at: string; total: number; status: string }>;
+    top_items?: Array<{ menu_item_id: string; name: string; qty: number; last_at: string }>;
   };
   const posSettings = useMemo(() => loadPosSettings(), []);
   const [customer, setCustomer] = useState<LoyaltyCustomer | null>(null);
   const [scanInput, setScanInput] = useState("");
   const [scanBusy, setScanBusy] = useState(false);
   const [redeem, setRedeem] = useState<string>("");
+  const [cameraOpen, setCameraOpen] = useState(false);
   const scanRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let alive = true;
     (async () => {
       const nowIso = new Date().toISOString();
-      const [{ data: c }, { data: m }, { data: p }, { data: pop }, { data: bs }, { data: bi }, { data: vs }] = await Promise.all([
+      const [{ data: c }, { data: m }, { data: p }, { data: pop }, { data: bs }, { data: bi }, { data: vs }, { data: ds }] = await Promise.all([
         db.from("categories").select("id,name,sort_order,prints_label").eq("is_active", true).order("sort_order"),
         db.from("menu_items").select("*").eq("is_active", true).order("sort_order"),
         db.from("payment_methods").select("*").eq("is_active", true).order("sort_order"),
         db.from("menu_item_popularity").select("menu_item_id,qty_sold").order("qty_sold", { ascending: false }).limit(3),
         db.from("bundles").select("*").eq("is_active", true)
           .or(`ends_at.is.null,ends_at.gt.${nowIso}`),
-        db.from("bundle_items").select("bundle_id,menu_item_id,qty"),
+        db.from("bundle_items").select("bundle_id,menu_item_id,qty,discount_type,discount_value"),
         db.from("menu_item_variants").select("*").eq("is_active", true).order("sort_order"),
+        db.from("discounts").select("*").eq("is_active", true),
       ]);
       if (!alive) return;
       setCats((c ?? []) as Category[]);
@@ -136,7 +151,20 @@ function POSPage() {
         !b.starts_at || new Date(b.starts_at) <= new Date(),
       );
       setBundles(visibleBundles);
-      setBundleItems((bi ?? []) as BundleItem[]);
+      setBundleItems(((bi ?? []) as any[]).map((r) => ({
+        bundle_id: r.bundle_id,
+        menu_item_id: r.menu_item_id,
+        qty: Number(r.qty),
+        discount_type: (r.discount_type ?? "percent") as "percent" | "fixed",
+        discount_value: Number(r.discount_value ?? 0),
+      })));
+      const now = new Date();
+      const okDiscounts = ((ds ?? []) as DiscountRow[]).filter((d) =>
+        (!d.starts_at || new Date(d.starts_at) <= now) &&
+        (!d.ends_at || new Date(d.ends_at) > now) &&
+        (d.max_uses == null || d.uses_count < d.max_uses),
+      );
+      setDiscounts(okDiscounts);
       setLoading(false);
     })();
     return () => { alive = false; };
@@ -287,34 +315,64 @@ function POSPage() {
     return () => clearTimeout(t);
   }, [posSettings.scanEnabled, posSettings.scanAutoFocus, cart.length, checkoutOpen, holdOpen, todayOpen]);
 
+  // Auto-apply item-scoped discounts when matching item is in cart.
+  // If an item-scoped promo is currently applied and its item leaves the cart, clear it.
+  useEffect(() => {
+    if (manual) return; // manager override wins
+    const itemIds = new Set(cart.map((l) => l.menu_item_id));
+    // clear stale item-scoped promo
+    if (appliedPromo?.applies_to_item_id && !itemIds.has(appliedPromo.applies_to_item_id)) {
+      setAppliedPromo(null);
+      return;
+    }
+    // skip if a non-item promo is already applied
+    if (appliedPromo && !appliedPromo.applies_to_item_id) return;
+    // find best matching item-scoped discount
+    const match = discounts.find((d) =>
+      d.applies_to_item_id && itemIds.has(d.applies_to_item_id),
+    );
+    if (!match) return;
+    if (appliedPromo?.applies_to_item_id === match.applies_to_item_id) return;
+    const base = cart
+      .filter((l) => l.menu_item_id === match.applies_to_item_id)
+      .reduce((s, l) => s + l.unit_price * l.qty, 0);
+    if (base <= 0) return;
+    const amt = match.type === "percent"
+      ? Math.round(base * Number(match.value)) / 100
+      : Math.min(Number(match.value), base);
+    setAppliedPromo({
+      code: match.code ?? match.name,
+      label: match.name,
+      amount: amt,
+      applies_to_item_id: match.applies_to_item_id,
+    });
+  }, [cart, discounts, manual, appliedPromo]);
+
+
   function addBundle(b: Bundle) {
     const rows = bundleItems.filter((x) => x.bundle_id === b.id);
     if (rows.length === 0) { toast.error("Bundle has no items"); return; }
     const newLines: CartLine[] = [];
-    let componentsTotal = 0;
     for (const r of rows) {
       const it = items.find((x) => x.id === r.menu_item_id);
       if (!it) continue;
       const base = Number(it.price);
-      componentsTotal += base * r.qty;
+      const unit = r.discount_type === "percent"
+        ? Math.max(0, base - base * (Number(r.discount_value) || 0) / 100)
+        : Math.max(0, base - (Number(r.discount_value) || 0));
       newLines.push({
         lineId: newLineId(),
         menu_item_id: it.id,
         variant_id: null,
         variant_name: null,
         name: it.name,
-        base_price: base, unit_price: base, qty: r.qty,
+        base_price: base, unit_price: Number(unit.toFixed(2)), qty: r.qty,
         customization: null, addon_total: 0,
         notes: `Bundle: ${b.name}`,
       });
     }
     if (newLines.length === 0) { toast.error("Bundle items unavailable"); return; }
     setCart((c) => [...c, ...newLines]);
-    const savings = Math.max(0, componentsTotal - Number(b.price));
-    if (savings > 0) {
-      setAppliedPromo(null);
-      setManual({ type: "fixed", value: savings, label: `Bundle: ${b.name}` });
-    }
     toast.success(`${b.name} added`);
   }
 
@@ -642,6 +700,11 @@ function POSPage() {
                   inputMode="numeric"
                   disabled={scanBusy}
                 />
+                <Button type="button" variant="outline" size="sm"
+                  onClick={() => setCameraOpen(true)} disabled={scanBusy}
+                  title="Scan with camera">
+                  <Camera className="h-4 w-4" />
+                </Button>
                 <Button type="submit" variant="outline" size="sm" disabled={scanBusy || !scanInput.trim()}>
                   Find
                 </Button>
@@ -691,6 +754,29 @@ function POSPage() {
                         <span className="font-medium">{fmt(Number(o.total))}</span>
                       </div>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {customer.top_items && customer.top_items.length > 0 && (
+                <div className="pt-1 border-t border-border/50">
+                  <div className="text-[11px] text-muted-foreground mb-1 flex items-center gap-1">
+                    <Sparkles className="h-3 w-3" /> Most ordered — ask if they want “the usual”
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {customer.top_items.slice(0, 5).map((t) => {
+                      const it = items.find((x) => x.id === t.menu_item_id);
+                      return (
+                        <Button key={t.menu_item_id} size="sm" variant="outline"
+                          className="h-7 text-[11px] gap-1"
+                          disabled={!it}
+                          onClick={() => it && addItem(it)}
+                          title={`Ordered ${t.qty}× before`}>
+                          <Plus className="h-3 w-3" /> {t.name}
+                          <span className="text-muted-foreground">×{t.qty}</span>
+                        </Button>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -764,11 +850,50 @@ function POSPage() {
               </Button>
             </div>
           ) : (
-            <div className="flex gap-2">
-              <Input placeholder="Promo code" value={promoCode}
-                onChange={(e) => setPromoCode(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && applyPromo()} />
-              <Button variant="outline" onClick={applyPromo} disabled={cart.length === 0}>Apply</Button>
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <Input placeholder="Promo code" value={promoCode}
+                  onChange={(e) => setPromoCode(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && applyPromo()} />
+                <Button variant="outline" onClick={applyPromo} disabled={cart.length === 0}>Apply</Button>
+              </div>
+              {(() => {
+                const opts = discounts.filter((d) => !d.applies_to_item_id);
+                if (opts.length === 0) return null;
+                return (
+                  <Select
+                    value=""
+                    onValueChange={(id) => {
+                      const d = opts.find((x) => x.id === id);
+                      if (!d || cart.length === 0) return;
+                      if (d.min_subtotal && subtotal < Number(d.min_subtotal)) {
+                        toast.error(`Min subtotal ${fmt(Number(d.min_subtotal))}`);
+                        return;
+                      }
+                      const amt = d.type === "percent"
+                        ? Math.round(subtotal * Number(d.value)) / 100
+                        : Math.min(Number(d.value), subtotal);
+                      setAppliedPromo({
+                        code: d.code ?? d.name, label: d.name, amount: amt,
+                        applies_to_item_id: null,
+                      });
+                      setManual(null);
+                      toast.success(`${d.name} applied`);
+                    }}
+                  >
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Select discount (Senior, PWD…)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {opts.map((d) => (
+                        <SelectItem key={d.id} value={d.id}>
+                          {d.name} · {d.type === "percent" ? `${d.value}%` : `−${Number(d.value).toFixed(2)}`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                );
+              })()}
             </div>
           )}
           {isAdmin && !appliedPromo && !manual && cart.length > 0 && (
@@ -924,6 +1049,18 @@ function POSPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      <CameraScannerDialog
+        open={cameraOpen}
+        onOpenChange={setCameraOpen}
+        onDetected={(code) => {
+          setCameraOpen(false);
+          setScanInput(code);
+          void lookupCustomerByCode(code);
+        }}
+      />
+
+
 
       {customizing && (
         <CustomizeDialog
