@@ -216,12 +216,14 @@ function MenuPage() {
 }
 
 function EditMenuDialog({
-  item, cats, invs, initialRecipes, onClose, onSaved,
+  item, cats, invs, initialRecipes, initialVariants, allVariantRecipes, onClose, onSaved,
 }: {
   item: Item;
   cats: Cat[];
   invs: Inv[];
   initialRecipes: Recipe[];
+  initialVariants: Variant[];
+  allVariantRecipes: VariantRecipe[];
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -231,10 +233,26 @@ function EditMenuDialog({
     price: String(item.price),
     category_id: item.category_id ?? "",
     is_active: item.is_active,
+    has_variants: item.has_variants,
     sort_order: String(item.sort_order),
   });
   const [rcs, setRcs] = useState<Array<{ inventory_item_id: string; qty: string }>>(
     initialRecipes.map((r) => ({ inventory_item_id: r.inventory_item_id, qty: String(r.qty_per_unit) })),
+  );
+  type VEdit = {
+    id: string | null; name: string; price: string; is_active: boolean; sort_order: number;
+    rcs: Array<{ inventory_item_id: string; qty: string }>;
+  };
+  const [vEdits, setVEdits] = useState<VEdit[]>(
+    initialVariants
+      .sort((a,b) => a.sort_order - b.sort_order)
+      .map((v) => ({
+        id: v.id, name: v.name, price: String(v.price),
+        is_active: v.is_active, sort_order: v.sort_order,
+        rcs: allVariantRecipes
+          .filter((x) => x.variant_id === v.id)
+          .map((x) => ({ inventory_item_id: x.inventory_item_id, qty: String(x.qty_per_unit) })),
+      })),
   );
   const [options, setOptions] = useState<MenuOptions>(
     (item.options && typeof item.options === "object") ? item.options : emptyOptions(),
@@ -244,6 +262,9 @@ function EditMenuDialog({
 
   async function save() {
     if (!f.name.trim()) return toast.error("Name required");
+    if (f.has_variants && vEdits.length === 0) {
+      return toast.error("Add at least one variant or turn off variants");
+    }
     setSaving(true);
     const payload = {
       name: f.name.trim(),
@@ -251,6 +272,7 @@ function EditMenuDialog({
       price: Number(f.price) || 0,
       category_id: f.category_id || null,
       is_active: f.is_active,
+      has_variants: f.has_variants,
       sort_order: Number(f.sort_order) || 0,
       options,
     };
@@ -263,18 +285,81 @@ function EditMenuDialog({
       if (error) { setSaving(false); return toast.error(error.message); }
       id = data.id;
     }
-    // Replace recipes
+    // Replace top-level recipes (used when has_variants=false)
     await db.from("recipes").delete().eq("menu_item_id", id);
-    const validRcs = rcs
-      .filter((r) => r.inventory_item_id && Number(r.qty) > 0)
-      .map((r) => ({ menu_item_id: id, inventory_item_id: r.inventory_item_id, qty_per_unit: Number(r.qty) }));
-    if (validRcs.length > 0) {
-      const { error } = await db.from("recipes").insert(validRcs);
-      if (error) { setSaving(false); return toast.error(error.message); }
+    if (!f.has_variants) {
+      const validRcs = rcs
+        .filter((r) => r.inventory_item_id && Number(r.qty) > 0)
+        .map((r) => ({ menu_item_id: id, inventory_item_id: r.inventory_item_id, qty_per_unit: Number(r.qty) }));
+      if (validRcs.length > 0) {
+        const { error } = await db.from("recipes").insert(validRcs);
+        if (error) { setSaving(false); return toast.error(error.message); }
+      }
+    }
+    // Sync variants
+    if (f.has_variants) {
+      const keepIds = vEdits.filter((v) => v.id).map((v) => v.id as string);
+      // delete removed variants
+      const removed = initialVariants.filter((iv) => !keepIds.includes(iv.id));
+      if (removed.length > 0) {
+        await db.from("menu_item_variants").delete().in("id", removed.map((r) => r.id));
+      }
+      for (let i = 0; i < vEdits.length; i++) {
+        const v = vEdits[i];
+        const vPayload = {
+          menu_item_id: id,
+          name: v.name.trim() || `Size ${i+1}`,
+          price: Number(v.price) || 0,
+          sort_order: i,
+          is_active: v.is_active,
+        };
+        let vid = v.id;
+        if (vid) {
+          await db.from("menu_item_variants").update(vPayload).eq("id", vid);
+        } else {
+          const { data, error } = await db.from("menu_item_variants").insert(vPayload).select("id").single();
+          if (error) { setSaving(false); return toast.error(error.message); }
+          vid = data.id;
+        }
+        await db.from("variant_recipes").delete().eq("variant_id", vid);
+        const vRcs = v.rcs
+          .filter((r) => r.inventory_item_id && Number(r.qty) > 0)
+          .map((r) => ({ variant_id: vid, inventory_item_id: r.inventory_item_id, qty_per_unit: Number(r.qty) }));
+        if (vRcs.length > 0) {
+          const { error } = await db.from("variant_recipes").insert(vRcs);
+          if (error) { setSaving(false); return toast.error(error.message); }
+        }
+      }
+    } else {
+      // turning off variants — wipe any existing variants
+      const existing = initialVariants.map((v) => v.id);
+      if (existing.length > 0) {
+        await db.from("menu_item_variants").delete().in("id", existing);
+      }
     }
     setSaving(false);
     toast.success("Saved");
     onSaved();
+  }
+
+  function addVariant() {
+    setVEdits((a) => [...a, { id: null, name: "", price: "", is_active: true, sort_order: a.length, rcs: [] }]);
+  }
+  function updateVariant(i: number, patch: Partial<VEdit>) {
+    setVEdits((a) => a.map((v, k) => k === i ? { ...v, ...patch } : v));
+  }
+  function removeVariant(i: number) {
+    setVEdits((a) => a.filter((_, k) => k !== i));
+  }
+  function addVRecipe(i: number) {
+    updateVariant(i, { rcs: [...vEdits[i].rcs, { inventory_item_id: "", qty: "" }] });
+  }
+  function updateVRecipe(i: number, j: number, patch: Partial<{ inventory_item_id: string; qty: string }>) {
+    const next = vEdits[i].rcs.map((r, k) => k === j ? { ...r, ...patch } : r);
+    updateVariant(i, { rcs: next });
+  }
+  function removeVRecipe(i: number, j: number) {
+    updateVariant(i, { rcs: vEdits[i].rcs.filter((_, k) => k !== j) });
   }
 
   return (
@@ -283,6 +368,11 @@ function EditMenuDialog({
         <DialogHeader>
           <DialogTitle>{item.id ? "Edit menu item" : "New menu item"}</DialogTitle>
         </DialogHeader>
+        {item.product_code && (
+          <div className="text-xs text-muted-foreground -mt-2 mb-1">
+            Product ID: <span className="font-mono">{item.product_code}</span>
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-3 text-sm">
           <div className="col-span-2">
             <label className="text-xs text-muted-foreground">Name</label>
@@ -292,10 +382,12 @@ function EditMenuDialog({
             <label className="text-xs text-muted-foreground">Description</label>
             <Textarea rows={2} value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} />
           </div>
-          <div>
-            <label className="text-xs text-muted-foreground">Price</label>
-            <Input type="number" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} />
-          </div>
+          {!f.has_variants && (
+            <div>
+              <label className="text-xs text-muted-foreground">Price</label>
+              <Input type="number" step="0.01" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} />
+            </div>
+          )}
           <div>
             <label className="text-xs text-muted-foreground">Category</label>
             <Select value={f.category_id} onValueChange={(v) => setF({ ...f, category_id: v })}>
@@ -313,50 +405,117 @@ function EditMenuDialog({
             <Switch checked={f.is_active} onCheckedChange={(v) => setF({ ...f, is_active: v })} />
             <span className="text-sm">Active (visible in POS)</span>
           </div>
+          <div className="col-span-2 flex items-center gap-2 mt-1">
+            <Switch checked={f.has_variants} onCheckedChange={(v) => setF({ ...f, has_variants: v })} />
+            <span className="text-sm">Has size variants (12oz, 16oz, etc.)</span>
+          </div>
         </div>
 
-        <div className="mt-4 border-t pt-3">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="font-medium text-sm">Ingredients per serving</h3>
-            <Button size="sm" variant="outline"
-              onClick={() => setRcs((a) => [...a, { inventory_item_id: "", qty: "" }])}>
-              <Plus className="h-3 w-3 mr-1" /> Add
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground mb-2">
-            Quantity used per 1 serving — auto-deducted from inventory on each sale.
-          </p>
-          {rcs.length === 0 ? (
-            <div className="text-xs text-muted-foreground py-2">No ingredients yet.</div>
-          ) : (
-            <div className="space-y-2">
-              {rcs.map((r, i) => {
-                const ing = invs.find((x) => x.id === r.inventory_item_id);
-                return (
-                  <div key={i} className="flex gap-2 items-center">
-                    <Select value={r.inventory_item_id}
-                      onValueChange={(v) => setRcs((arr) => arr.map((x, k) => k === i ? { ...x, inventory_item_id: v } : x))}>
-                      <SelectTrigger className="flex-1"><SelectValue placeholder="Pick ingredient" /></SelectTrigger>
-                      <SelectContent>
-                        {activeInvs.map((iv) => (
-                          <SelectItem key={iv.id} value={iv.id}>{iv.name} ({iv.unit})</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Input className="w-24" type="number" placeholder="qty"
-                      value={r.qty}
-                      onChange={(e) => setRcs((arr) => arr.map((x, k) => k === i ? { ...x, qty: e.target.value } : x))} />
-                    <span className="text-xs text-muted-foreground w-10">{ing?.unit ?? ""}</span>
-                    <Button size="icon" variant="ghost"
-                      onClick={() => setRcs((arr) => arr.filter((_, k) => k !== i))}>
-                      <Trash2 className="h-3.5 w-3.5" />
+        {f.has_variants ? (
+          <div className="mt-4 border-t pt-3 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-medium text-sm">Size variants</h3>
+              <Button size="sm" variant="outline" onClick={addVariant}>
+                <Plus className="h-3 w-3 mr-1" /> Add size
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Each size has its own price and recipe. POS prompts the cashier to pick a size.
+            </p>
+            {vEdits.length === 0 && (
+              <div className="text-xs text-muted-foreground py-2">No variants yet.</div>
+            )}
+            {vEdits.map((v, i) => (
+              <Card key={i} className="p-3 space-y-2">
+                <div className="grid grid-cols-[1fr,90px,auto,auto] gap-2 items-center">
+                  <Input placeholder="Size name (12oz)" value={v.name}
+                    onChange={(e) => updateVariant(i, { name: e.target.value })} />
+                  <Input type="number" step="0.01" placeholder="Price" value={v.price}
+                    onChange={(e) => updateVariant(i, { price: e.target.value })} />
+                  <Switch checked={v.is_active} onCheckedChange={(b) => updateVariant(i, { is_active: b })} />
+                  <Button size="icon" variant="ghost" onClick={() => removeVariant(i)}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+                <div className="space-y-1.5 pl-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Recipe (per serving)</span>
+                    <Button size="sm" variant="ghost" onClick={() => addVRecipe(i)}>
+                      <Plus className="h-3 w-3 mr-1" /> Ingredient
                     </Button>
                   </div>
-                );
-              })}
+                  {v.rcs.map((r, j) => {
+                    const ing = invs.find((x) => x.id === r.inventory_item_id);
+                    return (
+                      <div key={j} className="flex gap-1.5 items-center">
+                        <Select value={r.inventory_item_id}
+                          onValueChange={(val) => updateVRecipe(i, j, { inventory_item_id: val })}>
+                          <SelectTrigger className="flex-1 h-8 text-xs"><SelectValue placeholder="Pick ingredient" /></SelectTrigger>
+                          <SelectContent>
+                            {activeInvs.map((iv) => (
+                              <SelectItem key={iv.id} value={iv.id}>{iv.name} ({iv.unit})</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Input className="w-20 h-8 text-xs" type="number" step="0.01" placeholder="qty"
+                          value={r.qty}
+                          onChange={(e) => updateVRecipe(i, j, { qty: e.target.value })} />
+                        <span className="text-xs text-muted-foreground w-8">{ing?.unit ?? ""}</span>
+                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => removeVRecipe(i, j)}>
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <div className="mt-4 border-t pt-3">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-medium text-sm">Ingredients per serving</h3>
+              <Button size="sm" variant="outline"
+                onClick={() => setRcs((a) => [...a, { inventory_item_id: "", qty: "" }])}>
+                <Plus className="h-3 w-3 mr-1" /> Add
+              </Button>
             </div>
-          )}
-        </div>
+            <p className="text-xs text-muted-foreground mb-2">
+              Quantity used per 1 serving — auto-deducted from inventory on each sale.
+            </p>
+            {rcs.length === 0 ? (
+              <div className="text-xs text-muted-foreground py-2">No ingredients yet.</div>
+            ) : (
+              <div className="space-y-2">
+                {rcs.map((r, i) => {
+                  const ing = invs.find((x) => x.id === r.inventory_item_id);
+                  return (
+                    <div key={i} className="flex gap-2 items-center">
+                      <Select value={r.inventory_item_id}
+                        onValueChange={(v) => setRcs((arr) => arr.map((x, k) => k === i ? { ...x, inventory_item_id: v } : x))}>
+                        <SelectTrigger className="flex-1"><SelectValue placeholder="Pick ingredient" /></SelectTrigger>
+                        <SelectContent>
+                          {activeInvs.map((iv) => (
+                            <SelectItem key={iv.id} value={iv.id}>{iv.name} ({iv.unit})</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Input className="w-24" type="number" step="0.01" placeholder="qty"
+                        value={r.qty}
+                        onChange={(e) => setRcs((arr) => arr.map((x, k) => k === i ? { ...x, qty: e.target.value } : x))} />
+                      <span className="text-xs text-muted-foreground w-10">{ing?.unit ?? ""}</span>
+                      <Button size="icon" variant="ghost"
+                        onClick={() => setRcs((arr) => arr.filter((_, k) => k !== i))}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
 
         <div className="mt-4 border-t pt-3">
           <h3 className="font-medium text-sm mb-2">Customization options</h3>
