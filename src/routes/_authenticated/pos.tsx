@@ -1050,6 +1050,18 @@ function POSPage() {
         </DialogContent>
       </Dialog>
 
+      <CameraScannerDialog
+        open={cameraOpen}
+        onOpenChange={setCameraOpen}
+        onDetected={(code) => {
+          setCameraOpen(false);
+          setScanInput(code);
+          void lookupCustomerByCode(code);
+        }}
+      />
+
+
+
       {customizing && (
         <CustomizeDialog
           open
