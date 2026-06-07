@@ -932,6 +932,13 @@ function POSPage() {
           itemName={customizing.item.name}
           basePrice={Number(customizing.item.price)}
           options={customizing.item.options ?? {}}
+          variants={
+            customizing.item.has_variants
+              ? variants
+                  .filter((v) => v.menu_item_id === customizing.item.id && v.is_active !== false)
+                  .map((v) => ({ id: v.id, name: v.name, price: Number(v.price), sort_order: v.sort_order }))
+              : undefined
+          }
           initial={customizing.initial}
           onConfirm={(res) => {
             addCustomizedLine({
@@ -940,6 +947,7 @@ function POSPage() {
               addon: res.addon,
               qty: res.qty,
               notes: res.notes,
+              variant: res.variant,
               editingLineId: customizing.editingLineId,
             });
             setCustomizing(null);
