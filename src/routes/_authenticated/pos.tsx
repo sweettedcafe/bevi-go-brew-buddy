@@ -196,13 +196,16 @@ function POSPage() {
 
   const total = Math.max(0, subtotal - discountAmount);
 
-  // Per-line discount allocation (for showing discount inside the cart item)
+  // Per-line discount allocation — ONLY for item-scoped promos.
+  // Whole-order discounts are applied to the subtotal and shown in the order summary,
+  // not split across individual line items.
   const lineDiscounts = useMemo(() => {
     const map: Record<string, number> = {};
     if (discountAmount <= 0) return map;
     const scopedId = appliedPromo?.applies_to_item_id ?? null;
+    if (!scopedId) return map; // whole-order: skip per-line chips
     const eligible = cart.filter(
-      (l) => !l.bundle_id && (!scopedId || l.menu_item_id === scopedId),
+      (l) => !l.bundle_id && l.menu_item_id === scopedId,
     );
     const base = eligible.reduce((s, l) => s + l.unit_price * l.qty, 0);
     if (base <= 0) return map;
