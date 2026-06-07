@@ -331,6 +331,7 @@ function EditMenuDialog({
       description: f.description.trim() || null,
       price: Number(f.price) || 0,
       category_id: f.category_id || null,
+      owner_id: f.owner_id || null,
       is_active: f.is_active,
       has_variants: f.has_variants,
       sort_order: Number(f.sort_order) || 0,
