@@ -166,6 +166,9 @@ function MenuPage() {
                         <Badge variant="outline" className="text-[10px] font-mono">{it.product_code}</Badge>
                       )}
                       <Badge variant="secondary">{catName(it.category_id)}</Badge>
+                      {ownerName(it.owner_id) && (
+                        <Badge variant="outline" className="text-xs">{ownerName(it.owner_id)}</Badge>
+                      )}
                       {it.has_variants && (
                         <Badge className="bg-primary/15 text-primary hover:bg-primary/15">variants</Badge>
                       )}
