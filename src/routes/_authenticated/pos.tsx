@@ -35,7 +35,10 @@ type MenuItem = {
   id: string; category_id: string | null; name: string;
   description: string | null; price: number; is_active: boolean; sort_order: number;
   options: MenuOptions | null;
+  has_variants?: boolean;
+  product_code?: string | null;
 };
+type Variant = { id: string; menu_item_id: string; name: string; price: number; sort_order: number; is_active: boolean };
 type CartLine = {
   lineId: string;
   menu_item_id: string;
