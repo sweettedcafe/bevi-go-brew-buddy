@@ -42,6 +42,8 @@ type Variant = { id: string; menu_item_id: string; name: string; price: number; 
 type CartLine = {
   lineId: string;
   menu_item_id: string;
+  variant_id: string | null;
+  variant_name: string | null;
   name: string;
   base_price: number;
   unit_price: number;
