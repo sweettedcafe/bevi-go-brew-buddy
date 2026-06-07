@@ -196,6 +196,29 @@ function POSPage() {
 
   const total = Math.max(0, subtotal - discountAmount);
 
+  // Per-line discount allocation (for showing discount inside the cart item)
+  const lineDiscounts = useMemo(() => {
+    const map: Record<string, number> = {};
+    if (discountAmount <= 0) return map;
+    const scopedId = appliedPromo?.applies_to_item_id ?? null;
+    const eligible = cart.filter(
+      (l) => !l.bundle_id && (!scopedId || l.menu_item_id === scopedId),
+    );
+    const base = eligible.reduce((s, l) => s + l.unit_price * l.qty, 0);
+    if (base <= 0) return map;
+    let allocated = 0;
+    eligible.forEach((l, i) => {
+      const lineTotal = l.unit_price * l.qty;
+      const share =
+        i === eligible.length - 1
+          ? Math.max(0, discountAmount - allocated)
+          : Math.round((lineTotal / base) * discountAmount * 100) / 100;
+      map[l.lineId] = share;
+      allocated += share;
+    });
+    return map;
+  }, [cart, discountAmount, appliedPromo]);
+
   // Customize dialog state
   const [customizing, setCustomizing] = useState<{
     item: MenuItem;
