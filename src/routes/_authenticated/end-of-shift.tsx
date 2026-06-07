@@ -87,6 +87,7 @@ function EndOfShiftPage() {
   const expectedCash = report ? Number(report.shift.starting_cash) + cashNet - Number(report.total_expenses) : 0;
 
   const summaryText = report ? buildSummary(report, totalPayments, cashNet, expectedCash) : "";
+  const receiptRef = useRef<HTMLDivElement>(null);
 
   const copySummary = async () => {
     try { await navigator.clipboard.writeText(summaryText); toast.success("Summary copied"); }
@@ -98,6 +99,26 @@ function EndOfShiftPage() {
       catch { /* user cancelled */ }
     } else {
       void copySummary();
+    }
+  };
+  const saveAsImage = async () => {
+    if (!receiptRef.current) return;
+    try {
+      const dataUrl = await toPng(receiptRef.current, {
+        pixelRatio: 2,
+        backgroundColor: "#ffffff",
+        cacheBust: true,
+      });
+      const a = document.createElement("a");
+      const date = report?.shift.clock_in ? new Date(report.shift.clock_in).toISOString().slice(0, 10) : "shift";
+      a.href = dataUrl;
+      a.download = `shift-summary-${date}.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      toast.success("Saved to your device");
+    } catch (e) {
+      toast.error("Could not save image");
     }
   };
 
