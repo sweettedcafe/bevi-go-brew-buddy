@@ -70,7 +70,7 @@ function HistoryPage() {
 
   async function buildReceipt(r: Row): Promise<ReceiptData | null> {
     const [{ data: items }, { data: payments }] = await Promise.all([
-      db.from("order_items").select("*").eq("order_id", r.id).order("created_at"),
+      db.from("order_items").select("*").eq("order_id", r.id),
       db.from("order_payments").select("*").eq("order_id", r.id).order("created_at"),
     ]);
     const pms = await db.from("payment_methods").select("code,label");
