@@ -834,6 +834,17 @@ function POSPage() {
                           {l.notes && <div className="italic">“{l.notes}”</div>}
                         </div>
                       )}
+                      {lineDiscounts[l.lineId] > 0 && (
+                        <div className="mt-1 flex items-center justify-between gap-2 text-[11px] rounded bg-primary/10 text-primary px-2 py-1">
+                          <span className="flex items-center gap-1 truncate">
+                            <Tag className="h-3 w-3" />
+                            {appliedPromo?.label ?? manual?.label ?? "Discount"}
+                          </span>
+                          <span className="font-medium whitespace-nowrap">
+                            −{fmt(lineDiscounts[l.lineId])} · {fmt(Math.max(0, l.unit_price * l.qty - lineDiscounts[l.lineId]))}
+                          </span>
+                        </div>
+                      )}
                     </div>
                     <Button size="icon" variant="ghost" onClick={() => removeLine(l.lineId)}><Trash2 className="h-4 w-4" /></Button>
                   </div>
