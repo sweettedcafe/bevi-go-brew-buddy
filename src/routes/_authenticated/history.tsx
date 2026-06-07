@@ -170,7 +170,9 @@ function HistoryPage() {
                   {txnKind !== "sale" && (
                     <Badge variant="outline" className="capitalize">{txnKind}</Badge>
                   )}
-                  <Badge variant={r.status === "completed" ? "default" : "secondary"} className="capitalize">{r.status}</Badge>
+                  <Badge variant={txnKind !== "sale" ? "destructive" : (r.status === "completed" ? "default" : "secondary")} className="capitalize">
+                    {txnKind === "void" ? "voided" : txnKind === "refund" ? "refunded" : r.status}
+                  </Badge>
                   <div className={`font-display text-lg w-20 text-right ${Number(r.total) < 0 ? "text-destructive" : "text-primary"}`}>
                     {Number(r.total).toFixed(2)}
                   </div>
