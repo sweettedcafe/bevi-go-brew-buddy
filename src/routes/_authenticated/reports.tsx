@@ -113,7 +113,7 @@ function ReportsPage() {
     const fromTs = `${filters.from}T00:00:00`;
     const toTs   = `${filters.to}T23:59:59`;
     let q = db.from("orders")
-      .select("id,order_no,created_at,customer_name,cashier_id,subtotal,discount_total,discount_label,discount_code,total,status,points_earned,points_redeemed,source")
+      .select("id,order_no,created_at,customer_name,cashier_id,subtotal,discount_total,discount_label,discount_code,total,status,points_earned,points_redeemed,source,txn_kind,parent_order_id,order_type,business_date,notes")
       .gte("created_at", fromTs).lte("created_at", toTs)
       .order("created_at", { ascending: false });
     if (filters.customer.trim()) q = q.ilike("customer_name", `%${filters.customer.trim()}%`);
@@ -146,7 +146,7 @@ function ReportsPage() {
     const ids = list.map((r) => r.id);
     if (ids.length) {
       const [{ data: items }, { data: pays }, { data: pms }] = await Promise.all([
-        db.from("order_items").select("order_id,qty,line_total,menu_item_id,name_snapshot,menu_items(category_id,categories(name))").in("order_id", ids),
+        db.from("order_items").select("order_id,qty,line_total,menu_item_id,name_snapshot,menu_items(category_id,owner_id,categories(name),owners(name))").in("order_id", ids),
         db.from("order_payments").select("order_id,method,method_code,amount,fee_amount,change_due").in("order_id", ids),
         db.from("payment_methods").select("code,label"),
       ]);
@@ -181,15 +181,17 @@ function ReportsPage() {
   const itemRowsAll = useMemo(() => {
     const rows: AnyRow[] = [];
     for (const o of orders) {
-      if (o.status === "voided" || o.status === "refunded") continue;
       for (const it of (o._items ?? [])) {
         rows.push({
+          id: it.id,
           order_id: o.id,
           order_id_short: shortId(o.id),
           order_no: o.order_no,
           created_at: o.created_at,
+          txn_kind: o.txn_kind ?? "sale",
           name: it.name_snapshot,
           category: it.menu_items?.categories?.name ?? "—",
+          owner: it.menu_items?.owners?.name ?? "—",
           qty: Number(it.qty || 0),
           revenue: Number(it.line_total || 0),
         });
@@ -200,19 +202,37 @@ function ReportsPage() {
 
   const categoryOptions = useMemo(() => {
     const s = new Set<string>();
-    itemRowsAll.forEach((r) => r.category && s.add(r.category));
+    itemRowsAll.forEach((r) => r.category && r.category !== "—" && s.add(r.category));
+    return [...s].sort();
+  }, [itemRowsAll]);
+
+  const ownerOptions = useMemo(() => {
+    const s = new Set<string>();
+    itemRowsAll.forEach((r) => r.owner && r.owner !== "—" && s.add(r.owner));
     return [...s].sort();
   }, [itemRowsAll]);
 
   const itemRows = useMemo(() => {
     const cat = filters.category.trim().toLowerCase();
     const item = filters.item.trim().toLowerCase();
+    const owner = filters.owner.trim().toLowerCase();
     return itemRowsAll.filter((r) => {
       if (cat && r.category.toLowerCase() !== cat) return false;
+      if (owner && r.owner.toLowerCase() !== owner) return false;
       if (item && !r.name.toLowerCase().includes(item)) return false;
       return true;
     });
-  }, [itemRowsAll, filters.category, filters.item]);
+  }, [itemRowsAll, filters.category, filters.item, filters.owner]);
+
+  const ownerSubtotals = useMemo(() => {
+    const m = new Map<string, { qty: number; revenue: number }>();
+    for (const r of itemRows) {
+      const cur = m.get(r.owner) ?? { qty: 0, revenue: 0 };
+      cur.qty += Number(r.qty); cur.revenue += Number(r.revenue);
+      m.set(r.owner, cur);
+    }
+    return [...m.entries()].sort((a, b) => b[1].revenue - a[1].revenue);
+  }, [itemRows]);
 
   const discountRows = useMemo(
     () => orders.filter((o) => Number(o.discount_total) > 0),
@@ -229,15 +249,15 @@ function ReportsPage() {
   }, [orders]);
 
   async function refund(id: string) {
-    if (!confirm("Refund this order? Inventory will be restored and loyalty points reversed.")) return;
-    const { error } = await db.rpc("pos_refund_order", { p_order_id: id });
+    if (!confirm("Refund this order? A mirror negative transaction will be created and stock restored.")) return;
+    const { error } = await db.rpc("pos_refund_order_v2", { p_order_id: id, p_reason: null });
     if (error) { toast.error(error.message); return; }
     toast.success("Order refunded");
     await loadAll();
   }
   async function voidOrder(id: string) {
-    if (!confirm("Void this order? Same as refund: stock restored, points reversed.")) return;
-    const { error } = await db.rpc("pos_void_order", { p_order_id: id });
+    if (!confirm("Void this order? A mirror negative transaction will be created and stock restored.")) return;
+    const { error } = await db.rpc("pos_void_order_v2", { p_order_id: id, p_reason: null });
     if (error) { toast.error(error.message); return; }
     toast.success("Order voided");
     await loadAll();
