@@ -882,7 +882,6 @@ function POSPage() {
                   </Select>
                 );
               })()}
-              </div>
               {(() => {
                 const opts = discounts.filter((d) => !d.applies_to_item_id);
                 if (opts.length === 0) return null;
