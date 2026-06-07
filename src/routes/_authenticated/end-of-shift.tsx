@@ -137,12 +137,21 @@ function EndOfShiftPage() {
               <DialogTrigger asChild>
                 <Button size="sm" className="gap-2"><Share2 className="h-4 w-4" /> Share summary</Button>
               </DialogTrigger>
-              <DialogContent className="max-w-lg">
+              <DialogContent className="max-w-md">
                 <DialogHeader><DialogTitle>Shift summary</DialogTitle></DialogHeader>
-                <Textarea readOnly value={summaryText} className="font-mono text-xs min-h-[320px]" />
-                <DialogFooter className="gap-2">
-                  <Button variant="outline" onClick={copySummary} className="gap-2"><Copy className="h-4 w-4" /> Copy</Button>
-                  <Button onClick={shareSummary} className="gap-2"><Share2 className="h-4 w-4" /> Share</Button>
+                <div className="max-h-[70vh] overflow-y-auto -mx-2 px-2">
+                  <ShiftReceipt
+                    ref={receiptRef}
+                    report={report!}
+                    totalNet={totalPayments}
+                    cashNet={cashNet}
+                    expectedCash={expectedCash}
+                  />
+                </div>
+                <DialogFooter className="gap-2 flex-wrap">
+                  <Button variant="outline" onClick={copySummary} className="gap-2"><Copy className="h-4 w-4" /> Copy text</Button>
+                  <Button variant="outline" onClick={shareSummary} className="gap-2"><Share2 className="h-4 w-4" /> Share</Button>
+                  <Button onClick={saveAsImage} className="gap-2"><Camera className="h-4 w-4" /> Save image</Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
