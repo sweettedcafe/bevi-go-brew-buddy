@@ -55,18 +55,21 @@ function MenuPage() {
   const isAdmin = primaryRole === "admin" || primaryRole === "developer";
   const [items, setItems] = useState<Item[]>([]);
   const [cats, setCats] = useState<Cat[]>([]);
+  const [owners, setOwners] = useState<Owner[]>([]);
   const [invs, setInvs] = useState<Inv[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [variants, setVariants] = useState<Variant[]>([]);
   const [vrecipes, setVRecipes] = useState<VariantRecipe[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Item | null>(null);
+  const [deleting, setDeleting] = useState<Item | null>(null);
 
   async function load() {
     setLoading(true);
-    const [{ data: m }, { data: c }, { data: i }, { data: r }, { data: v }, { data: vr }] = await Promise.all([
+    const [{ data: m }, { data: c }, { data: o }, { data: i }, { data: r }, { data: v }, { data: vr }] = await Promise.all([
       db.from("menu_items").select("*").order("sort_order"),
       db.from("categories").select("id,name").order("sort_order"),
+      db.from("owners").select("id,name,is_active").eq("is_active", true).order("name"),
       db.from("inventory_items").select("id,name,unit,is_active").order("name"),
       db.from("recipes").select("*"),
       db.from("menu_item_variants").select("*").order("sort_order"),
@@ -74,6 +77,7 @@ function MenuPage() {
     ]);
     setItems((m ?? []) as Item[]);
     setCats((c ?? []) as Cat[]);
+    setOwners((o ?? []) as Owner[]);
     setInvs((i ?? []) as Inv[]);
     setRecipes((r ?? []) as Recipe[]);
     setVariants((v ?? []) as Variant[]);
