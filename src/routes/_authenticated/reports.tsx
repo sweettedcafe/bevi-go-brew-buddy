@@ -402,7 +402,7 @@ function ReportsPage() {
             cols={PER_ORDER_COLS.filter((c) => colsOrder.includes(c.key))}
             rows={orders}
             render={(row, key) => {
-              if (key === "status") return <StatusBadge s={row.status} />;
+              if (key === "status") return <StatusBadge s={row.status} k={row.txn_kind ?? "sale"} />;
               if (key === "txn_kind") return <TxnBadge k={row.txn_kind ?? "sale"} />;
               if (key === "total" || key === "subtotal" || key === "discount_total") {
                 const n = Number(row[key]);
