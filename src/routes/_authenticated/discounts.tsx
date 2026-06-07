@@ -284,22 +284,16 @@ function DiscountDialog({
           </div>
           <div>
             <label className="text-xs text-muted-foreground">
-              Applies to (leave blank = whole order)
+              Applies to (leave blank = whole order — pick multiple items to scope)
             </label>
-            <Select
-              value={d.applies_to_item_id ?? "__all__"}
-              onValueChange={(v) => setD({ ...d, applies_to_item_id: v === "__all__" ? null : v })}
-            >
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">Whole order (subtotal)</SelectItem>
-                {menuItems.map((m) => (
-                  <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <MultiItemPicker
+              menuItems={menuItems}
+              selected={d.applies_to_item_ids ?? []}
+              onChange={(ids) => setD({ ...d, applies_to_item_ids: ids, applies_to_item_id: ids[0] ?? null })}
+            />
             <p className="text-[11px] text-muted-foreground mt-1">
-              If an item is selected, the discount only reduces that specific item's line in the POS.
+              If items are selected, the discount only reduces those items' lines in the POS.
+              Bundle items are excluded — bundles already carry their own discounts.
             </p>
           </div>
           <div className="flex items-center gap-2">
