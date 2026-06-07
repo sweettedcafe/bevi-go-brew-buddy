@@ -940,6 +940,29 @@ function POSPage() {
           }}
         />
       )}
+
+      {variantPick && (
+        <Dialog open onOpenChange={(o) => !o && setVariantPick(null)}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Choose size — {variantPick.name}</DialogTitle>
+            </DialogHeader>
+            <div className="grid gap-2">
+              {variants
+                .filter((v) => v.menu_item_id === variantPick.id)
+                .sort((a,b) => a.sort_order - b.sort_order)
+                .map((v) => (
+                  <button key={v.id}
+                    onClick={() => { addPlainLine(variantPick, v); setVariantPick(null); }}
+                    className="flex items-center justify-between rounded-md border p-3 hover:bg-accent transition-colors">
+                    <span className="font-medium">{v.name}</span>
+                    <span className="font-display text-primary">{fmt(Number(v.price))}</span>
+                  </button>
+                ))}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
