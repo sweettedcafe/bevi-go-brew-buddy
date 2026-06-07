@@ -91,13 +91,14 @@ export function CustomizeDialog({
   const sizes = options.sizes ?? [];
   const milks = options.milks ?? [];
   const exs = options.extras ?? [];
+  const flvs = options.flavors ?? [];
+  const oths = options.others ?? [];
   const sizeRequired = !!options.size_required && sizes.length > 0;
 
-  function toggleExtra(o: PriceOption) {
-    setExtras((cur) => cur.some((x) => x.label === o.label)
-      ? cur.filter((x) => x.label !== o.label)
-      : [...cur, o]);
+  function toggleIn(list: PriceOption[], setList: (n: PriceOption[]) => void, o: PriceOption) {
+    setList(list.some((x) => x.label === o.label) ? list.filter((x) => x.label !== o.label) : [...list, o]);
   }
+  function toggleExtra(o: PriceOption) { toggleIn(extras, setExtras, o); }
 
   function addOther() {
     const lbl = otherLabel.trim();
