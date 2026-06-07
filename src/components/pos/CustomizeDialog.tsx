@@ -51,6 +51,8 @@ export function CustomizeDialog({
   const [size, setSize] = useState<PriceOption | null>(null);
   const [milk, setMilk] = useState<PriceOption | null>(null);
   const [extras, setExtras] = useState<PriceOption[]>([]);
+  const [flavors, setFlavors] = useState<PriceOption[]>([]);
+  const [others, setOthers] = useState<PriceOption[]>([]);
   const [other, setOther] = useState<PriceOption[]>([]);
   const [otherLabel, setOtherLabel] = useState("");
   const [otherPrice, setOtherPrice] = useState("");
@@ -63,6 +65,8 @@ export function CustomizeDialog({
     setSize(initial?.custom?.size ?? defSize);
     setMilk(initial?.custom?.milk ?? null);
     setExtras(initial?.custom?.extras ?? []);
+    setFlavors(initial?.custom?.flavors ?? []);
+    setOthers(initial?.custom?.others ?? []);
     setOther(initial?.custom?.other ?? []);
     setOtherLabel(""); setOtherPrice("");
     setQty(initial?.qty ?? 1);
@@ -77,6 +81,8 @@ export function CustomizeDialog({
     size: size ?? undefined,
     milk: milk ?? undefined,
     extras: extras.length ? extras : undefined,
+    flavors: flavors.length ? flavors : undefined,
+    others: others.length ? others : undefined,
     other: other.length ? other : undefined,
   };
   const addon = addonTotal(sel);
