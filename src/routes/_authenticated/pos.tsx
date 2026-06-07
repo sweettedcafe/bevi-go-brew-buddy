@@ -891,7 +891,7 @@ function POSPage() {
           {appliedPromo && (
             <div className="flex items-center gap-2 bg-primary/10 rounded px-3 py-2 text-sm">
               <Tag className="h-3 w-3 text-primary" />
-              <span className="font-medium">{appliedPromo.code}</span>
+              <span className="font-medium">{appliedPromo.code ?? appliedPromo.label}</span>
               <span className="text-muted-foreground">
                 −{fmt(appliedPromo.applies_to_item_id ? itemPromoAmount : orderDiscountAmount)}
               </span>
