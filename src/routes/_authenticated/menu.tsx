@@ -87,6 +87,7 @@ function MenuPage() {
   useEffect(() => { void load(); }, []);
 
   const catName = (id: string | null) => cats.find((c) => c.id === id)?.name ?? "—";
+  const ownerName = (id: string | null) => owners.find((o) => o.id === id)?.name ?? null;
   const itemRecipes = (id: string) => recipes.filter((r) => r.menu_item_id === id);
   const invName = (id: string) => invs.find((i) => i.id === id);
 
@@ -95,6 +96,26 @@ function MenuPage() {
       .update({ is_active: !it.is_active }).eq("id", it.id);
     if (error) return toast.error(error.message);
     toast.success(`${it.name} ${!it.is_active ? "activated" : "deactivated"}`);
+    void load();
+  }
+
+  async function confirmDelete(it: Item) {
+    // Try hard delete; if FK from order_items blocks it, fall back to soft delete (deactivate).
+    const { error } = await db.from("menu_items").delete().eq("id", it.id);
+    if (error) {
+      const msg = String(error.message || "").toLowerCase();
+      if (msg.includes("foreign key") || msg.includes("violates")) {
+        const { error: e2 } = await db.from("menu_items").update({ is_active: false }).eq("id", it.id);
+        if (e2) { setDeleting(null); return toast.error(e2.message); }
+        toast.success(`${it.name} has past orders — deactivated instead of deleted.`);
+      } else {
+        setDeleting(null);
+        return toast.error(error.message);
+      }
+    } else {
+      toast.success(`${it.name} deleted`);
+    }
+    setDeleting(null);
     void load();
   }
 
