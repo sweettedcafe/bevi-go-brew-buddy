@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { useRealtime } from "@/lib/use-realtime";
 
 export const Route = createFileRoute("/_authenticated/analytics")({
+  ssr: false,
   component: AnalyticsPage,
 });
 
