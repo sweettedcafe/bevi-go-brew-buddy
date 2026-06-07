@@ -816,7 +816,8 @@ function POSPage() {
             redeem_points: redeemPts,
             notes: null,
             items: cart.map((l) => ({
-              menu_item_id: l.menu_item_id, qty: l.qty,
+              menu_item_id: l.menu_item_id, variant_id: l.variant_id,
+              name: l.name, qty: l.qty,
               unit_price: l.unit_price, addon_total: l.addon_total,
               customization: l.customization, notes: l.notes,
             })),
