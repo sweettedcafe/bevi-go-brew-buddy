@@ -178,18 +178,33 @@ function POSPage() {
   }
 
   function addItem(it: MenuItem) {
+    if (it.has_variants) {
+      const hasAny = variants.some((v) => v.menu_item_id === it.id);
+      if (!hasAny) { toast.error(`${it.name} has no variants configured`); return; }
+      setVariantPick(it);
+      return;
+    }
     if (hasAnyCustomization(it.options)) {
       setCustomizing({ item: it });
       return;
     }
+    addPlainLine(it, null);
+  }
+
+  function addPlainLine(it: MenuItem, variant: Variant | null) {
     setCart((c) => {
       const sig = customSignature(null, null);
-      const f = c.find((l) => l.menu_item_id === it.id && customSignature(l.customization, l.notes) === sig);
+      const f = c.find((l) => l.menu_item_id === it.id
+        && l.variant_id === (variant?.id ?? null)
+        && customSignature(l.customization, l.notes) === sig);
       if (f) return c.map((l) => l.lineId === f.lineId ? { ...l, qty: l.qty + 1 } : l);
-      const base = Number(it.price);
+      const base = Number(variant?.price ?? it.price);
       return [...c, {
         lineId: newLineId(),
-        menu_item_id: it.id, name: it.name,
+        menu_item_id: it.id,
+        variant_id: variant?.id ?? null,
+        variant_name: variant?.name ?? null,
+        name: variant ? `${it.name} — ${variant.name}` : it.name,
         base_price: base, unit_price: base, qty: 1,
         customization: null, addon_total: 0, notes: null,
       }];
@@ -204,13 +219,11 @@ function POSPage() {
     const unit = base + args.addon;
     const cleanNotes = args.notes.trim() || null;
     setCart((c) => {
-      // If editing an existing line, replace it
       if (args.editingLineId) {
         return c.map((l) => l.lineId === args.editingLineId
           ? { ...l, customization: args.custom, addon_total: args.addon, unit_price: unit, qty: args.qty, notes: cleanNotes }
           : l);
       }
-      // Merge if exact same customization+notes already exists
       const sig = customSignature(args.custom, cleanNotes);
       const dup = c.find((l) =>
         l.menu_item_id === args.item.id &&
@@ -218,12 +231,16 @@ function POSPage() {
       if (dup) return c.map((l) => l.lineId === dup.lineId ? { ...l, qty: l.qty + args.qty } : l);
       return [...c, {
         lineId: newLineId(),
-        menu_item_id: args.item.id, name: args.item.name,
+        menu_item_id: args.item.id,
+        variant_id: null,
+        variant_name: null,
+        name: args.item.name,
         base_price: base, unit_price: unit, qty: args.qty,
         customization: args.custom, addon_total: args.addon, notes: cleanNotes,
       }];
     });
   }
+
 
   const changeQty = (lineId: string, d: number) =>
     setCart((c) => c.map((l) => l.lineId === lineId ? { ...l, qty: l.qty + d } : l).filter((l) => l.qty > 0));
