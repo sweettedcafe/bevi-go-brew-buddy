@@ -315,6 +315,40 @@ function POSPage() {
     return () => clearTimeout(t);
   }, [posSettings.scanEnabled, posSettings.scanAutoFocus, cart.length, checkoutOpen, holdOpen, todayOpen]);
 
+  // Auto-apply item-scoped discounts when matching item is in cart.
+  // If an item-scoped promo is currently applied and its item leaves the cart, clear it.
+  useEffect(() => {
+    if (manual) return; // manager override wins
+    const itemIds = new Set(cart.map((l) => l.menu_item_id));
+    // clear stale item-scoped promo
+    if (appliedPromo?.applies_to_item_id && !itemIds.has(appliedPromo.applies_to_item_id)) {
+      setAppliedPromo(null);
+      return;
+    }
+    // skip if a non-item promo is already applied
+    if (appliedPromo && !appliedPromo.applies_to_item_id) return;
+    // find best matching item-scoped discount
+    const match = discounts.find((d) =>
+      d.applies_to_item_id && itemIds.has(d.applies_to_item_id),
+    );
+    if (!match) return;
+    if (appliedPromo?.applies_to_item_id === match.applies_to_item_id) return;
+    const base = cart
+      .filter((l) => l.menu_item_id === match.applies_to_item_id)
+      .reduce((s, l) => s + l.unit_price * l.qty, 0);
+    if (base <= 0) return;
+    const amt = match.type === "percent"
+      ? Math.round(base * Number(match.value)) / 100
+      : Math.min(Number(match.value), base);
+    setAppliedPromo({
+      code: match.code ?? match.name,
+      label: match.name,
+      amount: amt,
+      applies_to_item_id: match.applies_to_item_id,
+    });
+  }, [cart, discounts, manual, appliedPromo]);
+
+
   function addBundle(b: Bundle) {
     const rows = bundleItems.filter((x) => x.bundle_id === b.id);
     if (rows.length === 0) { toast.error("Bundle has no items"); return; }
