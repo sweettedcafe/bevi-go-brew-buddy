@@ -66,7 +66,17 @@ type Bundle = {
   id: string; name: string; description: string | null; price: number;
   starts_at: string | null; ends_at: string | null; is_active: boolean;
 };
-type BundleItem = { bundle_id: string; menu_item_id: string; qty: number };
+type BundleItem = {
+  bundle_id: string; menu_item_id: string; qty: number;
+  discount_type: "percent" | "fixed"; discount_value: number;
+};
+type DiscountRow = {
+  id: string; code: string | null; name: string;
+  type: "percent" | "fixed"; value: number;
+  min_subtotal: number; max_uses: number | null; uses_count: number;
+  starts_at: string | null; ends_at: string | null; is_active: boolean;
+  applies_to_item_id: string | null;
+};
 
 const db = supabase as any;
 const fmt = (n: number) => n.toFixed(2);
