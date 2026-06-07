@@ -239,13 +239,33 @@ function MenuPage() {
         <EditMenuDialog
           item={editing}
           cats={cats}
+          owners={owners}
           invs={invs}
           initialRecipes={editing.id ? itemRecipes(editing.id) : []}
           initialVariants={editing.id ? variants.filter((v) => v.menu_item_id === editing.id) : []}
           allVariantRecipes={vrecipes}
           onClose={() => setEditing(null)}
           onSaved={() => { setEditing(null); void load(); }}
+          onOwnersChanged={() => void load()}
         />
+      )}
+      {deleting && (
+        <Dialog open onOpenChange={(o) => !o && setDeleting(null)}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Delete menu item?</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">
+              Delete <span className="font-medium text-foreground">{deleting.name}</span>?
+              If this item appears in past orders, it will be deactivated instead of removed
+              so reports stay accurate.
+            </p>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeleting(null)}>Cancel</Button>
+              <Button variant="destructive" onClick={() => void confirmDelete(deleting)}>Delete</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );
