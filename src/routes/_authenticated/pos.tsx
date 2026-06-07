@@ -12,7 +12,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Trash2, Plus, Minus, ShoppingCart, Coffee, Search, X, Tag, Pause, PlayCircle, ClipboardList, Star, Printer, ScanLine, UserCircle2 } from "lucide-react";
+import { Trash2, Plus, Minus, ShoppingCart, Coffee, Search, X, Tag, Pause, PlayCircle, ClipboardList, Star, Printer, ScanLine, UserCircle2, Camera, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { loadPrintSettings } from "@/lib/print-settings";
 import { loadPosSettings } from "@/lib/pos-settings";
@@ -21,6 +21,7 @@ import { receiptHTML, labelsHTML, type DrinkLabel } from "@/lib/print-templates"
 import { reprintReceiptById, reprintLabelsById } from "@/lib/reprint";
 import { randomQuote } from "@/lib/quotes";
 import { CustomizeDialog } from "@/components/pos/CustomizeDialog";
+import { CameraScannerDialog } from "@/components/pos/CameraScannerDialog";
 import {
   type MenuOptions, type SelectedCustom,
   hasAnyCustomization, addonTotal, customSignature, describeCustom,
