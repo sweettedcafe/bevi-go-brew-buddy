@@ -359,6 +359,17 @@ function ReportsPage() {
               {categoryOptions.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
+          <div>
+            <Label className="text-xs">Owner</Label>
+            <select
+              className="h-9 rounded-md border border-input bg-transparent px-2 text-sm"
+              value={filters.owner}
+              onChange={(e) => setFilters({ ...filters, owner: e.target.value })}
+            >
+              <option value="">All</option>
+              {ownerOptions.map((o) => <option key={o} value={o}>{o}</option>)}
+            </select>
+          </div>
           <div><Label className="text-xs">Item name</Label>
             <Input placeholder="Search item" value={filters.item} onChange={(e) => setFilters({ ...filters, item: e.target.value })} /></div>
           <Button size="sm" onClick={loadAll} disabled={loading}>{loading ? "Loading…" : "Apply"}</Button>
@@ -392,40 +403,72 @@ function ReportsPage() {
             rows={orders}
             render={(row, key) => {
               if (key === "status") return <StatusBadge s={row.status} />;
+              if (key === "txn_kind") return <TxnBadge k={row.txn_kind ?? "sale"} />;
+              if (key === "total" || key === "subtotal" || key === "discount_total") {
+                const n = Number(row[key]);
+                return <span className={n < 0 ? "text-destructive" : ""}>{`₱${n.toFixed(2)}`}</span>;
+              }
               return fmt(row[key], key);
             }}
-            actions={(row) => (
-              <div className="flex gap-1 justify-end">
-                <Button size="icon" variant="ghost" title="View" onClick={() => setDetailId(row.id)}>
-                  <Eye className="h-4 w-4" />
-                </Button>
-                {canRefund && row.status !== "voided" && row.status !== "refunded" && (
-                  <>
-                    <Button size="icon" variant="ghost" title="Refund" onClick={() => refund(row.id)}>
-                      <RotateCcw className="h-4 w-4 text-amber-600" />
-                    </Button>
-                    <Button size="icon" variant="ghost" title="Void" onClick={() => voidOrder(row.id)}>
-                      <XCircle className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </>
-                )}
-              </div>
-            )}
+            actions={(row) => {
+              const isSale = (row.txn_kind ?? "sale") === "sale";
+              return (
+                <div className="flex gap-1 justify-end">
+                  <Button size="icon" variant="ghost" title="View" onClick={() => setDetailId(row.id)}>
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                  {canRefund && isSale && row.status !== "voided" && row.status !== "refunded" && (
+                    <>
+                      <Button size="icon" variant="ghost" title="Refund" onClick={() => refund(row.id)}>
+                        <RotateCcw className="h-4 w-4 text-amber-600" />
+                      </Button>
+                      <Button size="icon" variant="ghost" title="Void" onClick={() => voidOrder(row.id)}>
+                        <XCircle className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </>
+                  )}
+                </div>
+              );
+            }}
             empty="No orders match the filters."
           />
         </TabsContent>
 
         <TabsContent value="item">
+          {ownerSubtotals.length > 1 && (
+            <div className="flex flex-wrap gap-2 mt-2">
+              {ownerSubtotals.map(([owner, t]) => (
+                <Badge key={owner} variant="outline" className="text-xs">
+                  {owner}: {t.qty} units · ₱{t.revenue.toFixed(2)}
+                </Badge>
+              ))}
+            </div>
+          )}
           <DataTable
             cols={PER_ITEM_COLS.filter((c) => colsItem.includes(c.key))}
             rows={itemRows}
             render={(row, key) => {
-              if (key === "revenue") return `₱${Number(row.revenue).toFixed(2)}`;
+              if (key === "revenue") {
+                const n = Number(row.revenue);
+                return <span className={n < 0 ? "text-destructive" : ""}>₱{n.toFixed(2)}</span>;
+              }
+              if (key === "qty") {
+                const n = Number(row.qty);
+                return <span className={n < 0 ? "text-destructive" : ""}>{n}</span>;
+              }
+              if (key === "txn_kind") return <TxnBadge k={row.txn_kind ?? "sale"} />;
               if (key === "created_at") return new Date(row.created_at).toLocaleString();
               if (key === "order_no") return `#${String(row.order_no).padStart(3, "0")}`;
               if (key === "order_id_short") return <span className="font-mono text-xs">{row.order_id_short}</span>;
               return (row as any)[key];
             }}
+            actions={(row) => (
+              <div className="flex gap-1 justify-end">
+                <Button size="icon" variant="ghost" title="View order" onClick={() => setDetailId(row.order_id)}>
+                  <Eye className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
             empty="No items sold in this range."
           />
         </TabsContent>
