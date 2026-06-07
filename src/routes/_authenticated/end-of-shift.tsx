@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,7 +10,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { ClipboardList, Plus, Trash2, RefreshCw, Share2, Copy } from "lucide-react";
+import { ClipboardList, Plus, Trash2, RefreshCw, Share2, Copy, Camera } from "lucide-react";
+import { toPng } from "html-to-image";
 
 export const Route = createFileRoute("/_authenticated/end-of-shift")({
   component: EndOfShiftPage,
