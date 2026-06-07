@@ -70,7 +70,7 @@ function HistoryPage() {
 
   async function buildReceipt(r: Row): Promise<ReceiptData | null> {
     const [{ data: items }, { data: payments }] = await Promise.all([
-      db.from("order_items").select("*").eq("order_id", r.id).order("created_at"),
+      db.from("order_items").select("*").eq("order_id", r.id),
       db.from("order_payments").select("*").eq("order_id", r.id).order("created_at"),
     ]);
     const pms = await db.from("payment_methods").select("code,label");
@@ -170,7 +170,9 @@ function HistoryPage() {
                   {txnKind !== "sale" && (
                     <Badge variant="outline" className="capitalize">{txnKind}</Badge>
                   )}
-                  <Badge variant={r.status === "completed" ? "default" : "secondary"} className="capitalize">{r.status}</Badge>
+                  <Badge variant={txnKind !== "sale" ? "destructive" : (r.status === "completed" ? "default" : "secondary")} className="capitalize">
+                    {txnKind === "void" ? "voided" : txnKind === "refund" ? "refunded" : r.status}
+                  </Badge>
                   <div className={`font-display text-lg w-20 text-right ${Number(r.total) < 0 ? "text-destructive" : "text-primary"}`}>
                     {Number(r.total).toFixed(2)}
                   </div>

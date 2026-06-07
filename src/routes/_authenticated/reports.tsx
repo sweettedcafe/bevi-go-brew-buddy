@@ -402,7 +402,7 @@ function ReportsPage() {
             cols={PER_ORDER_COLS.filter((c) => colsOrder.includes(c.key))}
             rows={orders}
             render={(row, key) => {
-              if (key === "status") return <StatusBadge s={row.status} />;
+              if (key === "status") return <StatusBadge s={row.status} k={row.txn_kind ?? "sale"} />;
               if (key === "txn_kind") return <TxnBadge k={row.txn_kind ?? "sale"} />;
               if (key === "total" || key === "subtotal" || key === "discount_total") {
                 const n = Number(row[key]);
@@ -522,11 +522,12 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function StatusBadge({ s }: { s: string }) {
+function StatusBadge({ s, k }: { s: string; k?: string }) {
+  const effective = (k && k !== "sale") ? (k === "void" ? "voided" : "refunded") : s;
   const map: Record<string, string> = {
     completed: "default", on_hold: "secondary", voided: "destructive", refunded: "outline", open: "secondary",
   };
-  return <Badge variant={(map[s] ?? "secondary") as any} className="capitalize">{s.replace("_", " ")}</Badge>;
+  return <Badge variant={(map[effective] ?? "secondary") as any} className="capitalize">{effective.replace("_", " ")}</Badge>;
 }
 
 function ColumnsPicker({ cols, value, onChange }: {

@@ -51,6 +51,8 @@ export function CustomizeDialog({
   const [size, setSize] = useState<PriceOption | null>(null);
   const [milk, setMilk] = useState<PriceOption | null>(null);
   const [extras, setExtras] = useState<PriceOption[]>([]);
+  const [flavors, setFlavors] = useState<PriceOption[]>([]);
+  const [others, setOthers] = useState<PriceOption[]>([]);
   const [other, setOther] = useState<PriceOption[]>([]);
   const [otherLabel, setOtherLabel] = useState("");
   const [otherPrice, setOtherPrice] = useState("");
@@ -63,6 +65,8 @@ export function CustomizeDialog({
     setSize(initial?.custom?.size ?? defSize);
     setMilk(initial?.custom?.milk ?? null);
     setExtras(initial?.custom?.extras ?? []);
+    setFlavors(initial?.custom?.flavors ?? []);
+    setOthers(initial?.custom?.others ?? []);
     setOther(initial?.custom?.other ?? []);
     setOtherLabel(""); setOtherPrice("");
     setQty(initial?.qty ?? 1);
@@ -77,6 +81,8 @@ export function CustomizeDialog({
     size: size ?? undefined,
     milk: milk ?? undefined,
     extras: extras.length ? extras : undefined,
+    flavors: flavors.length ? flavors : undefined,
+    others: others.length ? others : undefined,
     other: other.length ? other : undefined,
   };
   const addon = addonTotal(sel);
@@ -85,13 +91,14 @@ export function CustomizeDialog({
   const sizes = options.sizes ?? [];
   const milks = options.milks ?? [];
   const exs = options.extras ?? [];
+  const flvs = options.flavors ?? [];
+  const oths = options.others ?? [];
   const sizeRequired = !!options.size_required && sizes.length > 0;
 
-  function toggleExtra(o: PriceOption) {
-    setExtras((cur) => cur.some((x) => x.label === o.label)
-      ? cur.filter((x) => x.label !== o.label)
-      : [...cur, o]);
+  function toggleIn(list: PriceOption[], setList: (n: PriceOption[]) => void, o: PriceOption) {
+    setList(list.some((x) => x.label === o.label) ? list.filter((x) => x.label !== o.label) : [...list, o]);
   }
+  function toggleExtra(o: PriceOption) { toggleIn(extras, setExtras, o); }
 
   function addOther() {
     const lbl = otherLabel.trim();
@@ -199,6 +206,47 @@ export function CustomizeDialog({
               </div>
             </section>
           )}
+
+          {flvs.length > 0 && (
+            <section>
+              <div className="text-xs font-medium text-muted-foreground mb-2">Flavors</div>
+              <div className="space-y-1">
+                {flvs.map((e) => {
+                  const on = flavors.some((x) => x.label === e.label);
+                  return (
+                    <label key={e.label} className="flex items-center gap-2 rounded border p-2 cursor-pointer hover:bg-accent">
+                      <Checkbox checked={on} onCheckedChange={() => toggleIn(flavors, setFlavors, e)} />
+                      <span className="flex-1">{e.label}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {e.price_delta > 0 ? `+${fmt(e.price_delta)}` : "free"}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          {oths.length > 0 && (
+            <section>
+              <div className="text-xs font-medium text-muted-foreground mb-2">Others</div>
+              <div className="space-y-1">
+                {oths.map((e) => {
+                  const on = others.some((x) => x.label === e.label);
+                  return (
+                    <label key={e.label} className="flex items-center gap-2 rounded border p-2 cursor-pointer hover:bg-accent">
+                      <Checkbox checked={on} onCheckedChange={() => toggleIn(others, setOthers, e)} />
+                      <span className="flex-1">{e.label}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {e.price_delta > 0 ? `+${fmt(e.price_delta)}` : "free"}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
 
           {options.allow_other && (
             <section>

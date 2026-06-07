@@ -30,12 +30,14 @@ export function OrderDetailSheet({ orderId, onClose, onChanged, canReverse = tru
   const [busy, setBusy] = useState(false);
 
   async function load() {
-    const [{ data: o }, { data: items }, { data: pays }, { data: pms }] = await Promise.all([
+    const [{ data: o, error: oErr }, { data: items, error: iErr }, { data: pays }, { data: pms }] = await Promise.all([
       db.from("orders").select("*").eq("id", orderId).maybeSingle(),
-      db.from("order_items").select("*").eq("order_id", orderId).order("created_at"),
+      db.from("order_items").select("*").eq("order_id", orderId),
       db.from("order_payments").select("*").eq("order_id", orderId),
       db.from("payment_methods").select("code,label"),
     ]);
+    if (oErr) toast.error(oErr.message);
+    if (iErr) toast.error(iErr.message);
     // reversed qty per parent item
     const parentIds = (items ?? []).map((i: any) => i.id);
     let reversedByParent: Record<string, number> = {};
@@ -102,7 +104,9 @@ export function OrderDetailSheet({ orderId, onClose, onChanged, canReverse = tru
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             Order #{String(o.order_no).padStart(3, "0")}
-            <Badge variant={o.status === "completed" ? "default" : "secondary"} className="capitalize">{o.status}</Badge>
+            <Badge variant={isSale ? (o.status === "completed" ? "default" : "secondary") : "destructive"} className="capitalize">
+              {isSale ? o.status : (o.txn_kind === "void" ? "voided" : "refunded")}
+            </Badge>
             {!isSale && <Badge variant="outline" className="capitalize">{o.txn_kind}</Badge>}
           </DialogTitle>
         </DialogHeader>

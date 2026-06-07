@@ -112,6 +112,21 @@ export function MenuOptionsEditor({
         onChange={(next) => set({ extras: next })}
       />
 
+      <OptionList
+        title="Flavors"
+        hint="e.g. Vanilla (+10), Caramel (+10), Hazelnut (+15)."
+        items={v.flavors ?? []}
+        onChange={(next) => set({ flavors: next })}
+      />
+
+      <OptionList
+        title="Others"
+        hint="Any other variation the cashier can pick (e.g. less ice, extra hot)."
+        items={v.others ?? []}
+        onChange={(next) => set({ others: next })}
+      />
+
+
       <div className="border rounded p-3 space-y-2">
         <div className="flex items-center justify-between">
           <div>
