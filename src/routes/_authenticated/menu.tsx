@@ -221,6 +221,11 @@ function MenuPage() {
                       <Button size="icon" variant="ghost" onClick={() => setEditing(it)}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
+                      <Button size="icon" variant="ghost"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => setDeleting(it)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
                     </div>
                   )}
                 </div>
