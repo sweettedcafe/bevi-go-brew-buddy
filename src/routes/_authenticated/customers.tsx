@@ -247,9 +247,22 @@ function RegisterDialog({ onClose }: { onClose: (created: boolean) => void }) {
 }
 
 function CustomerDetailDialog({ customer, onClose }: { customer: Customer; onClose: (changed: boolean) => void }) {
+  const { hasRole } = useAuth();
+  const canDelete = hasRole("admin") || hasRole("developer");
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(false);
   const orderUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/o/${customer.token}`;
+
+  async function deleteCustomer() {
+    if (!confirm(`Delete customer "${customer.name}"? A developer can restore it later.`)) return;
+    setDeleting(true);
+    const { error } = await db.rpc("admin_delete_customer", { p_id: customer.id });
+    setDeleting(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Customer deleted");
+    onClose(true);
+  }
 
   useEffect(() => {
     (async () => {
