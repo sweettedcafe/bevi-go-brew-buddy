@@ -310,3 +310,54 @@ function DiscountDialog({
     </Dialog>
   );
 }
+
+function MultiItemPicker({
+  menuItems, selected, onChange,
+}: {
+  menuItems: MenuItemLite[];
+  selected: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  const selectedSet = new Set(selected);
+  const label = selected.length === 0
+    ? "Whole order (subtotal)"
+    : selected.length === 1
+      ? (menuItems.find((m) => m.id === selected[0])?.name ?? "1 item")
+      : `${selected.length} items selected`;
+  function toggle(id: string) {
+    const next = new Set(selectedSet);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    onChange([...next]);
+  }
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="outline" className="w-full justify-between font-normal">
+          <span className="truncate">{label}</span>
+          <ChevronsUpDown className="h-3 w-3 ml-2 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[320px] p-0 max-h-[300px] overflow-y-auto">
+        <button
+          type="button"
+          className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-accent border-b"
+          onClick={() => onChange([])}
+        >
+          {selected.length === 0 ? <Check className="h-3 w-3" /> : <span className="w-3" />}
+          Whole order (clear selection)
+        </button>
+        {menuItems.map((m) => (
+          <button
+            key={m.id}
+            type="button"
+            className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-accent text-left"
+            onClick={() => toggle(m.id)}
+          >
+            <Checkbox checked={selectedSet.has(m.id)} className="pointer-events-none" />
+            <span className="truncate">{m.name}</span>
+          </button>
+        ))}
+      </PopoverContent>
+    </Popover>
+  );
+}
