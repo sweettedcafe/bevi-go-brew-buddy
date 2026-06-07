@@ -25,6 +25,7 @@ type Customer = {
   id: string; code: string; token: string;
   name: string; phone: string | null; email: string | null;
   points: number; is_active: boolean; created_at: string;
+  deleted_at?: string | null;
 };
 type Loyalty = {
   is_active: boolean; earn_rate: number;
