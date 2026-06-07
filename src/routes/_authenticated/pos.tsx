@@ -949,14 +949,14 @@ function POSPage() {
                       toast.error(`Min subtotal ${fmt(Number(d.min_subtotal))}`);
                       return;
                     }
-                    const amt = d.type === "percent"
-                      ? Math.round(subtotal * Number(d.value)) / 100
-                      : Math.min(Number(d.value), subtotal);
-                    setAppliedPromo({
-                      code: d.code ?? d.name, label: d.name, amount: amt,
-                      applies_to_item_id: null,
-                    });
-                    setManual(null);
+                    // Route whole-order discounts through `manual` so item-scoped
+                    // promos (in `appliedPromo`) can stack on top.
+                    if (d.type === "percent") {
+                      setManual({ type: "percent", value: Number(d.value), label: d.name });
+                    } else {
+                      setManual({ type: "fixed", value: Number(d.value), label: d.name });
+                    }
+                    if (appliedPromo && !appliedPromo.applies_to_item_id) setAppliedPromo(null);
                     toast.success(`${d.name} applied`);
                   }}
                 >
