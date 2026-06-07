@@ -892,7 +892,9 @@ function POSPage() {
             <div className="flex items-center gap-2 bg-primary/10 rounded px-3 py-2 text-sm">
               <Tag className="h-3 w-3 text-primary" />
               <span className="font-medium">{appliedPromo.code}</span>
-              <span className="text-muted-foreground">−{fmt(discountAmount)}</span>
+              <span className="text-muted-foreground">
+                −{fmt(appliedPromo.applies_to_item_id ? itemPromoAmount : orderDiscountAmount)}
+              </span>
               <Button size="icon" variant="ghost" className="ml-auto h-6 w-6"
                 onClick={() => { setAppliedPromo(null); setPromoCode(""); }}>
                 <X className="h-3 w-3" />
@@ -903,7 +905,7 @@ function POSPage() {
             <div className="flex items-center gap-2 bg-secondary rounded px-3 py-2 text-sm">
               <Tag className="h-3 w-3" />
               <span className="font-medium">{manual.label}</span>
-              <span className="text-muted-foreground">−{fmt(discountAmount)}</span>
+              <span className="text-muted-foreground">−{fmt(orderDiscountAmount)}</span>
               <Button size="icon" variant="ghost" className="ml-auto h-6 w-6" onClick={() => setManual(null)}>
                 <X className="h-3 w-3" />
               </Button>
