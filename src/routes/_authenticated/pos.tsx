@@ -561,7 +561,10 @@ function POSPage() {
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
               {filtered.map((it) => {
                 const isPop = topSellers.has(it.id);
-                const customizable = hasAnyCustomization(it.options);
+                const itemVariants = it.has_variants
+                  ? variants.filter((v) => v.menu_item_id === it.id).sort((a,b) => a.sort_order - b.sort_order)
+                  : [];
+                const minPrice = itemVariants.length > 0 ? Math.min(...itemVariants.map((v) => Number(v.price))) : Number(it.price);
                 return (
                   <button key={it.id} onClick={() => addItem(it)}
                     className="relative text-left rounded-lg border bg-card hover:bg-accent hover:border-primary/50 transition-colors p-4 shadow-sm">
@@ -572,8 +575,15 @@ function POSPage() {
                     )}
                     <div className="font-medium leading-tight">{it.name}</div>
                     {it.description && <div className="text-xs text-muted-foreground mt-1 line-clamp-2">{it.description}</div>}
+                    {itemVariants.length > 0 && (
+                      <div className="mt-1 text-[10px] text-muted-foreground">
+                        {itemVariants.map((v) => v.name).join(" · ")}
+                      </div>
+                    )}
                     <div className="mt-3 flex items-end justify-between gap-2">
-                      <div className="font-display text-lg text-primary">{fmt(Number(it.price))}</div>
+                      <div className="font-display text-lg text-primary">
+                        {fmt(minPrice)}{itemVariants.length > 0 ? "+" : ""}
+                      </div>
                     </div>
                   </button>
                 );
