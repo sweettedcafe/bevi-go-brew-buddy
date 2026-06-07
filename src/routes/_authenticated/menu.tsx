@@ -559,6 +559,7 @@ function ImportExportButtons({
     for (const it of items) {
       const rcs = recipes.filter((r) => r.menu_item_id === it.id);
       const base = {
+        product_code: it.product_code ?? "",
         name: it.name,
         category: catName(it.category_id),
         price: it.price,
