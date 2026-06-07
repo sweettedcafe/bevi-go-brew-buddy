@@ -210,15 +210,25 @@ function EndOfShiftPage() {
                 <p className="text-xs text-muted-foreground">Shift is closed — expenses are read-only.</p>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-2 items-end">
-                  <div className="md:col-span-5">
-                    <Label htmlFor="exp-desc">Description</Label>
-                    <Input id="exp-desc" value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="e.g. Milk delivery" />
+                  <div className="md:col-span-4">
+                    <Label htmlFor="exp-desc">Item / description</Label>
+                    <Input id="exp-desc" value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="e.g. Whole milk 1L" />
                   </div>
-                  <div className="md:col-span-3">
-                    <Label htmlFor="exp-amt">Amount (₱)</Label>
-                    <Input id="exp-amt" type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
+                  <div className="md:col-span-2">
+                    <Label htmlFor="exp-qty">Quantity</Label>
+                    <Input id="exp-qty" type="number" min="0.01" step="0.01" value={qty} onChange={(e) => setQty(e.target.value)} />
                   </div>
-                  <div className="md:col-span-3">
+                  <div className="md:col-span-2">
+                    <Label htmlFor="exp-unit">Unit price (₱)</Label>
+                    <Input id="exp-unit" type="number" min="0" step="0.01" value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} />
+                  </div>
+                  <div className="md:col-span-2">
+                    <Label>Total</Label>
+                    <div className="h-9 flex items-center px-3 rounded-md border bg-muted/30 text-sm font-medium">
+                      {peso((Number(qty) || 0) * (Number(unitPrice) || 0))}
+                    </div>
+                  </div>
+                  <div className="md:col-span-1">
                     <Label htmlFor="exp-cat">Category</Label>
                     <Input id="exp-cat" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="optional" />
                   </div>
@@ -237,7 +247,9 @@ function EndOfShiftPage() {
                       <TableHead>When</TableHead>
                       <TableHead>Description</TableHead>
                       <TableHead>Category</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead className="text-right">Qty</TableHead>
+                      <TableHead className="text-right">Unit price</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
                       <TableHead></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -247,7 +259,9 @@ function EndOfShiftPage() {
                         <TableCell className="text-xs">{fmtTime(e.created_at)}</TableCell>
                         <TableCell>{e.description}</TableCell>
                         <TableCell className="text-muted-foreground">{e.category ?? "—"}</TableCell>
-                        <TableCell className="text-right">{peso(e.amount)}</TableCell>
+                        <TableCell className="text-right">{Number(e.quantity ?? 1)}</TableCell>
+                        <TableCell className="text-right">{peso(e.unit_price ?? e.amount)}</TableCell>
+                        <TableCell className="text-right font-medium">{peso(e.amount)}</TableCell>
                         <TableCell className="text-right">
                           {!report.shift.clock_out && (
                             <Button size="icon" variant="ghost" onClick={() => deleteExpense(e.id)}>
@@ -258,7 +272,7 @@ function EndOfShiftPage() {
                       </TableRow>
                     ))}
                     <TableRow>
-                      <TableCell colSpan={3} className="text-right font-semibold">Total expenses</TableCell>
+                      <TableCell colSpan={5} className="text-right font-semibold">Total expenses</TableCell>
                       <TableCell className="text-right font-semibold">{peso(report.total_expenses)}</TableCell>
                       <TableCell />
                     </TableRow>
