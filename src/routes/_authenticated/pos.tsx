@@ -1334,9 +1334,9 @@ function CheckoutDialog({
                       </SelectContent>
                     </Select>
                   </div>
-                  {pm?.kind === "cash" && (
+                  {(pm?.kind === "cash" || splits.length > 1) && (
                     <div className="w-32">
-                      {i === 0 && <label className="text-xs text-muted-foreground">Cash Bill</label>}
+                      {i === 0 && <label className="text-xs text-muted-foreground">{pm?.kind === "cash" ? "Cash Bill" : "Amount"}</label>}
                       <Input type="number" inputMode="decimal" value={s.amount}
                         onChange={(e) => setSplit(i, { amount: e.target.value })} />
                     </div>
@@ -1346,13 +1346,10 @@ function CheckoutDialog({
                       <X className="h-4 w-4" />
                     </Button>
                   )}
-                  {pm?.kind === "cash" && i === splits.length - 1 && splits.length === 1 && (
-                    <div className="hidden" />
-                  )}
                 </div>
               );
             })}
-            <Button size="sm" variant="outline" onClick={addSplit} disabled={remaining <= 0}>
+            <Button size="sm" variant="outline" onClick={addSplit}>
               <Plus className="h-3 w-3 mr-1" /> Split payment
             </Button>
           </div>
