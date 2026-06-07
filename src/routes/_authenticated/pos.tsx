@@ -514,6 +514,20 @@ function POSPage() {
         subtotal,
         discountLabel: appliedPromo?.label ?? manual?.label ?? null,
         discountAmount: discountAmount,
+        discounts: [
+          ...(itemPromoAmount > 0 && appliedPromo
+            ? [{ label: appliedPromo.code ? `${appliedPromo.code} (${appliedPromo.label})` : appliedPromo.label, amount: itemPromoAmount }]
+            : []),
+          ...(orderDiscountAmount > 0
+            ? [{
+                label: manual?.label
+                  ?? (appliedPromo && !appliedPromo.applies_to_item_id
+                    ? (appliedPromo.code ? `${appliedPromo.code} (${appliedPromo.label})` : appliedPromo.label)
+                    : "Discount"),
+                amount: orderDiscountAmount,
+              }]
+            : []),
+        ],
         total,
         payments: args.splits.map((s) => ({ label: pmLabel(s.method_code), amount: Number(s.amount) || 0 })),
         change: args.change,
