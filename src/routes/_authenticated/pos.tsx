@@ -1055,8 +1055,19 @@ function POSPage() {
               unit_price: l.unit_price, addon_total: l.addon_total,
               customization: l.customization, notes: l.notes,
             })),
-            discount_code: appliedPromo?.code ?? null,
-            manual_discount: manual,
+            // Encode the combined client-side discount (item promo + whole-order)
+            // as a single fixed manual_discount so server total matches the client.
+            discount_code: null,
+            manual_discount: discountAmount > 0
+              ? {
+                  type: "fixed",
+                  value: Number(discountAmount.toFixed(2)),
+                  label: [
+                    appliedPromo?.applies_to_item_id ? (appliedPromo.code ?? appliedPromo.label) : null,
+                    manual?.label ?? (appliedPromo && !appliedPromo.applies_to_item_id ? (appliedPromo.code ?? appliedPromo.label) : null),
+                  ].filter(Boolean).join(" + ") || "Discount",
+                }
+              : null,
             payments,
           };
           const { data, error } = await db.rpc("pos_create_order", { p_payload: payload });
