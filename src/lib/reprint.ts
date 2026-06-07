@@ -23,7 +23,7 @@ export type AnyOrder = {
 export async function reprintReceiptById(orderId: string, fallbackCashier = "—") {
   const [{ data: ord }, { data: items }, { data: payments }, pms] = await Promise.all([
     db.from("orders").select("*").eq("id", orderId).maybeSingle(),
-    db.from("order_items").select("*").eq("order_id", orderId).order("created_at"),
+    db.from("order_items").select("*").eq("order_id", orderId),
     db.from("order_payments").select("*").eq("order_id", orderId).order("created_at"),
     db.from("payment_methods").select("code,label"),
   ]);
