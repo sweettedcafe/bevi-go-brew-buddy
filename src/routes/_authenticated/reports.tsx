@@ -92,7 +92,7 @@ function ReportsPage() {
   const { hasRole } = useAuth();
   const canRefund = hasRole("admin") || hasRole("developer");
   const [filters, setFilters] = useState<Filters>({
-    from: daysAgoIso(30), to: todayIso(), customer: "", orderId: "", cashier: "", category: "", item: "",
+    from: daysAgoIso(30), to: todayIso(), customer: "", orderId: "", cashier: "", category: "", item: "", owner: "",
   });
   const [tab, setTab] = useState("order");
   const [loading, setLoading] = useState(false);
