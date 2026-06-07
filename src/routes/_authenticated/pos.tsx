@@ -862,7 +862,26 @@ function POSPage() {
                 <Input placeholder="Promo code" value={promoCode}
                   onChange={(e) => setPromoCode(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && applyPromo()} />
-                <Button variant="outline" onClick={applyPromo} disabled={cart.length === 0}>Apply</Button>
+                <Button variant="outline" onClick={() => applyPromo()} disabled={cart.length === 0}>Apply</Button>
+              </div>
+              {(() => {
+                const codeOpts = discounts.filter((d) => !!d.code);
+                if (codeOpts.length === 0) return null;
+                return (
+                  <Select value="" onValueChange={(code) => { if (cart.length === 0) return; applyPromo(code); }}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Select promo code…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {codeOpts.map((d) => (
+                        <SelectItem key={d.id} value={d.code as string}>
+                          {d.code} — {d.name} ({d.type === "percent" ? `${d.value}%` : `−${Number(d.value).toFixed(2)}`})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                );
+              })()}
               </div>
               {(() => {
                 const opts = discounts.filter((d) => !d.applies_to_item_id);
