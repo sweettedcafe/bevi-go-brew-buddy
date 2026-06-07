@@ -20,6 +20,7 @@ import { BarChart3, Download, Filter, Settings2, RotateCcw, XCircle, Eye, FileSp
 import { toCsv, downloadCsv } from "@/lib/csv";
 import { useServerFn } from "@tanstack/react-start";
 import { exportToGoogleSheets } from "@/lib/sheets.functions";
+import { OrderDetailSheet } from "@/components/orders/OrderDetailSheet";
 
 export const Route = createFileRoute("/_authenticated/reports")({
   component: ReportsPage,
@@ -31,7 +32,7 @@ type AnyRow = Record<string, any>;
 type Filters = {
   from: string; to: string;
   customer: string; orderId: string; cashier: string;
-  category: string; item: string;
+  category: string; item: string; owner: string;
 };
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
@@ -42,6 +43,7 @@ const PER_ORDER_COLS = [
   { key: "order_no", label: "Order #" },
   { key: "order_id_short", label: "Order ID" },
   { key: "created_at", label: "Date / time" },
+  { key: "txn_kind", label: "Type" },
   { key: "customer_name", label: "Customer" },
   { key: "cashier_email", label: "Cashier" },
   { key: "items_count", label: "Items" },
@@ -57,8 +59,10 @@ const PER_ITEM_COLS = [
   { key: "order_no", label: "Order #" },
   { key: "order_id_short", label: "Order ID" },
   { key: "created_at", label: "Date" },
+  { key: "txn_kind", label: "Type" },
   { key: "name", label: "Item" },
   { key: "category", label: "Category" },
+  { key: "owner", label: "Owner" },
   { key: "qty", label: "Qty" },
   { key: "revenue", label: "Revenue" },
 ];
@@ -88,7 +92,7 @@ function ReportsPage() {
   const { hasRole } = useAuth();
   const canRefund = hasRole("admin") || hasRole("developer");
   const [filters, setFilters] = useState<Filters>({
-    from: daysAgoIso(30), to: todayIso(), customer: "", orderId: "", cashier: "", category: "", item: "",
+    from: daysAgoIso(30), to: todayIso(), customer: "", orderId: "", cashier: "", category: "", item: "", owner: "",
   });
   const [tab, setTab] = useState("order");
   const [loading, setLoading] = useState(false);
@@ -109,7 +113,7 @@ function ReportsPage() {
     const fromTs = `${filters.from}T00:00:00`;
     const toTs   = `${filters.to}T23:59:59`;
     let q = db.from("orders")
-      .select("id,order_no,created_at,customer_name,cashier_id,subtotal,discount_total,discount_label,discount_code,total,status,points_earned,points_redeemed,source")
+      .select("id,order_no,created_at,customer_name,cashier_id,subtotal,discount_total,discount_label,discount_code,total,status,points_earned,points_redeemed,source,txn_kind,parent_order_id,order_type,business_date,notes")
       .gte("created_at", fromTs).lte("created_at", toTs)
       .order("created_at", { ascending: false });
     if (filters.customer.trim()) q = q.ilike("customer_name", `%${filters.customer.trim()}%`);
@@ -142,7 +146,7 @@ function ReportsPage() {
     const ids = list.map((r) => r.id);
     if (ids.length) {
       const [{ data: items }, { data: pays }, { data: pms }] = await Promise.all([
-        db.from("order_items").select("order_id,qty,line_total,menu_item_id,name_snapshot,menu_items(category_id,categories(name))").in("order_id", ids),
+        db.from("order_items").select("order_id,qty,line_total,menu_item_id,name_snapshot,menu_items(category_id,owner_id,categories(name),owners(name))").in("order_id", ids),
         db.from("order_payments").select("order_id,method,method_code,amount,fee_amount,change_due").in("order_id", ids),
         db.from("payment_methods").select("code,label"),
       ]);
@@ -177,15 +181,17 @@ function ReportsPage() {
   const itemRowsAll = useMemo(() => {
     const rows: AnyRow[] = [];
     for (const o of orders) {
-      if (o.status === "voided" || o.status === "refunded") continue;
       for (const it of (o._items ?? [])) {
         rows.push({
+          id: it.id,
           order_id: o.id,
           order_id_short: shortId(o.id),
           order_no: o.order_no,
           created_at: o.created_at,
+          txn_kind: o.txn_kind ?? "sale",
           name: it.name_snapshot,
           category: it.menu_items?.categories?.name ?? "—",
+          owner: it.menu_items?.owners?.name ?? "—",
           qty: Number(it.qty || 0),
           revenue: Number(it.line_total || 0),
         });
@@ -196,19 +202,37 @@ function ReportsPage() {
 
   const categoryOptions = useMemo(() => {
     const s = new Set<string>();
-    itemRowsAll.forEach((r) => r.category && s.add(r.category));
+    itemRowsAll.forEach((r) => r.category && r.category !== "—" && s.add(r.category));
+    return [...s].sort();
+  }, [itemRowsAll]);
+
+  const ownerOptions = useMemo(() => {
+    const s = new Set<string>();
+    itemRowsAll.forEach((r) => r.owner && r.owner !== "—" && s.add(r.owner));
     return [...s].sort();
   }, [itemRowsAll]);
 
   const itemRows = useMemo(() => {
     const cat = filters.category.trim().toLowerCase();
     const item = filters.item.trim().toLowerCase();
+    const owner = filters.owner.trim().toLowerCase();
     return itemRowsAll.filter((r) => {
       if (cat && r.category.toLowerCase() !== cat) return false;
+      if (owner && r.owner.toLowerCase() !== owner) return false;
       if (item && !r.name.toLowerCase().includes(item)) return false;
       return true;
     });
-  }, [itemRowsAll, filters.category, filters.item]);
+  }, [itemRowsAll, filters.category, filters.item, filters.owner]);
+
+  const ownerSubtotals = useMemo(() => {
+    const m = new Map<string, { qty: number; revenue: number }>();
+    for (const r of itemRows) {
+      const cur = m.get(r.owner) ?? { qty: 0, revenue: 0 };
+      cur.qty += Number(r.qty); cur.revenue += Number(r.revenue);
+      m.set(r.owner, cur);
+    }
+    return [...m.entries()].sort((a, b) => b[1].revenue - a[1].revenue);
+  }, [itemRows]);
 
   const discountRows = useMemo(
     () => orders.filter((o) => Number(o.discount_total) > 0),
@@ -218,22 +242,23 @@ function ReportsPage() {
   const totals = useMemo(() => {
     let gross = 0, disc = 0, net = 0, count = 0;
     for (const o of orders) {
-      if (o.status === "voided" || o.status === "refunded") continue;
-      gross += Number(o.subtotal); disc += Number(o.discount_total); net += Number(o.total); count++;
+      // Signed totals: sale rows are positive, void/refund mirrors are negative.
+      gross += Number(o.subtotal); disc += Number(o.discount_total); net += Number(o.total);
+      if ((o.txn_kind ?? "sale") === "sale" && o.status !== "voided" && o.status !== "refunded") count++;
     }
     return { gross, disc, net, count };
   }, [orders]);
 
   async function refund(id: string) {
-    if (!confirm("Refund this order? Inventory will be restored and loyalty points reversed.")) return;
-    const { error } = await db.rpc("pos_refund_order", { p_order_id: id });
+    if (!confirm("Refund this order? A mirror negative transaction will be created and stock restored.")) return;
+    const { error } = await db.rpc("pos_refund_order_v2", { p_order_id: id, p_reason: null });
     if (error) { toast.error(error.message); return; }
     toast.success("Order refunded");
     await loadAll();
   }
   async function voidOrder(id: string) {
-    if (!confirm("Void this order? Same as refund: stock restored, points reversed.")) return;
-    const { error } = await db.rpc("pos_void_order", { p_order_id: id });
+    if (!confirm("Void this order? A mirror negative transaction will be created and stock restored.")) return;
+    const { error } = await db.rpc("pos_void_order_v2", { p_order_id: id, p_reason: null });
     if (error) { toast.error(error.message); return; }
     toast.success("Order voided");
     await loadAll();
@@ -334,6 +359,17 @@ function ReportsPage() {
               {categoryOptions.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
+          <div>
+            <Label className="text-xs">Owner</Label>
+            <select
+              className="h-9 rounded-md border border-input bg-transparent px-2 text-sm"
+              value={filters.owner}
+              onChange={(e) => setFilters({ ...filters, owner: e.target.value })}
+            >
+              <option value="">All</option>
+              {ownerOptions.map((o) => <option key={o} value={o}>{o}</option>)}
+            </select>
+          </div>
           <div><Label className="text-xs">Item name</Label>
             <Input placeholder="Search item" value={filters.item} onChange={(e) => setFilters({ ...filters, item: e.target.value })} /></div>
           <Button size="sm" onClick={loadAll} disabled={loading}>{loading ? "Loading…" : "Apply"}</Button>
@@ -367,40 +403,72 @@ function ReportsPage() {
             rows={orders}
             render={(row, key) => {
               if (key === "status") return <StatusBadge s={row.status} />;
+              if (key === "txn_kind") return <TxnBadge k={row.txn_kind ?? "sale"} />;
+              if (key === "total" || key === "subtotal" || key === "discount_total") {
+                const n = Number(row[key]);
+                return <span className={n < 0 ? "text-destructive" : ""}>{`₱${n.toFixed(2)}`}</span>;
+              }
               return fmt(row[key], key);
             }}
-            actions={(row) => (
-              <div className="flex gap-1 justify-end">
-                <Button size="icon" variant="ghost" title="View" onClick={() => setDetailId(row.id)}>
-                  <Eye className="h-4 w-4" />
-                </Button>
-                {canRefund && row.status !== "voided" && row.status !== "refunded" && (
-                  <>
-                    <Button size="icon" variant="ghost" title="Refund" onClick={() => refund(row.id)}>
-                      <RotateCcw className="h-4 w-4 text-amber-600" />
-                    </Button>
-                    <Button size="icon" variant="ghost" title="Void" onClick={() => voidOrder(row.id)}>
-                      <XCircle className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </>
-                )}
-              </div>
-            )}
+            actions={(row) => {
+              const isSale = (row.txn_kind ?? "sale") === "sale";
+              return (
+                <div className="flex gap-1 justify-end">
+                  <Button size="icon" variant="ghost" title="View" onClick={() => setDetailId(row.id)}>
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                  {canRefund && isSale && row.status !== "voided" && row.status !== "refunded" && (
+                    <>
+                      <Button size="icon" variant="ghost" title="Refund" onClick={() => refund(row.id)}>
+                        <RotateCcw className="h-4 w-4 text-amber-600" />
+                      </Button>
+                      <Button size="icon" variant="ghost" title="Void" onClick={() => voidOrder(row.id)}>
+                        <XCircle className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </>
+                  )}
+                </div>
+              );
+            }}
             empty="No orders match the filters."
           />
         </TabsContent>
 
         <TabsContent value="item">
+          {ownerSubtotals.length > 1 && (
+            <div className="flex flex-wrap gap-2 mt-2">
+              {ownerSubtotals.map(([owner, t]) => (
+                <Badge key={owner} variant="outline" className="text-xs">
+                  {owner}: {t.qty} units · ₱{t.revenue.toFixed(2)}
+                </Badge>
+              ))}
+            </div>
+          )}
           <DataTable
             cols={PER_ITEM_COLS.filter((c) => colsItem.includes(c.key))}
             rows={itemRows}
             render={(row, key) => {
-              if (key === "revenue") return `₱${Number(row.revenue).toFixed(2)}`;
+              if (key === "revenue") {
+                const n = Number(row.revenue);
+                return <span className={n < 0 ? "text-destructive" : ""}>₱{n.toFixed(2)}</span>;
+              }
+              if (key === "qty") {
+                const n = Number(row.qty);
+                return <span className={n < 0 ? "text-destructive" : ""}>{n}</span>;
+              }
+              if (key === "txn_kind") return <TxnBadge k={row.txn_kind ?? "sale"} />;
               if (key === "created_at") return new Date(row.created_at).toLocaleString();
               if (key === "order_no") return `#${String(row.order_no).padStart(3, "0")}`;
               if (key === "order_id_short") return <span className="font-mono text-xs">{row.order_id_short}</span>;
               return (row as any)[key];
             }}
+            actions={(row) => (
+              <div className="flex gap-1 justify-end">
+                <Button size="icon" variant="ghost" title="View order" onClick={() => setDetailId(row.order_id)}>
+                  <Eye className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
             empty="No items sold in this range."
           />
         </TabsContent>
@@ -418,8 +486,14 @@ function ReportsPage() {
         </TabsContent>
       </Tabs>
 
-      {detailId && <OrderDetailDialog id={detailId} staffEmails={staffEmails}
-        onClose={() => setDetailId(null)} />}
+      {detailId && (
+        <OrderDetailSheet
+          orderId={detailId}
+          canReverse={canRefund}
+          onClose={() => setDetailId(null)}
+          onChanged={loadAll}
+        />
+      )}
     </div>
   );
 }
@@ -430,7 +504,13 @@ function fmt(v: any, key: string) {
   if (key === "subtotal" || key === "discount_total" || key === "total" || key === "fee_amount")
     return `₱${Number(v).toFixed(2)}`;
   if (key === "order_no") return `#${String(v).padStart(3, "0")}`;
+  if (key === "txn_kind") return String(v ?? "sale");
   return String(v);
+}
+
+function TxnBadge({ k }: { k: string }) {
+  const map: Record<string, string> = { sale: "default", void: "destructive", refund: "outline" };
+  return <Badge variant={(map[k] ?? "secondary") as any} className="capitalize">{k}</Badge>;
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
@@ -506,82 +586,3 @@ function DataTable({ cols, rows, render, actions, empty }: {
   );
 }
 
-function OrderDetailDialog({ id, staffEmails, onClose }: {
-  id: string; staffEmails: Record<string, string>; onClose: () => void;
-}) {
-  const [data, setData] = useState<any>(null);
-  useEffect(() => {
-    (async () => {
-      const [{ data: o }, { data: items }, { data: pays }, { data: pms }] = await Promise.all([
-        db.from("orders").select("*").eq("id", id).maybeSingle(),
-        db.from("order_items").select("*").eq("order_id", id),
-        db.from("order_payments").select("*").eq("order_id", id),
-        db.from("payment_methods").select("code,label"),
-      ]);
-      const pmMap = new Map<string, string>(((pms ?? []) as any[]).map((p) => [p.code, p.label]));
-      setData({ o, items: items ?? [], pays: pays ?? [], pmMap });
-    })();
-  }, [id]);
-  if (!data) return null;
-  const { o, items, pays, pmMap } = data;
-  return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Order #{String(o.order_no).padStart(3, "0")} · <StatusBadge s={o.status} /></DialogTitle>
-        </DialogHeader>
-        <div className="text-xs text-muted-foreground">
-          {new Date(o.created_at).toLocaleString()} · {o.order_type} ·
-          Cashier {staffEmails[o.cashier_id] ?? "self-order"} ·
-          Customer {o.customer_name ?? "Walk-in"}
-        </div>
-        <div className="border rounded-md divide-y">
-          {items.map((it: any) => (
-            <div key={it.id} className="p-3 text-sm">
-              <div className="flex justify-between">
-                <div className="font-medium">{it.qty}× {it.name_snapshot}</div>
-                <div>₱{Number(it.line_total).toFixed(2)}</div>
-              </div>
-              {it.customization && (
-                <div className="text-xs text-muted-foreground pl-3 mt-0.5">
-                  {Array.isArray(it.customization)
-                    ? it.customization.map((c: any) => c.label ?? c.name).filter(Boolean).join(" · ")
-                    : typeof it.customization === "object"
-                      ? Object.entries(it.customization).map(([k, v]) => `${k}: ${typeof v === "object" ? JSON.stringify(v) : v}`).join(" · ")
-                      : String(it.customization)}
-                </div>
-              )}
-              {it.notes && <div className="text-xs italic text-muted-foreground pl-3 mt-0.5">“{it.notes}”</div>}
-            </div>
-          ))}
-        </div>
-        <div className="text-sm space-y-1">
-          <Row k="Subtotal" v={`₱${Number(o.subtotal).toFixed(2)}`} />
-          {Number(o.discount_total) > 0 && <Row k={`Discount${o.discount_label ? ` (${o.discount_label})` : ""}`} v={`− ₱${Number(o.discount_total).toFixed(2)}`} />}
-          {pays.map((p: any) => (
-            <Row key={p.id} k={`${pmMap.get(p.method_code) ?? p.method_code ?? p.method}${Number(p.fee_amount) > 0 ? ` (fee ₱${Number(p.fee_amount).toFixed(2)})` : ""}`}
-              v={`₱${Number(p.amount).toFixed(2)}${Number(p.change_due) > 0 ? ` (change ₱${Number(p.change_due).toFixed(2)})` : ""}`} />
-          ))}
-          <Row k="Total" v={`₱${Number(o.total).toFixed(2)}`} bold />
-          {(o.points_earned > 0 || o.points_redeemed > 0) && (
-            <div className="text-xs text-muted-foreground">
-              {o.points_earned > 0 && `+${o.points_earned} pts earned · `}
-              {o.points_redeemed > 0 && `${o.points_redeemed} pts redeemed`}
-            </div>
-          )}
-        </div>
-        <DialogFooter>
-          <Button onClick={onClose}>Close</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function Row({ k, v, bold }: { k: string; v: string; bold?: boolean }) {
-  return (
-    <div className={`flex justify-between ${bold ? "font-display text-base" : ""}`}>
-      <span>{k}</span><span>{v}</span>
-    </div>
-  );
-}

@@ -11,6 +11,7 @@ import { loadPrintSettings } from "@/lib/print-settings";
 import { printHTML } from "@/lib/print";
 import { receiptHTML, labelsHTML, type ReceiptData, type DrinkLabel } from "@/lib/print-templates";
 import { useAuth } from "@/lib/auth-context";
+import { OrderDetailSheet } from "@/components/orders/OrderDetailSheet";
 
 export const Route = createFileRoute("/_authenticated/history")({
   component: HistoryPage,
@@ -34,10 +35,12 @@ type Row = {
 };
 
 function HistoryPage() {
-  const { user } = useAuth();
+  const { user, hasRole } = useAuth();
+  const canReverse = hasRole("admin") || hasRole("developer") || hasRole("barista");
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
+  const [detailId, setDetailId] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -51,7 +54,7 @@ function HistoryPage() {
       .select("*")
       .eq("business_date", iso)
       .in("status", ["completed", "refunded", "voided"])
-      .order("order_no", { ascending: false });
+      .order("created_at", { ascending: false });
     if (error) toast.error(error.message);
     setRows((data ?? []) as Row[]);
     setLoading(false);
@@ -149,32 +152,50 @@ function HistoryPage() {
         <div className="text-muted-foreground text-sm">No orders yet today.</div>
       ) : (
         <div className="space-y-2">
-          {filtered.map((r) => (
-            <Card key={r.id} className="p-3 sm:p-4">
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="font-display text-lg w-16">#{String(r.order_no).padStart(3, "0")}</div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium truncate">
-                    {r.customer_name || "Walk-in"} · <span className="text-muted-foreground capitalize">{r.order_type.replace("_", " ")}</span>
+          {filtered.map((r) => {
+            const txnKind = (r as any).txn_kind ?? "sale";
+            return (
+              <Card key={r.id} className="p-3 sm:p-4 cursor-pointer hover:bg-accent/30"
+                onClick={() => setDetailId(r.id)}>
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="font-display text-lg w-16">#{String(r.order_no).padStart(3, "0")}</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium truncate">
+                      {r.customer_name || "Walk-in"} · <span className="text-muted-foreground capitalize">{r.order_type.replace("_", " ")}</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {new Date(r.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </div>
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    {new Date(r.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                  {txnKind !== "sale" && (
+                    <Badge variant="outline" className="capitalize">{txnKind}</Badge>
+                  )}
+                  <Badge variant={r.status === "completed" ? "default" : "secondary"} className="capitalize">{r.status}</Badge>
+                  <div className={`font-display text-lg w-20 text-right ${Number(r.total) < 0 ? "text-destructive" : "text-primary"}`}>
+                    {Number(r.total).toFixed(2)}
+                  </div>
+                  <div className="flex gap-2 w-full sm:w-auto" onClick={(e) => e.stopPropagation()}>
+                    <Button size="sm" variant="outline" className="flex-1 sm:flex-none" onClick={() => reprintReceipt(r)}>
+                      <Printer className="h-3 w-3 mr-1" /> Receipt
+                    </Button>
+                    <Button size="sm" variant="outline" className="flex-1 sm:flex-none" onClick={() => reprintLabels(r)}>
+                      <Tag className="h-3 w-3 mr-1" /> Labels
+                    </Button>
                   </div>
                 </div>
-                <Badge variant={r.status === "completed" ? "default" : "secondary"} className="capitalize">{r.status}</Badge>
-                <div className="font-display text-lg text-primary w-20 text-right">{Number(r.total).toFixed(2)}</div>
-                <div className="flex gap-2 w-full sm:w-auto">
-                  <Button size="sm" variant="outline" className="flex-1 sm:flex-none" onClick={() => reprintReceipt(r)}>
-                    <Printer className="h-3 w-3 mr-1" /> Receipt
-                  </Button>
-                  <Button size="sm" variant="outline" className="flex-1 sm:flex-none" onClick={() => reprintLabels(r)}>
-                    <Tag className="h-3 w-3 mr-1" /> Labels
-                  </Button>
-                </div>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            );
+          })}
         </div>
+      )}
+
+      {detailId && (
+        <OrderDetailSheet
+          orderId={detailId}
+          canReverse={canReverse}
+          onClose={() => setDetailId(null)}
+          onChanged={load}
+        />
       )}
     </div>
   );
