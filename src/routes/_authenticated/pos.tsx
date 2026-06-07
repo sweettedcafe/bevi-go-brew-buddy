@@ -504,9 +504,10 @@ function POSPage() {
     }
   }
 
-  async function applyPromo() {
-    const code = promoCode.trim().toUpperCase();
+  async function applyPromo(overrideCode?: string) {
+    const code = (overrideCode ?? promoCode).trim().toUpperCase();
     if (!code) return;
+    setPromoCode(code);
     const { data, error } = await db
       .from("discounts").select("*")
       .eq("code", code).eq("is_active", true).maybeSingle();
