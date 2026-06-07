@@ -20,6 +20,7 @@ import { BarChart3, Download, Filter, Settings2, RotateCcw, XCircle, Eye, FileSp
 import { toCsv, downloadCsv } from "@/lib/csv";
 import { useServerFn } from "@tanstack/react-start";
 import { exportToGoogleSheets } from "@/lib/sheets.functions";
+import { OrderDetailSheet } from "@/components/orders/OrderDetailSheet";
 
 export const Route = createFileRoute("/_authenticated/reports")({
   component: ReportsPage,
@@ -31,7 +32,7 @@ type AnyRow = Record<string, any>;
 type Filters = {
   from: string; to: string;
   customer: string; orderId: string; cashier: string;
-  category: string; item: string;
+  category: string; item: string; owner: string;
 };
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
@@ -42,6 +43,7 @@ const PER_ORDER_COLS = [
   { key: "order_no", label: "Order #" },
   { key: "order_id_short", label: "Order ID" },
   { key: "created_at", label: "Date / time" },
+  { key: "txn_kind", label: "Type" },
   { key: "customer_name", label: "Customer" },
   { key: "cashier_email", label: "Cashier" },
   { key: "items_count", label: "Items" },
@@ -57,8 +59,10 @@ const PER_ITEM_COLS = [
   { key: "order_no", label: "Order #" },
   { key: "order_id_short", label: "Order ID" },
   { key: "created_at", label: "Date" },
+  { key: "txn_kind", label: "Type" },
   { key: "name", label: "Item" },
   { key: "category", label: "Category" },
+  { key: "owner", label: "Owner" },
   { key: "qty", label: "Qty" },
   { key: "revenue", label: "Revenue" },
 ];
