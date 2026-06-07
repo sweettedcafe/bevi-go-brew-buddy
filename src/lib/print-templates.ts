@@ -16,6 +16,7 @@ export type ReceiptData = {
   subtotal: number;
   discountLabel: string | null;
   discountAmount: number;
+  discounts?: { label: string; amount: number }[];
   total: number;
   payments: ReceiptPayment[];
   change: number;
@@ -67,7 +68,9 @@ export function receiptHTML(d: ReceiptData, s: PrintSettings): string {
 <hr/>
 <table class="totals">
   <tr><td colspan="2">Subtotal</td><td class="p">${money(d.subtotal)}</td></tr>
-  ${d.discountAmount > 0 ? `<tr><td colspan="2">${esc(d.discountLabel ?? "Discount")}</td><td class="p">-${money(d.discountAmount)}</td></tr>` : ""}
+  ${(d.discounts && d.discounts.length > 0)
+    ? d.discounts.map((x) => `<tr><td colspan="2">${esc(x.label)}</td><td class="p">-${money(x.amount)}</td></tr>`).join("")
+    : (d.discountAmount > 0 ? `<tr><td colspan="2">${esc(d.discountLabel ?? "Discount")}</td><td class="p">-${money(d.discountAmount)}</td></tr>` : "")}
   <tr class="grand"><td colspan="2">TOTAL</td><td class="p">${money(d.total)}</td></tr>
 </table>
 <hr/>

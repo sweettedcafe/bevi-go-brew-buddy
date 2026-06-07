@@ -106,7 +106,7 @@ function POSPage() {
   // discount state
   const [promoCode, setPromoCode] = useState("");
   const [appliedPromo, setAppliedPromo] = useState<
-    { code: string; label: string; amount: number; applies_to_item_id: string | null } | null
+    { code: string | null; label: string; amount: number; applies_to_item_id: string | null } | null
   >(null);
   const [manual, setManual] = useState<ManualDiscount>(null);
   const [topSellers, setTopSellers] = useState<Set<string>>(new Set());
@@ -387,7 +387,7 @@ function POSPage() {
       ? Math.round(base * Number(match.value)) / 100
       : Math.min(Number(match.value), base);
     setAppliedPromo({
-      code: match.code ?? match.name,
+      code: match.code ?? null,
       label: match.name,
       amount: amt,
       applies_to_item_id: matchIds[0],
@@ -514,6 +514,20 @@ function POSPage() {
         subtotal,
         discountLabel: appliedPromo?.label ?? manual?.label ?? null,
         discountAmount: discountAmount,
+        discounts: [
+          ...(itemPromoAmount > 0 && appliedPromo
+            ? [{ label: appliedPromo.code ? `${appliedPromo.code} (${appliedPromo.label})` : appliedPromo.label, amount: itemPromoAmount }]
+            : []),
+          ...(orderDiscountAmount > 0
+            ? [{
+                label: manual?.label
+                  ?? (appliedPromo && !appliedPromo.applies_to_item_id
+                    ? (appliedPromo.code ? `${appliedPromo.code} (${appliedPromo.label})` : appliedPromo.label)
+                    : "Discount"),
+                amount: orderDiscountAmount,
+              }]
+            : []),
+        ],
         total,
         payments: args.splits.map((s) => ({ label: pmLabel(s.method_code), amount: Number(s.amount) || 0 })),
         change: args.change,
@@ -891,7 +905,7 @@ function POSPage() {
           {appliedPromo && (
             <div className="flex items-center gap-2 bg-primary/10 rounded px-3 py-2 text-sm">
               <Tag className="h-3 w-3 text-primary" />
-              <span className="font-medium">{appliedPromo.code}</span>
+              <span className="font-medium">{appliedPromo.code ?? appliedPromo.label}</span>
               <span className="text-muted-foreground">
                 −{fmt(appliedPromo.applies_to_item_id ? itemPromoAmount : orderDiscountAmount)}
               </span>
