@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { RotateCcw, XCircle } from "lucide-react";
+import { XCircle } from "lucide-react";
 
 const db = supabase as any;
 
@@ -19,8 +19,8 @@ type Props = {
 };
 
 type ReverseTarget =
-  | { kind: "void" | "refund"; scope: "order" }
-  | { kind: "void" | "refund"; scope: "item"; itemId: string; maxQty: number; name: string };
+  | { kind: "void"; scope: "order" }
+  | { kind: "void"; scope: "item"; itemId: string; maxQty: number; name: string };
 
 export function OrderDetailSheet({ orderId, onClose, onChanged, canReverse = true }: Props) {
   const [data, setData] = useState<any>(null);
@@ -61,20 +61,18 @@ export function OrderDetailSheet({ orderId, onClose, onChanged, canReverse = tru
     setBusy(true);
     try {
       if (target.scope === "order") {
-        const fn = target.kind === "void" ? "pos_void_order_v2" : "pos_refund_order_v2";
-        const { error } = await db.rpc(fn, { p_order_id: orderId, p_reason: reason || null });
+        const { error } = await db.rpc("pos_void_order_v2", { p_order_id: orderId, p_reason: reason || null });
         if (error) throw error;
       } else {
-        const fn = target.kind === "void" ? "pos_void_order_item" : "pos_refund_order_item";
         const n = Number(qty);
         if (!Number.isFinite(n) || n <= 0) throw new Error("Quantity must be > 0");
         if (n > target.maxQty) throw new Error(`Only ${target.maxQty} remaining`);
-        const { error } = await db.rpc(fn, {
+        const { error } = await db.rpc("pos_void_order_item", {
           p_order_item_id: target.itemId, p_qty: n, p_reason: reason || null,
         });
         if (error) throw error;
       }
-      toast.success(`${target.kind === "void" ? "Voided" : "Refunded"} successfully`);
+      toast.success("Voided successfully");
       setTarget(null); setReason(""); setQty("1");
       await load();
       onChanged?.();
@@ -135,10 +133,6 @@ export function OrderDetailSheet({ orderId, onClose, onChanged, canReverse = tru
                 {canReverse && isSale && remaining > 0 && (
                   <div className="flex gap-2 mt-2">
                     <Button size="sm" variant="outline" className="h-7"
-                      onClick={() => { setTarget({ kind: "refund", scope: "item", itemId: it.id, maxQty: remaining, name: it.name_snapshot }); setQty(String(remaining)); }}>
-                      <RotateCcw className="h-3 w-3 mr-1" /> Refund
-                    </Button>
-                    <Button size="sm" variant="outline" className="h-7"
                       onClick={() => { setTarget({ kind: "void", scope: "item", itemId: it.id, maxQty: remaining, name: it.name_snapshot }); setQty(String(remaining)); }}>
                       <XCircle className="h-3 w-3 mr-1" /> Void
                     </Button>
@@ -165,14 +159,9 @@ export function OrderDetailSheet({ orderId, onClose, onChanged, canReverse = tru
 
         <DialogFooter className="gap-2">
           {allowOrderActions && (
-            <>
-              <Button variant="outline" onClick={() => { setTarget({ kind: "refund", scope: "order" }); setReason(""); }}>
-                <RotateCcw className="h-4 w-4 mr-1" /> Refund entire order
-              </Button>
-              <Button variant="outline" onClick={() => { setTarget({ kind: "void", scope: "order" }); setReason(""); }}>
-                <XCircle className="h-4 w-4 mr-1" /> Void entire order
-              </Button>
-            </>
+            <Button variant="outline" onClick={() => { setTarget({ kind: "void", scope: "order" }); setReason(""); }}>
+              <XCircle className="h-4 w-4 mr-1" /> Void entire order
+            </Button>
           )}
           <Button onClick={onClose}>Close</Button>
         </DialogFooter>
