@@ -74,14 +74,7 @@ function ExpensesReportPage() {
   }, [rows]);
 
   function exportCsv() {
-    const cols = [
-      { key: "created_at", label: "Date" },
-      { key: "description", label: "Item" },
-      { key: "category", label: "Category" },
-      { key: "quantity", label: "Qty" },
-      { key: "unit_price", label: "Unit price" },
-      { key: "amount", label: "Total" },
-    ];
+    const cols = ["created_at", "description", "category", "quantity", "unit_price", "amount"];
     const data = rows.map((r) => ({
       created_at: new Date(r.created_at).toLocaleString(),
       description: r.description,
@@ -90,7 +83,7 @@ function ExpensesReportPage() {
       unit_price: Number(r.unit_price ?? r.amount).toFixed(2),
       amount: Number(r.amount).toFixed(2),
     }));
-    downloadCsv(`expenses_${from}_to_${to}.csv`, toCsv(cols, data));
+    downloadCsv(`expenses_${from}_to_${to}.csv`, toCsv(data, cols));
   }
 
   return (
