@@ -23,7 +23,7 @@ export type VariantChoice = {
 
 export function CustomizeDialog({
   open, onOpenChange, itemName, basePrice, options, onConfirm,
-  initial, variants,
+  initial, variants, hideOther = false,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -32,6 +32,7 @@ export function CustomizeDialog({
   options: MenuOptions;
   variants?: VariantChoice[];
   initial?: { custom: SelectedCustom | null; qty: number; notes: string; variantId?: string | null };
+  hideOther?: boolean;          // NEW — customer self-order should hide free-form price input
   onConfirm: (sel: {
     custom: SelectedCustom; addon: number; qty: number; notes: string;
     variant: VariantChoice | null;
@@ -46,6 +47,8 @@ export function CustomizeDialog({
     [variants],
   );
   const hasVariants = sortedVariants.length > 0;
+  const variantHeading = (options.variant_group_label?.trim() || "Variant");
+  const dynGroups = options.groups ?? [];
 
   const [variantId, setVariantId] = useState<string | null>(null);
   const [size, setSize] = useState<PriceOption | null>(null);
@@ -54,6 +57,7 @@ export function CustomizeDialog({
   const [flavors, setFlavors] = useState<PriceOption[]>([]);
   const [others, setOthers] = useState<PriceOption[]>([]);
   const [other, setOther] = useState<PriceOption[]>([]);
+  const [groupSel, setGroupSel] = useState<Record<string, PriceOption[]>>({});
   const [otherLabel, setOtherLabel] = useState("");
   const [otherPrice, setOtherPrice] = useState("");
   const [qty, setQty] = useState(1);
@@ -68,6 +72,7 @@ export function CustomizeDialog({
     setFlavors(initial?.custom?.flavors ?? []);
     setOthers(initial?.custom?.others ?? []);
     setOther(initial?.custom?.other ?? []);
+    setGroupSel(initial?.custom?.groups ?? {});
     setOtherLabel(""); setOtherPrice("");
     setQty(initial?.qty ?? 1);
     setNotes(initial?.notes ?? "");
@@ -84,6 +89,7 @@ export function CustomizeDialog({
     flavors: flavors.length ? flavors : undefined,
     others: others.length ? others : undefined,
     other: other.length ? other : undefined,
+    groups: Object.keys(groupSel).length ? groupSel : undefined,
   };
   const addon = addonTotal(sel);
   const base = selectedVariant ? Number(selectedVariant.price) : Number(basePrice);
@@ -100,6 +106,19 @@ export function CustomizeDialog({
   }
   function toggleExtra(o: PriceOption) { toggleIn(extras, setExtras, o); }
 
+  function pickGroup(groupName: string, mode: "single" | "multi", opt: PriceOption) {
+    setGroupSel((cur) => {
+      const list = cur[groupName] ?? [];
+      const has = list.some((x) => x.label === opt.label);
+      let next: PriceOption[];
+      if (mode === "single") next = has ? [] : [opt];
+      else next = has ? list.filter((x) => x.label !== opt.label) : [...list, opt];
+      const out = { ...cur };
+      if (next.length === 0) delete out[groupName]; else out[groupName] = next;
+      return out;
+    });
+  }
+
   function addOther() {
     const lbl = otherLabel.trim();
     const p = Number(otherPrice);
@@ -115,7 +134,11 @@ export function CustomizeDialog({
     });
   }
 
-  const disabled = (sizeRequired && !size) || (hasVariants && !selectedVariant);
+  const groupMissing = dynGroups.some(
+    (g) => g.required && !(groupSel[g.name]?.length),
+  );
+  const disabled =
+    (sizeRequired && !size) || (hasVariants && !selectedVariant) || groupMissing;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -128,7 +151,7 @@ export function CustomizeDialog({
           {hasVariants && (
             <section>
               <div className="text-xs font-medium text-muted-foreground mb-2">
-                Size <span className="text-destructive">*</span>
+                {variantHeading} <span className="text-destructive">*</span>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {sortedVariants.map((v) => (
@@ -148,7 +171,7 @@ export function CustomizeDialog({
           {!hasVariants && sizes.length > 0 && (
             <section>
               <div className="text-xs font-medium text-muted-foreground mb-2">
-                Size {sizeRequired && <span className="text-destructive">*</span>}
+                {variantHeading} {sizeRequired && <span className="text-destructive">*</span>}
               </div>
               <div className="grid grid-cols-3 gap-2">
                 {sizes.map((s) => (
@@ -247,8 +270,38 @@ export function CustomizeDialog({
             </section>
           )}
 
+          {/* NEW: dynamic admin-defined groups */}
+          {dynGroups.map((g) => {
+            const list = groupSel[g.name] ?? [];
+            return (
+              <section key={g.name}>
+                <div className="text-xs font-medium text-muted-foreground mb-2">
+                  {g.name}
+                  {g.required && <span className="text-destructive"> *</span>}
+                  <span className="ml-1 text-[10px] uppercase opacity-60">
+                    {g.select === "single" ? "pick one" : "pick any"}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  {g.options.map((opt) => {
+                    const on = list.some((x) => x.label === opt.label);
+                    return (
+                      <label key={opt.label}
+                        className={`flex items-center gap-2 rounded border p-2 cursor-pointer hover:bg-accent ${on ? "border-primary bg-primary/10" : ""}`}>
+                        <Checkbox checked={on} onCheckedChange={() => pickGroup(g.name, g.select, opt)} />
+                        <span className="flex-1">{opt.label}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {opt.price_delta > 0 ? `+${fmt(opt.price_delta)}` : opt.price_delta < 0 ? fmt(opt.price_delta) : "free"}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </section>
+            );
+          })}
 
-          {options.allow_other && (
+          {options.allow_other && !hideOther && (
             <section>
               <div className="text-xs font-medium text-muted-foreground mb-2">Other</div>
               {other.length > 0 && (
