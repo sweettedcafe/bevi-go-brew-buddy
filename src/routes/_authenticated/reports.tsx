@@ -54,6 +54,7 @@ const PER_ORDER_COLS = [
   { key: "fee_amount", label: "Fee" },
   { key: "total", label: "Total" },
   { key: "status", label: "Status" },
+  { key: "notes", label: "Special instructions" },
 ];
 const PER_ITEM_COLS = [
   { key: "order_no", label: "Order #" },
