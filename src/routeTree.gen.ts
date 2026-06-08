@@ -27,6 +27,7 @@ import { Route as AuthenticatedMenuRouteImport } from './routes/_authenticated/m
 import { Route as AuthenticatedManualRouteImport } from './routes/_authenticated/manual'
 import { Route as AuthenticatedInventoryRouteImport } from './routes/_authenticated/inventory'
 import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticated/history'
+import { Route as AuthenticatedExpensesReportRouteImport } from './routes/_authenticated/expenses-report'
 import { Route as AuthenticatedEosAdminRouteImport } from './routes/_authenticated/eos-admin'
 import { Route as AuthenticatedEndOfShiftRouteImport } from './routes/_authenticated/end-of-shift'
 import { Route as AuthenticatedDiscountsRouteImport } from './routes/_authenticated/discounts'
@@ -129,6 +130,12 @@ const AuthenticatedHistoryRoute = AuthenticatedHistoryRouteImport.update({
   path: '/history',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedExpensesReportRoute =
+  AuthenticatedExpensesReportRouteImport.update({
+    id: '/expenses-report',
+    path: '/expenses-report',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedEosAdminRoute = AuthenticatedEosAdminRouteImport.update({
   id: '/eos-admin',
   path: '/eos-admin',
@@ -188,6 +195,7 @@ export interface FileRoutesByFullPath {
   '/discounts': typeof AuthenticatedDiscountsRoute
   '/end-of-shift': typeof AuthenticatedEndOfShiftRoute
   '/eos-admin': typeof AuthenticatedEosAdminRoute
+  '/expenses-report': typeof AuthenticatedExpensesReportRoute
   '/history': typeof AuthenticatedHistoryRoute
   '/inventory': typeof AuthenticatedInventoryRoute
   '/manual': typeof AuthenticatedManualRoute
@@ -216,6 +224,7 @@ export interface FileRoutesByTo {
   '/discounts': typeof AuthenticatedDiscountsRoute
   '/end-of-shift': typeof AuthenticatedEndOfShiftRoute
   '/eos-admin': typeof AuthenticatedEosAdminRoute
+  '/expenses-report': typeof AuthenticatedExpensesReportRoute
   '/history': typeof AuthenticatedHistoryRoute
   '/inventory': typeof AuthenticatedInventoryRoute
   '/manual': typeof AuthenticatedManualRoute
@@ -246,6 +255,7 @@ export interface FileRoutesById {
   '/_authenticated/discounts': typeof AuthenticatedDiscountsRoute
   '/_authenticated/end-of-shift': typeof AuthenticatedEndOfShiftRoute
   '/_authenticated/eos-admin': typeof AuthenticatedEosAdminRoute
+  '/_authenticated/expenses-report': typeof AuthenticatedExpensesReportRoute
   '/_authenticated/history': typeof AuthenticatedHistoryRoute
   '/_authenticated/inventory': typeof AuthenticatedInventoryRoute
   '/_authenticated/manual': typeof AuthenticatedManualRoute
@@ -276,6 +286,7 @@ export interface FileRouteTypes {
     | '/discounts'
     | '/end-of-shift'
     | '/eos-admin'
+    | '/expenses-report'
     | '/history'
     | '/inventory'
     | '/manual'
@@ -304,6 +315,7 @@ export interface FileRouteTypes {
     | '/discounts'
     | '/end-of-shift'
     | '/eos-admin'
+    | '/expenses-report'
     | '/history'
     | '/inventory'
     | '/manual'
@@ -333,6 +345,7 @@ export interface FileRouteTypes {
     | '/_authenticated/discounts'
     | '/_authenticated/end-of-shift'
     | '/_authenticated/eos-admin'
+    | '/_authenticated/expenses-report'
     | '/_authenticated/history'
     | '/_authenticated/inventory'
     | '/_authenticated/manual'
@@ -485,6 +498,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedHistoryRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/expenses-report': {
+      id: '/_authenticated/expenses-report'
+      path: '/expenses-report'
+      fullPath: '/expenses-report'
+      preLoaderRoute: typeof AuthenticatedExpensesReportRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/eos-admin': {
       id: '/_authenticated/eos-admin'
       path: '/eos-admin'
@@ -561,6 +581,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedDiscountsRoute: typeof AuthenticatedDiscountsRoute
   AuthenticatedEndOfShiftRoute: typeof AuthenticatedEndOfShiftRoute
   AuthenticatedEosAdminRoute: typeof AuthenticatedEosAdminRoute
+  AuthenticatedExpensesReportRoute: typeof AuthenticatedExpensesReportRoute
   AuthenticatedHistoryRoute: typeof AuthenticatedHistoryRoute
   AuthenticatedInventoryRoute: typeof AuthenticatedInventoryRoute
   AuthenticatedManualRoute: typeof AuthenticatedManualRoute
@@ -586,6 +607,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedDiscountsRoute: AuthenticatedDiscountsRoute,
   AuthenticatedEndOfShiftRoute: AuthenticatedEndOfShiftRoute,
   AuthenticatedEosAdminRoute: AuthenticatedEosAdminRoute,
+  AuthenticatedExpensesReportRoute: AuthenticatedExpensesReportRoute,
   AuthenticatedHistoryRoute: AuthenticatedHistoryRoute,
   AuthenticatedInventoryRoute: AuthenticatedInventoryRoute,
   AuthenticatedManualRoute: AuthenticatedManualRoute,
@@ -615,13 +637,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

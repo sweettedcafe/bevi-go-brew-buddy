@@ -99,7 +99,7 @@ function POSPage() {
   const [loading, setLoading] = useState(true);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [holdOpen, setHoldOpen] = useState(false);
-  const [heldOrders, setHeldOrders] = useState<Array<{ id: string; order_no: number; customer_name: string | null; held_at: string; total: number }>>([]);
+  const [heldOrders, setHeldOrders] = useState<Array<{ id: string; order_no: number; customer_name: string | null; held_at: string; total: number; held_by: string | null; source: string | null }>>([]);
   const [todayOpen, setTodayOpen] = useState(false);
   const [todayOrders, setTodayOrders] = useState<Array<{ id: string; order_no: number; customer_name: string | null; created_at: string; total: number; order_type: string }>>([]);
 
@@ -444,7 +444,7 @@ function POSPage() {
   async function openHeldList() {
     const { data, error } = await db
       .from("orders")
-      .select("id, order_no, customer_name, held_at, total")
+      .select("id, order_no, customer_name, held_at, total, held_by, source")
       .eq("status", "on_hold")
       .order("held_at", { ascending: false });
     if (error) { toast.error(error.message); return; }
@@ -1091,22 +1091,30 @@ function POSPage() {
             <div className="text-sm text-muted-foreground py-6 text-center">No orders on hold.</div>
           ) : (
             <div className="space-y-2 max-h-[60vh] overflow-y-auto">
-              {heldOrders.map((h) => (
-                <button key={h.id}
-                  onClick={() => resumeHeld(h.id)}
-                  className="w-full text-left rounded-md border p-3 hover:bg-accent transition-colors">
-                  <div className="flex items-center gap-2">
-                    <div className="font-display text-lg">#{String(h.order_no).padStart(3, "0")}</div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate">{h.customer_name || "Walk-in"}</div>
-                      <div className="text-xs text-muted-foreground">
-                        Held {new Date(h.held_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · {fmt(Number(h.total))}
+              {heldOrders.map((h) => {
+                const placedByCustomer = h.source === "self" || (!h.held_by && h.source !== "barista");
+                return (
+                  <button key={h.id}
+                    onClick={() => resumeHeld(h.id)}
+                    className="w-full text-left rounded-md border p-3 hover:bg-accent transition-colors">
+                    <div className="flex items-center gap-2">
+                      <div className="font-display text-lg">#{String(h.order_no).padStart(3, "0")}</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate flex items-center gap-2">
+                          {h.customer_name || "Walk-in"}
+                          <Badge variant={placedByCustomer ? "default" : "secondary"} className="text-[10px]">
+                            {placedByCustomer ? "Customer" : "Barista"}
+                          </Badge>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Held {new Date(h.held_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · {fmt(Number(h.total))}
+                        </div>
                       </div>
+                      <PlayCircle className="h-4 w-4 text-primary" />
                     </div>
-                    <PlayCircle className="h-4 w-4 text-primary" />
-                  </div>
-                </button>
-              ))}
+                  </button>
+                );
+              })}
             </div>
           )}
         </DialogContent>

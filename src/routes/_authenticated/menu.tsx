@@ -130,6 +130,18 @@ function MenuPage() {
         </div>
         {isAdmin && (
           <div className="flex gap-2">
+            <Button size="sm" variant="outline"
+              onClick={async () => {
+                const name = window.prompt("New category name (e.g. Pizza, Snacks, Merchandise)")?.trim();
+                if (!name) return;
+                const { error } = await db.from("categories")
+                  .insert({ name, sort_order: cats.length + 1, is_active: true });
+                if (error) return toast.error(error.message);
+                toast.success(`Category "${name}" added`);
+                void load();
+              }}>
+              <Plus className="h-3 w-3 mr-1" /> Category
+            </Button>
             <ImportExportButtons
               items={items} cats={cats} invs={invs} recipes={recipes}
               onImported={() => void load()}
