@@ -408,6 +408,7 @@ function POSPage() {
         : Math.max(0, base - (Number(r.discount_value) || 0));
       newLines.push({
         lineId: newLineId(),
+        bundle_id: b.id,
         menu_item_id: it.id,
         variant_id: null,
         variant_name: null,
