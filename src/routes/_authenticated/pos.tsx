@@ -456,16 +456,47 @@ function POSPage() {
   }
 
   async function openTodayList() {
-    const today = new Date().toISOString().slice(0, 10);
+    // Use the local calendar day so orders show up regardless of how
+    // business_date is stored/timezoned on the server.
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 1);
     const { data, error } = await db
       .from("orders")
-      .select("id, order_no, customer_name, created_at, total, order_type")
-      .eq("business_date", today)
-      .eq("status", "completed")
+      .select("id, order_no, customer_name, created_at, total, order_type, status")
+      .gte("created_at", start.toISOString())
+      .lt("created_at", end.toISOString())
+      .in("status", ["completed", "ready"])
       .order("created_at", { ascending: false });
     if (error) { toast.error(error.message); return; }
     setTodayOrders((data ?? []) as any);
     setTodayOpen(true);
+  }
+
+  function notifyOrderReady(o: { order_no: number; customer_name: string | null }) {
+    // Audible + visual counter alert. No push infra required — the barista
+    // uses this to call the customer to the counter.
+    try {
+      const AC = (window as any).AudioContext ?? (window as any).webkitAudioContext;
+      if (AC) {
+        const ctx = new AC();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.type = "sine"; osc.frequency.value = 880;
+        gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.6);
+        osc.start(); osc.stop(ctx.currentTime + 0.65);
+        setTimeout(() => ctx.close?.(), 900);
+      }
+    } catch { /* ignore audio errors */ }
+    const name = o.customer_name?.trim() || "Customer";
+    toast.success(
+      `Order #${String(o.order_no).padStart(3, "0")} ready — ${name}, please proceed to the counter.`,
+      { duration: 6000 },
+    );
   }
 
   async function resumeHeld(id: string) {
