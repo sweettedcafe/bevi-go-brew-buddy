@@ -237,6 +237,11 @@ export function PrintPreviewDialog({
           >
             <Wifi className="h-4 w-4 mr-2" /> WiFi printer
           </Button>
+          {active.id === "receipt" && documents.some((d) => d.id === "labels") && (
+            <Button variant="secondary" onClick={() => setActiveId("labels")}>
+              Go to Labels →
+            </Button>
+          )}
           <Button variant="ghost" className="ml-auto" onClick={() => onOpenChange(false)}>
             Close
           </Button>
