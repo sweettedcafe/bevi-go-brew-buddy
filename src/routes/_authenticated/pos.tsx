@@ -1109,6 +1109,7 @@ function POSPage() {
             customer_name: customerName || null,
             redeem_points: redeemPts,
             notes: null,
+            existing_order_id: resumedOrderId,
             items: cart.map((l) => ({
               menu_item_id: l.menu_item_id, variant_id: l.variant_id,
               name: l.name, qty: l.qty,
