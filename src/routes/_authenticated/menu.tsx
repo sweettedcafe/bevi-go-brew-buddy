@@ -384,7 +384,7 @@ function EditMenuDialog({
         const v = vEdits[i];
         const vPayload = {
           menu_item_id: id,
-          name: v.name.trim() || `Size ${i+1}`,
+          name: v.name.trim() || `Variant ${i+1}`,
           price: Number(v.price) || 0,
           sort_order: i,
           is_active: v.is_active,
