@@ -42,7 +42,8 @@ const shortId = (id?: string | null) => (id ? String(id).slice(0, 8) : "—");
 const PER_ORDER_COLS = [
   { key: "order_no", label: "Order #" },
   { key: "order_id_short", label: "Order ID" },
-  { key: "created_at", label: "Date / time" },
+  { key: "date_only", label: "Date" },
+  { key: "time_only", label: "Time" },
   { key: "txn_kind", label: "Type" },
   { key: "customer_name", label: "Customer" },
   { key: "cashier_email", label: "Cashier" },
@@ -59,7 +60,8 @@ const PER_ORDER_COLS = [
 const PER_ITEM_COLS = [
   { key: "order_no", label: "Order #" },
   { key: "order_id_short", label: "Order ID" },
-  { key: "created_at", label: "Date" },
+  { key: "date_only", label: "Date" },
+  { key: "time_only", label: "Time" },
   { key: "txn_kind", label: "Type" },
   { key: "name", label: "Item" },
   { key: "category", label: "Category" },
@@ -70,7 +72,8 @@ const PER_ITEM_COLS = [
 const DISCOUNT_COLS = [
   { key: "order_no", label: "Order #" },
   { key: "order_id_short", label: "Order ID" },
-  { key: "created_at", label: "Date" },
+  { key: "date_only", label: "Date" },
+  { key: "time_only", label: "Time" },
   { key: "customer_name", label: "Customer" },
   { key: "discount_label", label: "Promotion / discount" },
   { key: "discount_code", label: "Code" },
