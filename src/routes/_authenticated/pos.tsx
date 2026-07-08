@@ -346,8 +346,10 @@ function POSPage() {
     } finally {
       setScanBusy(false);
       setScanInput("");
-      // refocus for the next scan
-      requestAnimationFrame(() => scanRef.current?.focus());
+      // refocus only when user opted in
+      if (posSettings.scanAutoFocus) {
+        requestAnimationFrame(() => scanRef.current?.focus());
+      }
     }
   }
 
