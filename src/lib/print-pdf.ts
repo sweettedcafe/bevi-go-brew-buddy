@@ -1,57 +1,75 @@
 // Render an HTML fragment to a PDF and trigger the browser save dialog.
-// Uses html2canvas + jsPDF. Rendered offscreen so the current page is untouched.
+// The HTML is rendered inside a sandboxed <iframe> so it never inherits the
+// app's CSS (which uses oklch/lab tokens that html2canvas cannot parse).
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 import { toast } from "sonner";
 
 export type PaperSize =
-  | { kind: "roll"; widthMm: number }        // thermal roll: fixed width, height auto
-  | { kind: "fixed"; widthMm: number; heightMm: number }; // full sheet, e.g. A4/label
+  | { kind: "roll"; widthMm: number }
+  | { kind: "fixed"; widthMm: number; heightMm: number };
+
+async function renderInIsolatedFrame(html: string, contentPx: number): Promise<HTMLCanvasElement> {
+  const iframe = document.createElement("iframe");
+  iframe.style.position = "fixed";
+  iframe.style.left = "-10000px";
+  iframe.style.top = "0";
+  iframe.style.width = `${contentPx}px`;
+  iframe.style.height = "10px";
+  iframe.style.border = "0";
+  iframe.style.background = "#ffffff";
+  document.body.appendChild(iframe);
+
+  try {
+    const doc = iframe.contentDocument!;
+    doc.open();
+    // A minimal document — no app CSS reaches this frame, so no oklch/lab
+    // tokens leak into html2canvas.
+    doc.write(`<!doctype html><html><head><meta charset="utf-8"><style>
+      html,body{margin:0;padding:0;background:#fff;color:#000;}
+      body{width:${contentPx}px;font-family:ui-monospace,Menlo,Consolas,monospace;}
+    </style></head><body>${html}</body></html>`);
+    doc.close();
+
+    // Give fonts + layout a tick.
+    try { await (doc as any).fonts?.ready; } catch { /* ignore */ }
+    await new Promise((r) => setTimeout(r, 80));
+
+    const body = doc.body as HTMLElement;
+    iframe.style.height = `${body.scrollHeight}px`;
+
+    const canvas = await html2canvas(body, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: "#ffffff",
+      logging: false,
+      width: contentPx,
+      windowWidth: contentPx,
+      height: body.scrollHeight,
+      windowHeight: body.scrollHeight,
+    } as any);
+    return canvas;
+  } finally {
+    iframe.remove();
+  }
+}
 
 export async function savePdfFromHTML(
   html: string,
   filename: string,
   paper: PaperSize | number = 80,
 ) {
-  // Backwards-compat: number => roll width in mm.
-  const p: PaperSize = typeof paper === "number"
-    ? { kind: "roll", widthMm: paper }
-    : paper;
-
+  const p: PaperSize = typeof paper === "number" ? { kind: "roll", widthMm: paper } : paper;
   const contentWidthMm = p.widthMm;
   const contentPx = Math.max(240, Math.round(contentWidthMm * 3.78));
 
-  const container = document.createElement("div");
-  container.style.position = "fixed";
-  container.style.left = "-10000px";
-  container.style.top = "0";
-  container.style.background = "#ffffff";
-  container.style.width = `${contentPx}px`;
-  container.style.padding = "0";
-  container.innerHTML = html;
-  document.body.appendChild(container);
-
   try {
-    // Give fonts a tick to lay out.
-    if ((document as any).fonts?.ready) {
-      try { await (document as any).fonts.ready; } catch { /* ignore */ }
-    }
-    await new Promise((r) => setTimeout(r, 60));
-
-    const canvas = await html2canvas(container, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: "#ffffff",
-      logging: false,
-      windowWidth: contentPx,
-    } as any);
-
+    const canvas = await renderInIsolatedFrame(html, contentPx);
     const imgData = canvas.toDataURL("image/png");
     const imgWmm = contentWidthMm;
     const imgHmm = (canvas.height * imgWmm) / canvas.width;
 
     if (p.kind === "roll") {
-      // Custom page = content size, so there's no clipping or huge margins.
       const pdf = new jsPDF({
         unit: "mm",
         format: [imgWmm, imgHmm],
@@ -62,7 +80,6 @@ export async function savePdfFromHTML(
       return;
     }
 
-    // Fixed sheet: center content, add extra pages if it overflows.
     const pageW = p.widthMm;
     const pageH = p.heightMm;
     const marginMm = 5;
@@ -74,12 +91,10 @@ export async function savePdfFromHTML(
       orientation: pageH > pageW ? "portrait" : "landscape",
     });
     if (drawH <= pageH - marginMm * 2) {
-      // Single page — center vertically & horizontally.
       const x = (pageW - drawW) / 2;
       const y = (pageH - drawH) / 2;
       pdf.addImage(imgData, "PNG", x, y, drawW, drawH);
     } else {
-      // Multi-page — slice the source canvas into page-height chunks.
       const sliceHpx = Math.floor((pageH - marginMm * 2) * (canvas.width / drawW));
       let y = 0;
       const x = (pageW - drawW) / 2;
@@ -101,11 +116,8 @@ export async function savePdfFromHTML(
     }
     pdf.save(filename);
   } catch (err: any) {
-    // Surface the failure — a silent throw is why "nothing saves".
     console.error("PDF save failed", err);
     toast.error(`Couldn't save PDF: ${err?.message ?? err}`);
     throw err;
-  } finally {
-    container.remove();
   }
 }
