@@ -622,6 +622,19 @@ function EditMenuDialog({
           <MenuOptionsEditor value={options} onChange={setOptions} />
         </div>
 
+        <div className="mt-4 border-t pt-3">
+          <h3 className="font-medium text-sm mb-1">Upsell suggestions</h3>
+          <p className="text-xs text-muted-foreground mb-2">
+            Pick items to recommend when this one is added — shown to both the barista in POS and the customer on their ordering page.
+          </p>
+          <UpsellPicker
+            allItems={allItems.filter((x) => x.id !== item.id && x.is_active)}
+            selected={options.upsell_item_ids ?? []}
+            onChange={(ids) => setOptions({ ...options, upsell_item_ids: ids })}
+          />
+        </div>
+
+
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button onClick={save} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
