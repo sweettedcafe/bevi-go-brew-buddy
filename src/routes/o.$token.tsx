@@ -55,6 +55,8 @@ function SelfOrderPage() {
   const [done, setDone] = useState<{ order_no: number; order_id: string; total: number } | null>(null);
   const [orderStatus, setOrderStatus] = useState<string | null>(null);
   const [alerting, setAlerting] = useState(false);
+  // Once the customer dismisses the alert for an order, don't re-alert
+  const dismissedRef = useRef<Set<string>>(new Set());
 
   async function loadMenu() {
     const { data: m } = await db.rpc("public_menu");
