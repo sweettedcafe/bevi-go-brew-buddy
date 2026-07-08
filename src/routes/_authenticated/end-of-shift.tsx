@@ -279,19 +279,23 @@ function EndOfShiftPage() {
                 <p className="text-xs text-muted-foreground">Shift is closed — expenses are read-only.</p>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-2 items-end">
-                  <div className="md:col-span-4">
+                  <div className="md:col-span-3">
                     <Label htmlFor="exp-desc">Item / description</Label>
                     <Input id="exp-desc" value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="e.g. Whole milk 1L" />
                   </div>
                   <div className="md:col-span-2">
-                    <Label htmlFor="exp-qty">Quantity</Label>
+                    <Label htmlFor="exp-inv">Invoice #</Label>
+                    <Input id="exp-inv" value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)} placeholder="OR / SI #" />
+                  </div>
+                  <div className="md:col-span-1">
+                    <Label htmlFor="exp-qty">Qty</Label>
                     <Input id="exp-qty" type="number" min="0.01" step="0.01" value={qty} onChange={(e) => setQty(e.target.value)} />
                   </div>
                   <div className="md:col-span-2">
                     <Label htmlFor="exp-unit">Unit price (₱)</Label>
                     <Input id="exp-unit" type="number" min="0" step="0.01" value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} />
                   </div>
-                  <div className="md:col-span-2">
+                  <div className="md:col-span-1">
                     <Label>Total</Label>
                     <div className="h-9 flex items-center px-3 rounded-md border bg-muted/30 text-sm font-medium">
                       {peso((Number(qty) || 0) * (Number(unitPrice) || 0))}
@@ -302,7 +306,14 @@ function EndOfShiftPage() {
                     <Input id="exp-cat" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="optional" />
                   </div>
                   <div className="md:col-span-1">
-                    <Button onClick={addExpense} className="w-full gap-1"><Plus className="h-4 w-4" /></Button>
+                    <Label htmlFor="exp-img" className="text-xs">Receipt</Label>
+                    <Input id="exp-img" type="file" accept="image/*"
+                      onChange={(e) => setReceiptFile(e.target.files?.[0] ?? null)} />
+                  </div>
+                  <div className="md:col-span-1">
+                    <Button onClick={addExpense} disabled={uploadingReceipt} className="w-full gap-1">
+                      <Plus className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
               )}
@@ -313,24 +324,34 @@ function EndOfShiftPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>When</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Time</TableHead>
+                      <TableHead>Invoice #</TableHead>
                       <TableHead>Description</TableHead>
                       <TableHead>Category</TableHead>
                       <TableHead className="text-right">Qty</TableHead>
                       <TableHead className="text-right">Unit price</TableHead>
                       <TableHead className="text-right">Total</TableHead>
+                      <TableHead>Receipt</TableHead>
                       <TableHead></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {report.expenses.map((e) => (
                       <TableRow key={e.id}>
-                        <TableCell className="text-xs">{fmtTime(e.created_at)}</TableCell>
+                        <TableCell className="text-xs">{fmtDate(e.created_at)}</TableCell>
+                        <TableCell className="text-xs">{fmtClock(e.created_at)}</TableCell>
+                        <TableCell className="text-xs">{e.invoice_number ?? "—"}</TableCell>
                         <TableCell>{e.description}</TableCell>
                         <TableCell className="text-muted-foreground">{e.category ?? "—"}</TableCell>
                         <TableCell className="text-right">{Number(e.quantity ?? 1)}</TableCell>
                         <TableCell className="text-right">{peso(e.unit_price ?? e.amount)}</TableCell>
                         <TableCell className="text-right font-medium">{peso(e.amount)}</TableCell>
+                        <TableCell>
+                          {e.receipt_url
+                            ? <a href={e.receipt_url} target="_blank" rel="noreferrer" className="text-xs underline">view</a>
+                            : <span className="text-xs text-muted-foreground">—</span>}
+                        </TableCell>
                         <TableCell className="text-right">
                           {!report.shift.clock_out && (
                             <Button size="icon" variant="ghost" onClick={() => deleteExpense(e.id)}>
@@ -341,8 +362,10 @@ function EndOfShiftPage() {
                       </TableRow>
                     ))}
                     <TableRow>
-                      <TableCell colSpan={5} className="text-right font-semibold">Total expenses</TableCell>
+                      <TableCell colSpan={7} className="text-right font-semibold">Total expenses</TableCell>
                       <TableCell className="text-right font-semibold">{peso(report.total_expenses)}</TableCell>
+                      <TableCell colSpan={2} />
+                    </TableRow>
                       <TableCell />
                     </TableRow>
                   </TableBody>
