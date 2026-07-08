@@ -9,6 +9,7 @@ import { Printer, Receipt as ReceiptIcon, Tag, RefreshCw, Search } from "lucide-
 import { toast } from "sonner";
 import { loadPrintSettings } from "@/lib/print-settings";
 import { printHTML } from "@/lib/print";
+import { savePdfFromHTML } from "@/lib/print-pdf";
 import { receiptHTML, labelsHTML, type ReceiptData, type DrinkLabel } from "@/lib/print-templates";
 import { useAuth } from "@/lib/auth-context";
 import { OrderDetailSheet } from "@/components/orders/OrderDetailSheet";
@@ -106,6 +107,13 @@ function HistoryPage() {
     printHTML(receiptHTML(data, loadPrintSettings()), `Receipt #${r.order_no}`);
   }
 
+  async function savePdfReceipt(r: Row) {
+    const data = await buildReceipt(r);
+    if (!data) return;
+    const html = receiptHTML(data, loadPrintSettings());
+    await savePdfFromHTML(html, `receipt-${String(r.order_no).padStart(3, "0")}.pdf`, 80);
+  }
+
   async function reprintLabels(r: Row) {
     const { data: items } = await db
       .from("order_items")
@@ -176,9 +184,12 @@ function HistoryPage() {
                   <div className={`font-display text-lg w-20 text-right ${Number(r.total) < 0 ? "text-destructive" : "text-primary"}`}>
                     {Number(r.total).toFixed(2)}
                   </div>
-                  <div className="flex gap-2 w-full sm:w-auto" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex gap-2 w-full sm:w-auto flex-wrap" onClick={(e) => e.stopPropagation()}>
                     <Button size="sm" variant="outline" className="flex-1 sm:flex-none" onClick={() => reprintReceipt(r)}>
                       <Printer className="h-3 w-3 mr-1" /> Receipt
+                    </Button>
+                    <Button size="sm" variant="outline" className="flex-1 sm:flex-none" onClick={() => savePdfReceipt(r)}>
+                      <Printer className="h-3 w-3 mr-1" /> Save PDF
                     </Button>
                     <Button size="sm" variant="outline" className="flex-1 sm:flex-none" onClick={() => reprintLabels(r)}>
                       <Tag className="h-3 w-3 mr-1" /> Labels

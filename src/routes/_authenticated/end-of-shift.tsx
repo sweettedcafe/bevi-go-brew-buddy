@@ -83,7 +83,12 @@ function EndOfShiftPage() {
       const { data: pub } = (supabase.storage.from("expense-receipts") as any).getPublicUrl(path);
       return pub?.publicUrl ?? null;
     } catch (e: any) {
-      toast.error(`Upload failed: ${e?.message ?? e}. You can still save the expense without the image.`);
+      const msg = String(e?.message ?? e);
+      if (/bucket/i.test(msg) && /not found/i.test(msg)) {
+        toast.error("Receipt bucket missing. Run supabase_phase25_schema.sql to create the 'expense-receipts' bucket. Saving expense without image.");
+      } else {
+        toast.error(`Upload failed: ${msg}. You can still save the expense without the image.`);
+      }
       return null;
     } finally {
       setUploadingReceipt(false);
@@ -348,9 +353,14 @@ function EndOfShiftPage() {
                         <TableCell className="text-right">{peso(e.unit_price ?? e.amount)}</TableCell>
                         <TableCell className="text-right font-medium">{peso(e.amount)}</TableCell>
                         <TableCell>
-                          {e.receipt_url
-                            ? <a href={e.receipt_url} target="_blank" rel="noreferrer" className="text-xs underline">view</a>
-                            : <span className="text-xs text-muted-foreground">—</span>}
+                          {e.receipt_url ? (
+                            <div className="flex items-center gap-2">
+                              <a href={e.receipt_url} target="_blank" rel="noreferrer" className="text-xs underline">view</a>
+                              <a href={e.receipt_url} download className="text-xs underline">download</a>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
                         </TableCell>
                         <TableCell className="text-right">
                           {!report.shift.clock_out && (

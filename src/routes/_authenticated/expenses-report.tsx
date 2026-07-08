@@ -46,7 +46,9 @@ function ExpensesReportPage() {
   const isDeveloper = hasRole("developer");
   const [from, setFrom] = useState(daysAgoIso(29));
   const [to, setTo] = useState(todayIso());
-  const [rows, setRows] = useState<Row[]>([]);
+  const [cashierQuery, setCashierQuery] = useState("");
+  const [invoiceQuery, setInvoiceQuery] = useState("");
+  const [rowsAll, setRowsAll] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
   const [sheetsBusy, setSheetsBusy] = useState(false);
   const exportSheets = useServerFn(exportToGoogleSheets);
@@ -66,15 +68,30 @@ function ExpensesReportPage() {
         .gte("created_at", startIso).lte("created_at", endIso)
         .order("created_at", { ascending: false });
       if (fb.error) toast.error(fb.error.message);
-      setRows(((fb.data ?? []) as any[]).map((r) => ({
+      setRowsAll(((fb.data ?? []) as any[]).map((r) => ({
         ...r, cashier_user_id: null, cashier_email: null,
       })) as Row[]);
     } else {
-      setRows((data ?? []) as Row[]);
+      setRowsAll((data ?? []) as Row[]);
     }
     setLoading(false);
   }
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, []);
+
+  const rows = useMemo(() => {
+    const c = cashierQuery.trim().toLowerCase();
+    const inv = invoiceQuery.trim().toLowerCase();
+    return rowsAll.filter((r) => {
+      if (c && !(r.cashier_email ?? "").toLowerCase().includes(c)) return false;
+      if (inv && !(r.invoice_number ?? "").toLowerCase().includes(inv)) return false;
+      return true;
+    });
+  }, [rowsAll, cashierQuery, invoiceQuery]);
+  const cashierOptions = useMemo(() => {
+    const s = new Set<string>();
+    rowsAll.forEach((r) => r.cashier_email && s.add(r.cashier_email));
+    return [...s].sort();
+  }, [rowsAll]);
 
   const total = useMemo(() => rows.reduce((s, r) => s + Number(r.amount || 0), 0), [rows]);
   const byCategory = useMemo(() => {
@@ -167,7 +184,7 @@ function ExpensesReportPage() {
         </div>
       </header>
 
-      <Card className="p-4 grid sm:grid-cols-[auto,auto,auto,1fr] gap-3 items-end">
+      <Card className="p-4 grid gap-3 items-end sm:grid-cols-2 lg:grid-cols-[auto,auto,1fr,1fr,auto,auto]">
         <div>
           <Label className="text-xs">From</Label>
           <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
@@ -175,6 +192,22 @@ function ExpensesReportPage() {
         <div>
           <Label className="text-xs">To</Label>
           <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+        </div>
+        <div>
+          <Label className="text-xs">Cashier (name/email)</Label>
+          <Input
+            list="expense-cashiers"
+            placeholder="Filter by cashier"
+            value={cashierQuery}
+            onChange={(e) => setCashierQuery(e.target.value)}
+          />
+          <datalist id="expense-cashiers">
+            {cashierOptions.map((c) => <option key={c} value={c} />)}
+          </datalist>
+        </div>
+        <div>
+          <Label className="text-xs">Invoice #</Label>
+          <Input placeholder="Filter by invoice #" value={invoiceQuery} onChange={(e) => setInvoiceQuery(e.target.value)} />
         </div>
         <Button size="sm" onClick={() => void load()} disabled={loading}>
           {loading ? "Loading…" : "Apply"}
