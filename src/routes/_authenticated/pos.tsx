@@ -18,7 +18,7 @@ import { loadPrintSettings } from "@/lib/print-settings";
 import { loadPosSettings } from "@/lib/pos-settings";
 import { printHTML } from "@/lib/print";
 import { receiptHTML, labelsHTML, type DrinkLabel } from "@/lib/print-templates";
-import { reprintReceiptById, reprintLabelsById } from "@/lib/reprint";
+import { reprintReceiptById, reprintLabelsById, saveReceiptPdfById } from "@/lib/reprint";
 import { randomQuote } from "@/lib/quotes";
 import { CustomizeDialog } from "@/components/pos/CustomizeDialog";
 import { CameraScannerDialog } from "@/components/pos/CameraScannerDialog";
@@ -1145,6 +1145,12 @@ function POSPage() {
                       catch (e: any) { toast.error(e.message); }
                     }}>
                       <Printer className="h-3 w-3 mr-1" /> Receipt
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={async () => {
+                      try { await saveReceiptPdfById(o.id, user?.email ?? "—"); }
+                      catch (e: any) { toast.error(e.message); }
+                    }}>
+                      <Printer className="h-3 w-3 mr-1" /> Save PDF
                     </Button>
                     <Button size="sm" variant="outline" onClick={async () => {
                       try {
