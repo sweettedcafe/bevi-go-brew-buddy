@@ -989,7 +989,7 @@ function POSPage() {
               );
             })()}
           </div>
-          {isAdmin && !manual && cart.length > 0 && (
+          {!manual && cart.length > 0 && (
             <ManualDiscountControl subtotal={subtotal} onApply={setManual} />
           )}
         </div>
