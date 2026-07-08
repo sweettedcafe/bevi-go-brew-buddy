@@ -514,13 +514,13 @@ function EditMenuDialog({
         {f.has_variants ? (
           <div className="mt-4 border-t pt-3 space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="font-medium text-sm">Size variants</h3>
+              <h3 className="font-medium text-sm">Custom variants</h3>
               <Button size="sm" variant="outline" onClick={addVariant}>
-                <Plus className="h-3 w-3 mr-1" /> Add size
+                <Plus className="h-3 w-3 mr-1" /> Add variant
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Each size has its own price and recipe. POS prompts the cashier to pick a size.
+              Name each variant anything you want (size, color, pack…). Each has its own price and recipe.
             </p>
             {vEdits.length === 0 && (
               <div className="text-xs text-muted-foreground py-2">No variants yet.</div>
