@@ -1291,8 +1291,10 @@ function POSPage() {
           }
           initial={customizing.initial}
           onConfirm={(res) => {
+            const it = customizing.item;
+            const wasEdit = !!customizing.editingLineId;
             addCustomizedLine({
-              item: customizing.item,
+              item: it,
               custom: res.custom,
               addon: res.addon,
               qty: res.qty,
@@ -1301,9 +1303,28 @@ function POSPage() {
               editingLineId: customizing.editingLineId,
             });
             setCustomizing(null);
+            if (!wasEdit) maybeOfferUpsell(it);
           }}
         />
       )}
+
+      {upsell && (
+        <UpsellDialog
+          open
+          onOpenChange={(o) => !o && setUpsell(null)}
+          triggerName={upsell.trigger}
+          suggestions={upsell.suggestions}
+          onSkip={() => setUpsell(null)}
+          onAdd={(picked) => {
+            for (const p of picked) {
+              const it = items.find((x) => x.id === p.id);
+              if (it) addPlainLine(it, null);
+            }
+            setUpsell(null);
+          }}
+        />
+      )}
+
 
     </div>
   );
