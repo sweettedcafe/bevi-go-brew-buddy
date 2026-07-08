@@ -16,12 +16,12 @@ import { Trash2, Plus, Minus, ShoppingCart, Coffee, Search, X, Tag, Pause, PlayC
 import { toast } from "sonner";
 import { loadPrintSettings } from "@/lib/print-settings";
 import { loadPosSettings } from "@/lib/pos-settings";
-import { printHTML } from "@/lib/print";
 import { receiptHTML, labelsHTML, type DrinkLabel } from "@/lib/print-templates";
-import { reprintReceiptById, reprintLabelsById, saveReceiptPdfById } from "@/lib/reprint";
+import { buildReceiptPreviewById, reprintLabelsById } from "@/lib/reprint";
 import { randomQuote } from "@/lib/quotes";
 import { CustomizeDialog } from "@/components/pos/CustomizeDialog";
 import { CameraScannerDialog } from "@/components/pos/CameraScannerDialog";
+import { PrintPreviewDialog, type PrintPreviewDocument } from "@/components/print/PrintPreviewDialog";
 import {
   type MenuOptions, type SelectedCustom,
   hasAnyCustomization, addonTotal, customSignature, describeCustom,
@@ -102,6 +102,8 @@ function POSPage() {
   const [heldOrders, setHeldOrders] = useState<Array<{ id: string; order_no: number; customer_name: string | null; held_at: string; total: number; held_by: string | null; source: string | null }>>([]);
   const [todayOpen, setTodayOpen] = useState(false);
   const [todayOrders, setTodayOrders] = useState<Array<{ id: string; order_no: number; customer_name: string | null; created_at: string; total: number; order_type: string }>>([]);
+  const [printOpen, setPrintOpen] = useState(false);
+  const [printDocs, setPrintDocs] = useState<PrintPreviewDocument[]>([]);
 
   // discount state
   const [promoCode, setPromoCode] = useState("");
@@ -500,9 +502,10 @@ function POSPage() {
     const labelCatIds = new Set(cats.filter((c) => c.prints_label).map((c) => c.id));
     const now = new Date().toISOString();
     const pmLabel = (code: string) => pms.find((p) => p.code === code)?.label ?? code;
+    const docs: PrintPreviewDocument[] = [];
 
     if (settings.autoPrintReceipt) {
-      printHTML(receiptHTML({
+      const receipt = receiptHTML({
         orderNo: args.orderNo,
         businessDate: new Date().toISOString().slice(0, 10),
         createdAt: now,
@@ -532,7 +535,15 @@ function POSPage() {
         total,
         payments: args.splits.map((s) => ({ label: pmLabel(s.method_code), amount: Number(s.amount) || 0 })),
         change: args.change,
-      }, settings), `Receipt #${args.orderNo}`);
+      }, settings);
+      docs.push({
+        id: "receipt",
+        label: "Receipt",
+        title: `Receipt #${args.orderNo}`,
+        html: receipt,
+        filename: `receipt-${String(args.orderNo).padStart(3, "0")}.pdf`,
+        widthMm: 80,
+      });
     }
 
     if (settings.autoPrintLabels) {
@@ -546,16 +557,27 @@ function POSPage() {
             drinkName: line.name,
             cupIndex: i, cupTotal: line.qty,
             customerName: customerName || null,
-            notes: null,
+            notes: line.notes,
             createdAt: now,
             quote: randomQuote(),
           });
         }
       }
       if (labels.length > 0) {
-        // small delay so the receipt iframe doesn't race the label iframe
-        setTimeout(() => printHTML(labelsHTML(labels, settings), `Labels #${args.orderNo}`), 700);
+        docs.push({
+          id: "labels",
+          label: "Labels",
+          title: `Labels #${args.orderNo}`,
+          html: labelsHTML(labels, settings),
+          filename: `labels-${String(args.orderNo).padStart(3, "0")}.pdf`,
+          widthMm: 58,
+        });
       }
+    }
+
+    if (docs.length > 0) {
+      setPrintDocs(docs);
+      setPrintOpen(true);
     }
   }
 
@@ -1141,21 +1163,22 @@ function POSPage() {
                   <div className="font-medium">{fmt(Number(o.total))}</div>
                   <div className="flex gap-1">
                     <Button size="sm" variant="outline" onClick={async () => {
-                      try { await reprintReceiptById(o.id, user?.email ?? "—"); }
+                      try {
+                        setPrintDocs([await buildReceiptPreviewById(o.id, user?.email ?? "—")]);
+                        setPrintOpen(true);
+                      }
                       catch (e: any) { toast.error(e.message); }
                     }}>
                       <Printer className="h-3 w-3 mr-1" /> Receipt
                     </Button>
                     <Button size="sm" variant="outline" onClick={async () => {
-                      try { await saveReceiptPdfById(o.id, user?.email ?? "—"); }
-                      catch (e: any) { toast.error(e.message); }
-                    }}>
-                      <Printer className="h-3 w-3 mr-1" /> Save PDF
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={async () => {
                       try {
-                        const ok = await reprintLabelsById(o.id);
-                        if (!ok) toast.message("No drinks to label in this order.");
+                        const doc = await reprintLabelsById(o.id);
+                        if (!doc) toast.message("No drinks to label in this order.");
+                        else {
+                          setPrintDocs([doc]);
+                          setPrintOpen(true);
+                        }
                       } catch (e: any) { toast.error(e.message); }
                     }}>
                       <Tag className="h-3 w-3 mr-1" /> Labels
@@ -1176,6 +1199,12 @@ function POSPage() {
           setScanInput(code);
           void lookupCustomerByCode(code);
         }}
+      />
+
+      <PrintPreviewDialog
+        open={printOpen}
+        onOpenChange={setPrintOpen}
+        documents={printDocs}
       />
 
 
