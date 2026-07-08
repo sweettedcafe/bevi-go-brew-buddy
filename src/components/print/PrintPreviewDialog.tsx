@@ -259,9 +259,12 @@ function wrapPrintHtml(html: string, title: string, paper: PaperSize) {
     paper.kind === "roll"
       ? `@page { size: ${paper.widthMm}mm auto; margin: 3mm; }`
       : `@page { size: ${paper.widthMm}mm ${paper.heightMm}mm; margin: 4mm; }`;
+  // Center the receipt block horizontally so the left and right margins
+  // match. html becomes a flex row; the receipt template's <body>-scoped
+  // width (e.g. 72mm) then sits centered inside the chosen paper width.
   const centerCss = `
-    html, body { margin: 0; padding: 0; background: #fff; color: #000; }
-    body > * { margin-left: auto !important; margin-right: auto !important; }
+    html { display: flex; justify-content: center; margin: 0; padding: 0; background: #fff; }
+    body { margin: 0 auto !important; padding: 0; background: #fff; color: #000; }
   `;
   return `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>${pageRule}${centerCss}</style></head><body>${html}</body></html>`;
 }
