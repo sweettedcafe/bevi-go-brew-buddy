@@ -1,10 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Coffee, Plus, Minus, Star, Trash2 } from "lucide-react";
+import { Coffee, Plus, Minus, Star, Trash2, Package, BellRing } from "lucide-react";
 import { toast } from "sonner";
 import { CustomizeDialog, type VariantChoice } from "@/components/pos/CustomizeDialog";
 import {
@@ -23,8 +23,17 @@ type Item = {
 };
 type Cat = { id: string; name: string; sort_order: number };
 type Variant = { id: string; menu_item_id: string; name: string; price: number; sort_order: number };
+type Bundle = { id: string; name: string; description: string | null; price: number };
+type BundleItem = {
+  bundle_id: string; menu_item_id: string; qty: number;
+  discount_type: "percent" | "fixed"; discount_value: number;
+};
 type CartLine = {
-  lineId: string; menu_item_id: string; name: string;
+  lineId: string;
+  kind: "item" | "bundle";
+  menu_item_id: string | null;
+  bundle_id: string | null;
+  name: string;
   unit_price: number; qty: number; addon_total: number;
   customization: SelectedCustom | null; notes: string | null;
   variant_id: string | null;
@@ -36,18 +45,25 @@ function SelfOrderPage() {
   const [cats, setCats] = useState<Cat[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [variants, setVariants] = useState<Variant[]>([]);
-  const [activeCat, setActiveCat] = useState<string | "all">("all");
+  const [bundles, setBundles] = useState<Bundle[]>([]);
+  const [bundleItems, setBundleItems] = useState<BundleItem[]>([]);
+  const [activeCat, setActiveCat] = useState<string | "all" | "__bundles__">("all");
   const [cart, setCart] = useState<CartLine[]>([]);
   const [customizing, setCustomizing] = useState<Item | null>(null);
   const [loading, setLoading] = useState(true);
   const [placing, setPlacing] = useState(false);
   const [done, setDone] = useState<{ order_no: number; order_id: string; total: number } | null>(null);
+  const [orderStatus, setOrderStatus] = useState<string | null>(null);
+  const [alerting, setAlerting] = useState(false);
 
   async function loadMenu() {
     const { data: m } = await db.rpc("public_menu");
-    setCats(((m as any)?.categories ?? []) as Cat[]);
-    setItems(((m as any)?.items ?? []) as Item[]);
-    setVariants(((m as any)?.variants ?? []) as Variant[]);
+    const d: any = m ?? {};
+    setCats((d.categories ?? []) as Cat[]);
+    setItems((d.items ?? []) as Item[]);
+    setVariants((d.variants ?? []) as Variant[]);
+    setBundles((d.bundles ?? []) as Bundle[]);
+    setBundleItems((d.bundle_items ?? []) as BundleItem[]);
   }
 
   useEffect(() => {
@@ -67,15 +83,84 @@ function SelfOrderPage() {
       .on("postgres_changes", { event: "*", schema: "public", table: "menu_items" }, () => loadMenu())
       .on("postgres_changes", { event: "*", schema: "public", table: "categories" }, () => loadMenu())
       .on("postgres_changes", { event: "*", schema: "public", table: "menu_item_variants" }, () => loadMenu())
+      .on("postgres_changes", { event: "*", schema: "public", table: "bundles" }, () => loadMenu())
+      .on("postgres_changes", { event: "*", schema: "public", table: "bundle_items" }, () => loadMenu())
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, []);
+
+  // Poll order status while awaiting pickup, and alert when ready
+  useEffect(() => {
+    if (!done) { setOrderStatus(null); return; }
+    let cancelled = false;
+    async function check() {
+      const { data } = await db.rpc("customer_order_status", {
+        p_token: token, p_order_id: done!.order_id,
+      });
+      if (cancelled || !data) return;
+      const s = (data as any).status as string;
+      setOrderStatus(s);
+      if (s === "completed") setAlerting(true);
+    }
+    void check();
+    const t = window.setInterval(check, 5000);
+    return () => { cancelled = true; window.clearInterval(t); };
+  }, [done, token]);
+
+  // Ready alert: vibrate + beep in a loop until user taps stop
+  const audioRef = useRef<{ ctx: AudioContext; timer: number } | null>(null);
+  useEffect(() => {
+    if (!alerting) return;
+    // vibration pattern loop
+    const vibrate = () => {
+      if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+        // pattern: buzz-pause-buzz
+        (navigator as any).vibrate([400, 150, 400, 150, 400]);
+      }
+    };
+    vibrate();
+    const vTimer = window.setInterval(vibrate, 2000);
+
+    // audio beep loop
+    let ctx: AudioContext | null = null;
+    let aTimer = 0;
+    try {
+      const AC = (window as any).AudioContext || (window as any).webkitAudioContext;
+      if (AC) {
+        ctx = new AC();
+        const beep = () => {
+          if (!ctx) return;
+          const o = ctx.createOscillator();
+          const g = ctx.createGain();
+          o.type = "sine"; o.frequency.value = 880;
+          g.gain.setValueAtTime(0.001, ctx.currentTime);
+          g.gain.exponentialRampToValueAtTime(0.5, ctx.currentTime + 0.02);
+          g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+          o.connect(g).connect(ctx.destination);
+          o.start(); o.stop(ctx.currentTime + 0.55);
+        };
+        beep();
+        aTimer = window.setInterval(beep, 1200);
+        audioRef.current = { ctx, timer: aTimer };
+      }
+    } catch { /* ignore */ }
+
+    return () => {
+      window.clearInterval(vTimer);
+      if (aTimer) window.clearInterval(aTimer);
+      if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+        try { (navigator as any).vibrate(0); } catch { /* noop */ }
+      }
+      try { ctx?.close(); } catch { /* noop */ }
+      audioRef.current = null;
+    };
+  }, [alerting]);
 
   const filtered = useMemo(
     () => items.filter((i) => activeCat === "all" || i.category_id === activeCat),
     [items, activeCat],
   );
-  const subtotal = cart.reduce((s, l) => s + l.unit_price * l.qty, 0);
+  const cartSubtotal = cart.reduce((s, l) => s + l.unit_price * l.qty, 0);
   const itemVariants = (id: string) =>
     variants.filter((v) => v.menu_item_id === id).sort((a, b) => a.sort_order - b.sort_order);
 
@@ -86,12 +171,45 @@ function SelfOrderPage() {
     const needsDialog = vs.length > 0 || hasAnyCustomization(it.options);
     if (needsDialog) { setCustomizing(it); return; }
     setCart((c) => {
-      const f = c.find((l) => l.menu_item_id === it.id && !l.customization && !l.notes && !l.variant_id);
+      const f = c.find((l) =>
+        l.kind === "item" &&
+        l.menu_item_id === it.id && !l.customization && !l.notes && !l.variant_id);
       if (f) return c.map((l) => l.lineId === f.lineId ? { ...l, qty: l.qty + 1 } : l);
-      return [...c, { lineId: newId(), menu_item_id: it.id, name: it.name,
+      return [...c, {
+        lineId: newId(), kind: "item",
+        menu_item_id: it.id, bundle_id: null, name: it.name,
         unit_price: Number(it.price), qty: 1, addon_total: 0,
-        customization: null, notes: null, variant_id: null }];
+        customization: null, notes: null, variant_id: null,
+      }];
     });
+  }
+
+  function addBundle(b: Bundle) {
+    const rows = bundleItems.filter((x) => x.bundle_id === b.id);
+    if (rows.length === 0) { toast.error("Bundle is empty"); return; }
+    // compute effective bundle price from its component discounts
+    let price = 0;
+    for (const r of rows) {
+      const it = items.find((i) => i.id === r.menu_item_id);
+      if (!it) continue;
+      const base = Number(it.price);
+      const unit = r.discount_type === "percent"
+        ? Math.max(0, base - base * (Number(r.discount_value) || 0) / 100)
+        : Math.max(0, base - (Number(r.discount_value) || 0));
+      price += unit * r.qty;
+    }
+    price = Math.round(price * 100) / 100;
+    setCart((c) => {
+      const f = c.find((l) => l.kind === "bundle" && l.bundle_id === b.id);
+      if (f) return c.map((l) => l.lineId === f.lineId ? { ...l, qty: l.qty + 1 } : l);
+      return [...c, {
+        lineId: newId(), kind: "bundle",
+        menu_item_id: null, bundle_id: b.id, name: b.name,
+        unit_price: price, qty: 1, addon_total: 0,
+        customization: null, notes: null, variant_id: null,
+      }];
+    });
+    toast.success(`${b.name} added`);
   }
 
   function addCustom(it: Item, res: {
@@ -104,12 +222,15 @@ function SelfOrderPage() {
     const name = res.variant ? `${it.name} — ${res.variant.name}` : it.name;
     setCart((c) => {
       const sig = customSignature(res.custom, notes) + `|V:${res.variant?.id ?? ""}`;
-      const dup = c.find((l) => l.menu_item_id === it.id
+      const dup = c.find((l) => l.kind === "item" && l.menu_item_id === it.id
         && (customSignature(l.customization, l.notes) + `|V:${l.variant_id ?? ""}`) === sig);
       if (dup) return c.map((l) => l.lineId === dup.lineId ? { ...l, qty: l.qty + res.qty } : l);
-      return [...c, { lineId: newId(), menu_item_id: it.id, name,
+      return [...c, {
+        lineId: newId(), kind: "item",
+        menu_item_id: it.id, bundle_id: null, name,
         unit_price: unit, qty: res.qty, addon_total: res.addon,
-        customization: res.custom, notes, variant_id: res.variant?.id ?? null }];
+        customization: res.custom, notes, variant_id: res.variant?.id ?? null,
+      }];
     });
   }
 
@@ -120,9 +241,12 @@ function SelfOrderPage() {
       p_token: token,
       p_payload: {
         order_type: "takeout",
-        items: cart.map((l) => ({
+        items: cart.filter((l) => l.kind === "item").map((l) => ({
           menu_item_id: l.menu_item_id, qty: l.qty,
           addon_total: l.addon_total, customization: l.customization, notes: l.notes,
+        })),
+        bundles: cart.filter((l) => l.kind === "bundle").map((l) => ({
+          bundle_id: l.bundle_id, qty: l.qty,
         })),
       },
     });
@@ -137,17 +261,38 @@ function SelfOrderPage() {
   if (!customer) return <div className="min-h-screen flex items-center justify-center text-sm text-muted-foreground p-6 text-center">Sorry, this QR is no longer valid. Please ask the barista to issue a new one.</div>;
 
   if (done) {
+    const ready = orderStatus === "completed";
+    const voided = orderStatus === "voided";
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-background">
         <Card className="max-w-md w-full p-6 text-center space-y-3">
           <Coffee className="h-8 w-8 text-primary mx-auto" />
-          <h1 className="font-display text-2xl">Order placed!</h1>
-          <div className="text-sm text-muted-foreground">Show this number at the counter to pay.</div>
+          <h1 className="font-display text-2xl">
+            {ready ? "Your order is ready!" : voided ? "Order cancelled" : "Order placed!"}
+          </h1>
+          <div className="text-sm text-muted-foreground">
+            {ready
+              ? "Please pick it up from the counter."
+              : voided
+                ? "This order was voided by the barista."
+                : "Show this number at the counter to pay."}
+          </div>
           <div className="font-display text-5xl text-primary">#{String(done.order_no).padStart(3,"0")}</div>
           <div className="text-[10px] text-muted-foreground font-mono break-all">ID: {done.order_id}</div>
           <div className="text-lg">Total ₱{fmt(done.total)}</div>
-          <div className="text-xs text-muted-foreground">Pay with cash at the counter — the barista will complete your order.</div>
-          <Button className="w-full" onClick={() => setDone(null)}>Order again</Button>
+          {!ready && !voided && (
+            <div className="text-xs text-muted-foreground">
+              Pay with cash at the counter — this page will alert you when your order is ready.
+            </div>
+          )}
+          {alerting && (
+            <Button className="w-full" size="lg" variant="destructive" onClick={() => setAlerting(false)}>
+              <BellRing className="h-4 w-4 mr-2 animate-pulse" /> Stop alert
+            </Button>
+          )}
+          <Button className="w-full" variant={alerting ? "outline" : "default"} onClick={() => { setAlerting(false); setDone(null); }}>
+            Order again
+          </Button>
         </Card>
       </div>
     );
@@ -169,33 +314,67 @@ function SelfOrderPage() {
 
       <div className="px-3 py-2 border-b bg-card flex gap-2 overflow-x-auto">
         <Button size="sm" variant={activeCat === "all" ? "default" : "outline"} onClick={() => setActiveCat("all")}>All</Button>
+        {bundles.length > 0 && (
+          <Button size="sm" variant={activeCat === "__bundles__" ? "default" : "outline"} onClick={() => setActiveCat("__bundles__")}>
+            <Package className="h-3 w-3 mr-1" /> Bundles
+          </Button>
+        )}
         {cats.map((c) => (
           <Button key={c.id} size="sm" variant={activeCat === c.id ? "default" : "outline"} onClick={() => setActiveCat(c.id)}>{c.name}</Button>
         ))}
       </div>
 
       <div className="p-3 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 pb-56 max-w-3xl mx-auto">
-        {filtered.map((it) => {
-          const vs = itemVariants(it.id);
-          const fromPrice = vs.length > 0 ? Math.min(...vs.map((v) => Number(v.price))) : Number(it.price);
-          return (
-            <button key={it.id} onClick={() => tap(it)}
-              className="text-left rounded-lg border bg-card hover:bg-accent active:scale-[0.98] transition-all p-3 min-h-[88px] touch-manipulation">
-              <div className="font-medium leading-tight">{it.name}</div>
-              {it.description && <div className="text-xs text-muted-foreground mt-1 line-clamp-2">{it.description}</div>}
-              <div className="mt-2 font-display text-lg text-primary">
-                {vs.length > 0 ? `${fmt(fromPrice)}+` : fmt(fromPrice)}
-              </div>
-            </button>
-          );
-        })}
+        {activeCat === "__bundles__" ? (
+          bundles.length === 0 ? (
+            <div className="col-span-full text-muted-foreground text-sm">No active bundles.</div>
+          ) : bundles.map((b) => {
+            const rows = bundleItems.filter((x) => x.bundle_id === b.id);
+            let price = 0;
+            for (const r of rows) {
+              const it = items.find((i) => i.id === r.menu_item_id);
+              if (!it) continue;
+              const base = Number(it.price);
+              const unit = r.discount_type === "percent"
+                ? Math.max(0, base - base * (Number(r.discount_value) || 0) / 100)
+                : Math.max(0, base - (Number(r.discount_value) || 0));
+              price += unit * r.qty;
+            }
+            return (
+              <button key={b.id} onClick={() => addBundle(b)}
+                className="text-left rounded-lg border-2 border-primary/40 bg-card hover:bg-accent active:scale-[0.98] transition-all p-3 min-h-[88px] touch-manipulation">
+                <div className="flex items-center gap-1 text-[10px] font-medium text-primary uppercase tracking-wide">
+                  <Package className="h-3 w-3" /> Bundle
+                </div>
+                <div className="font-medium leading-tight mt-1">{b.name}</div>
+                {b.description && <div className="text-xs text-muted-foreground mt-1 line-clamp-2">{b.description}</div>}
+                <div className="mt-2 font-display text-lg text-primary">₱{fmt(price)}</div>
+              </button>
+            );
+          })
+        ) : (
+          filtered.map((it) => {
+            const vs = itemVariants(it.id);
+            const fromPrice = vs.length > 0 ? Math.min(...vs.map((v) => Number(v.price))) : Number(it.price);
+            return (
+              <button key={it.id} onClick={() => tap(it)}
+                className="text-left rounded-lg border bg-card hover:bg-accent active:scale-[0.98] transition-all p-3 min-h-[88px] touch-manipulation">
+                <div className="font-medium leading-tight">{it.name}</div>
+                {it.description && <div className="text-xs text-muted-foreground mt-1 line-clamp-2">{it.description}</div>}
+                <div className="mt-2 font-display text-lg text-primary">
+                  {vs.length > 0 ? `${fmt(fromPrice)}+` : fmt(fromPrice)}
+                </div>
+              </button>
+            );
+          })
+        )}
       </div>
 
       {cart.length > 0 && (
         <div className="fixed bottom-0 inset-x-0 bg-card border-t shadow-lg p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] space-y-2 max-h-[60vh] flex flex-col">
           <div className="flex items-center gap-2">
             <Badge>{cart.reduce((n,l) => n + l.qty, 0)} items</Badge>
-            <div className="ml-auto font-display text-xl text-primary">₱{fmt(subtotal)}</div>
+            <div className="ml-auto font-display text-xl text-primary">₱{fmt(cartSubtotal)}</div>
           </div>
           <div className="flex-1 overflow-y-auto space-y-1">
             {cart.map((l) => {
@@ -203,7 +382,10 @@ function SelfOrderPage() {
               return (
                 <div key={l.lineId} className="flex items-center gap-2 text-sm border rounded p-2">
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium truncate">{l.name}</div>
+                    <div className="font-medium truncate">
+                      {l.kind === "bundle" && <Package className="h-3 w-3 inline mr-1 text-primary" />}
+                      {l.name}
+                    </div>
                     <div className="text-xs text-muted-foreground">{fmt(l.unit_price)} × {l.qty}</div>
                     {desc.length > 0 && <div className="text-[11px] text-muted-foreground">{desc.join(" · ")}</div>}
                   </div>
@@ -225,7 +407,7 @@ function SelfOrderPage() {
             })}
           </div>
           <Button className="w-full" disabled={placing} onClick={place}>
-            {placing ? "Placing…" : `Place order — Pay at counter (₱${fmt(subtotal)})`}
+            {placing ? "Placing…" : `Place order — Pay at counter (₱${fmt(cartSubtotal)})`}
           </Button>
         </div>
       )}
