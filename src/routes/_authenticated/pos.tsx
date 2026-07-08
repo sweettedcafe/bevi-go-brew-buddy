@@ -278,6 +278,7 @@ function POSPage() {
       return;
     }
     addPlainLine(it, null);
+    maybeOfferUpsell(it);
   }
 
   function addPlainLine(it: MenuItem, variant: Variant | null) {
