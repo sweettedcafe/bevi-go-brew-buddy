@@ -297,7 +297,9 @@ function ReportsPage() {
         rows: itemRows.map((r) => PER_ITEM_COLS.map((c) => {
           const v = (r as any)[c.key];
           if (c.key === "revenue") return Number(v).toFixed(2);
-          if (c.key === "created_at") return new Date(v).toLocaleString();
+          if (c.key === "created_at") return new Date((r as any).created_at).toLocaleString();
+          if (c.key === "date_only") return (r as any).created_at ? new Date((r as any).created_at).toLocaleDateString() : "";
+          if (c.key === "time_only") return (r as any).created_at ? new Date((r as any).created_at).toLocaleTimeString() : "";
           if (c.key === "order_no") return `#${String(v).padStart(3, "0")}`;
           return v == null ? "" : String(v);
         })),
