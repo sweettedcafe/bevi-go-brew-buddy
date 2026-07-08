@@ -18,6 +18,12 @@ export const Route = createFileRoute("/_authenticated/end-of-shift")({
 });
 
 const MANILA_TZ = "Asia/Manila";
+const fmtDate = (iso: string | null) => iso
+  ? new Intl.DateTimeFormat("en-PH", { timeZone: MANILA_TZ, dateStyle: "medium" }).format(new Date(iso))
+  : "—";
+const fmtClock = (iso: string | null) => iso
+  ? new Intl.DateTimeFormat("en-PH", { timeZone: MANILA_TZ, timeStyle: "short" }).format(new Date(iso))
+  : "—";
 const fmtTime = (iso: string | null) => iso
   ? new Intl.DateTimeFormat("en-PH", { timeZone: MANILA_TZ, dateStyle: "medium", timeStyle: "short" }).format(new Date(iso))
   : "—";
@@ -34,7 +40,7 @@ type EOS = {
   leave_hours_deducted: number;
   net_worked_hours: number;
   payments: Array<{ method: string; gross: number; change: number; net: number; count: number }>;
-  expenses: Array<{ id: string; description: string; amount: number; quantity?: number | null; unit_price?: number | null; category: string | null; created_at: string }>;
+  expenses: Array<{ id: string; description: string; amount: number; quantity?: number | null; unit_price?: number | null; category: string | null; created_at: string; invoice_number?: string | null; receipt_url?: string | null }>;
   total_expenses: number;
   breaks: Array<{ id: string; type: "break" | "lunch"; started_at: string; ended_at: string | null }>;
 };
@@ -48,6 +54,9 @@ function EndOfShiftPage() {
   const [qty, setQty] = useState("1");
   const [unitPrice, setUnitPrice] = useState("");
   const [category, setCategory] = useState("");
+  const [invoiceNo, setInvoiceNo] = useState("");
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [uploadingReceipt, setUploadingReceipt] = useState(false);
 
   const refresh = async () => {
     setLoading(true);
@@ -62,18 +71,47 @@ function EndOfShiftPage() {
   };
   useEffect(() => { void refresh(); }, []);
 
+  async function uploadReceipt(file: File): Promise<string | null> {
+    setUploadingReceipt(true);
+    try {
+      const ext = file.name.split(".").pop() || "jpg";
+      const path = `receipts/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const { error: upErr } = await (supabase.storage.from("expense-receipts") as any).upload(path, file, {
+        upsert: false, contentType: file.type || undefined,
+      });
+      if (upErr) throw upErr;
+      const { data: pub } = (supabase.storage.from("expense-receipts") as any).getPublicUrl(path);
+      return pub?.publicUrl ?? null;
+    } catch (e: any) {
+      toast.error(`Upload failed: ${e?.message ?? e}. You can still save the expense without the image.`);
+      return null;
+    } finally {
+      setUploadingReceipt(false);
+    }
+  }
+
   const addExpense = async () => {
     const q = Number(qty);
     const up = Number(unitPrice);
     if (!desc.trim()) { toast.error("Description required"); return; }
     if (!Number.isFinite(q) || q <= 0) { toast.error("Quantity must be > 0"); return; }
     if (!Number.isFinite(up) || up < 0) { toast.error("Unit price must be ≥ 0"); return; }
-    const { error } = await (supabase as any).rpc("tc_add_expense_v2", {
-      p_description: desc.trim(), p_quantity: q, p_unit_price: up, p_category: category.trim() || null,
+    let receiptUrl: string | null = null;
+    if (receiptFile) {
+      receiptUrl = await uploadReceipt(receiptFile);
+    }
+    const { error } = await (supabase as any).rpc("tc_add_expense_v3", {
+      p_description: desc.trim(),
+      p_quantity: q,
+      p_unit_price: up,
+      p_category: category.trim() || null,
+      p_invoice_number: invoiceNo.trim() || null,
+      p_receipt_url: receiptUrl,
     });
     if (error) { toast.error(error.message); return; }
     toast.success("Expense saved");
     setDesc(""); setQty("1"); setUnitPrice(""); setCategory("");
+    setInvoiceNo(""); setReceiptFile(null);
     await refresh();
   };
   const deleteExpense = async (id: string) => {
@@ -241,19 +279,23 @@ function EndOfShiftPage() {
                 <p className="text-xs text-muted-foreground">Shift is closed — expenses are read-only.</p>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-2 items-end">
-                  <div className="md:col-span-4">
+                  <div className="md:col-span-3">
                     <Label htmlFor="exp-desc">Item / description</Label>
                     <Input id="exp-desc" value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="e.g. Whole milk 1L" />
                   </div>
                   <div className="md:col-span-2">
-                    <Label htmlFor="exp-qty">Quantity</Label>
+                    <Label htmlFor="exp-inv">Invoice #</Label>
+                    <Input id="exp-inv" value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)} placeholder="OR / SI #" />
+                  </div>
+                  <div className="md:col-span-1">
+                    <Label htmlFor="exp-qty">Qty</Label>
                     <Input id="exp-qty" type="number" min="0.01" step="0.01" value={qty} onChange={(e) => setQty(e.target.value)} />
                   </div>
                   <div className="md:col-span-2">
                     <Label htmlFor="exp-unit">Unit price (₱)</Label>
                     <Input id="exp-unit" type="number" min="0" step="0.01" value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} />
                   </div>
-                  <div className="md:col-span-2">
+                  <div className="md:col-span-1">
                     <Label>Total</Label>
                     <div className="h-9 flex items-center px-3 rounded-md border bg-muted/30 text-sm font-medium">
                       {peso((Number(qty) || 0) * (Number(unitPrice) || 0))}
@@ -264,7 +306,14 @@ function EndOfShiftPage() {
                     <Input id="exp-cat" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="optional" />
                   </div>
                   <div className="md:col-span-1">
-                    <Button onClick={addExpense} className="w-full gap-1"><Plus className="h-4 w-4" /></Button>
+                    <Label htmlFor="exp-img" className="text-xs">Receipt</Label>
+                    <Input id="exp-img" type="file" accept="image/*"
+                      onChange={(e) => setReceiptFile(e.target.files?.[0] ?? null)} />
+                  </div>
+                  <div className="md:col-span-1">
+                    <Button onClick={addExpense} disabled={uploadingReceipt} className="w-full gap-1">
+                      <Plus className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
               )}
@@ -275,24 +324,34 @@ function EndOfShiftPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>When</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Time</TableHead>
+                      <TableHead>Invoice #</TableHead>
                       <TableHead>Description</TableHead>
                       <TableHead>Category</TableHead>
                       <TableHead className="text-right">Qty</TableHead>
                       <TableHead className="text-right">Unit price</TableHead>
                       <TableHead className="text-right">Total</TableHead>
+                      <TableHead>Receipt</TableHead>
                       <TableHead></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {report.expenses.map((e) => (
                       <TableRow key={e.id}>
-                        <TableCell className="text-xs">{fmtTime(e.created_at)}</TableCell>
+                        <TableCell className="text-xs">{fmtDate(e.created_at)}</TableCell>
+                        <TableCell className="text-xs">{fmtClock(e.created_at)}</TableCell>
+                        <TableCell className="text-xs">{e.invoice_number ?? "—"}</TableCell>
                         <TableCell>{e.description}</TableCell>
                         <TableCell className="text-muted-foreground">{e.category ?? "—"}</TableCell>
                         <TableCell className="text-right">{Number(e.quantity ?? 1)}</TableCell>
                         <TableCell className="text-right">{peso(e.unit_price ?? e.amount)}</TableCell>
                         <TableCell className="text-right font-medium">{peso(e.amount)}</TableCell>
+                        <TableCell>
+                          {e.receipt_url
+                            ? <a href={e.receipt_url} target="_blank" rel="noreferrer" className="text-xs underline">view</a>
+                            : <span className="text-xs text-muted-foreground">—</span>}
+                        </TableCell>
                         <TableCell className="text-right">
                           {!report.shift.clock_out && (
                             <Button size="icon" variant="ghost" onClick={() => deleteExpense(e.id)}>
@@ -303,9 +362,9 @@ function EndOfShiftPage() {
                       </TableRow>
                     ))}
                     <TableRow>
-                      <TableCell colSpan={5} className="text-right font-semibold">Total expenses</TableCell>
+                      <TableCell colSpan={7} className="text-right font-semibold">Total expenses</TableCell>
                       <TableCell className="text-right font-semibold">{peso(report.total_expenses)}</TableCell>
-                      <TableCell />
+                      <TableCell colSpan={2} />
                     </TableRow>
                   </TableBody>
                 </Table>

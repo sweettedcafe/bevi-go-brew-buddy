@@ -42,7 +42,8 @@ const shortId = (id?: string | null) => (id ? String(id).slice(0, 8) : "—");
 const PER_ORDER_COLS = [
   { key: "order_no", label: "Order #" },
   { key: "order_id_short", label: "Order ID" },
-  { key: "created_at", label: "Date / time" },
+  { key: "date_only", label: "Date" },
+  { key: "time_only", label: "Time" },
   { key: "txn_kind", label: "Type" },
   { key: "customer_name", label: "Customer" },
   { key: "cashier_email", label: "Cashier" },
@@ -59,7 +60,8 @@ const PER_ORDER_COLS = [
 const PER_ITEM_COLS = [
   { key: "order_no", label: "Order #" },
   { key: "order_id_short", label: "Order ID" },
-  { key: "created_at", label: "Date" },
+  { key: "date_only", label: "Date" },
+  { key: "time_only", label: "Time" },
   { key: "txn_kind", label: "Type" },
   { key: "name", label: "Item" },
   { key: "category", label: "Category" },
@@ -70,7 +72,8 @@ const PER_ITEM_COLS = [
 const DISCOUNT_COLS = [
   { key: "order_no", label: "Order #" },
   { key: "order_id_short", label: "Order ID" },
-  { key: "created_at", label: "Date" },
+  { key: "date_only", label: "Date" },
+  { key: "time_only", label: "Time" },
   { key: "customer_name", label: "Customer" },
   { key: "discount_label", label: "Promotion / discount" },
   { key: "discount_code", label: "Code" },
@@ -267,13 +270,13 @@ function ReportsPage() {
 
   function exportCurrent() {
     if (tab === "order") {
-      const rows = orders.map((o) => Object.fromEntries(PER_ORDER_COLS.map((c) => [c.key, fmt(o[c.key], c.key)])));
+      const rows = orders.map((o) => Object.fromEntries(PER_ORDER_COLS.map((c) => [c.key, fmt(o[c.key], c.key, o)])));
       downloadCsv(`per-order-${todayIso()}.csv`, toCsv(rows, PER_ORDER_COLS.map((c) => c.label)));
     } else if (tab === "item") {
       const rows = itemRows.map((r) => Object.fromEntries(PER_ITEM_COLS.map((c) => [c.label, (r as any)[c.key]])));
       downloadCsv(`per-item-${todayIso()}.csv`, toCsv(rows, PER_ITEM_COLS.map((c) => c.label)));
     } else {
-      const rows = discountRows.map((o) => Object.fromEntries(DISCOUNT_COLS.map((c) => [c.label, fmt(o[c.key], c.key)])));
+      const rows = discountRows.map((o) => Object.fromEntries(DISCOUNT_COLS.map((c) => [c.label, fmt(o[c.key], c.key, o)])));
       downloadCsv(`discounts-${todayIso()}.csv`, toCsv(rows, DISCOUNT_COLS.map((c) => c.label)));
     }
   }
@@ -286,7 +289,7 @@ function ReportsPage() {
       const perOrder = {
         title: "Per order",
         headers: PER_ORDER_COLS.map((c) => c.label),
-        rows: orders.map((o) => PER_ORDER_COLS.map((c) => String(fmt(o[c.key], c.key)))),
+        rows: orders.map((o) => PER_ORDER_COLS.map((c) => String(fmt(o[c.key], c.key, o)))),
       };
       const perItem = {
         title: "Per item",
@@ -294,7 +297,9 @@ function ReportsPage() {
         rows: itemRows.map((r) => PER_ITEM_COLS.map((c) => {
           const v = (r as any)[c.key];
           if (c.key === "revenue") return Number(v).toFixed(2);
-          if (c.key === "created_at") return new Date(v).toLocaleString();
+          if (c.key === "created_at") return new Date((r as any).created_at).toLocaleString();
+          if (c.key === "date_only") return (r as any).created_at ? new Date((r as any).created_at).toLocaleDateString() : "";
+          if (c.key === "time_only") return (r as any).created_at ? new Date((r as any).created_at).toLocaleTimeString() : "";
           if (c.key === "order_no") return `#${String(v).padStart(3, "0")}`;
           return v == null ? "" : String(v);
         })),
@@ -302,7 +307,7 @@ function ReportsPage() {
       const discounts = {
         title: "Discounts",
         headers: DISCOUNT_COLS.map((c) => c.label),
-        rows: discountRows.map((o) => DISCOUNT_COLS.map((c) => String(fmt(o[c.key], c.key)))),
+        rows: discountRows.map((o) => DISCOUNT_COLS.map((c) => String(fmt(o[c.key], c.key, o)))),
       };
       const res = await exportSheets({
         data: {
@@ -409,7 +414,7 @@ function ReportsPage() {
                 const n = Number(row[key]);
                 return <span className={n < 0 ? "text-destructive" : ""}>{`₱${n.toFixed(2)}`}</span>;
               }
-              return fmt(row[key], key);
+              return fmt(row[key], key, row);
             }}
             actions={(row) => {
               const isSale = (row.txn_kind ?? "sale") === "sale";
@@ -459,6 +464,8 @@ function ReportsPage() {
               }
               if (key === "txn_kind") return <TxnBadge k={row.txn_kind ?? "sale"} />;
               if (key === "created_at") return new Date(row.created_at).toLocaleString();
+              if (key === "date_only") return row.created_at ? new Date(row.created_at).toLocaleDateString() : "—";
+              if (key === "time_only") return row.created_at ? new Date(row.created_at).toLocaleTimeString() : "—";
               if (key === "order_no") return `#${String(row.order_no).padStart(3, "0")}`;
               if (key === "order_id_short") return <span className="font-mono text-xs">{row.order_id_short}</span>;
               return (row as any)[key];
@@ -480,7 +487,7 @@ function ReportsPage() {
             rows={discountRows}
             render={(row, key) => {
               if (key === "discount_label") return row.discount_label ?? <Tag className="h-3 w-3 inline" />;
-              return fmt(row[key], key);
+              return fmt(row[key], key, row);
             }}
             empty="No discounted orders in this range."
           />
@@ -499,7 +506,15 @@ function ReportsPage() {
   );
 }
 
-function fmt(v: any, key: string) {
+function fmt(v: any, key: string, row?: any) {
+  if (key === "date_only") {
+    const iso = row?.created_at;
+    return iso ? new Date(iso).toLocaleDateString() : "—";
+  }
+  if (key === "time_only") {
+    const iso = row?.created_at;
+    return iso ? new Date(iso).toLocaleTimeString() : "—";
+  }
   if (v == null) return "—";
   if (key === "created_at") return new Date(v).toLocaleString();
   if (key === "subtotal" || key === "discount_total" || key === "total" || key === "fee_amount")
