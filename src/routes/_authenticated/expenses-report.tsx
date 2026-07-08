@@ -46,7 +46,9 @@ function ExpensesReportPage() {
   const isDeveloper = hasRole("developer");
   const [from, setFrom] = useState(daysAgoIso(29));
   const [to, setTo] = useState(todayIso());
-  const [rows, setRows] = useState<Row[]>([]);
+  const [cashierQuery, setCashierQuery] = useState("");
+  const [invoiceQuery, setInvoiceQuery] = useState("");
+  const [rowsAll, setRowsAll] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
   const [sheetsBusy, setSheetsBusy] = useState(false);
   const exportSheets = useServerFn(exportToGoogleSheets);

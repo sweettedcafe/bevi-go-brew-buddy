@@ -83,7 +83,12 @@ function EndOfShiftPage() {
       const { data: pub } = (supabase.storage.from("expense-receipts") as any).getPublicUrl(path);
       return pub?.publicUrl ?? null;
     } catch (e: any) {
-      toast.error(`Upload failed: ${e?.message ?? e}. You can still save the expense without the image.`);
+      const msg = String(e?.message ?? e);
+      if (/bucket/i.test(msg) && /not found/i.test(msg)) {
+        toast.error("Receipt bucket missing. Run supabase_phase25_schema.sql to create the 'expense-receipts' bucket. Saving expense without image.");
+      } else {
+        toast.error(`Upload failed: ${msg}. You can still save the expense without the image.`);
+      }
       return null;
     } finally {
       setUploadingReceipt(false);
