@@ -2,6 +2,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { loadPrintSettings } from "./print-settings";
 import { printHTML } from "./print";
+import { savePdfFromHTML } from "./print-pdf";
 import { receiptHTML, labelsHTML, type ReceiptData, type DrinkLabel } from "./print-templates";
 import { randomQuote } from "./quotes";
 
