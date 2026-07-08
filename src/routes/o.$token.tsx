@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Coffee, Plus, Minus, Star, Trash2, Package, BellRing } from "lucide-react";
 import { toast } from "sonner";
 import { CustomizeDialog, type VariantChoice } from "@/components/pos/CustomizeDialog";
+import { UpsellDialog, type UpsellChoice } from "@/components/pos/UpsellDialog";
 import {
   type MenuOptions, type SelectedCustom,
   hasAnyCustomization, customSignature, describeCustom,
