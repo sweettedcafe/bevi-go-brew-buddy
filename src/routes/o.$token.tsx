@@ -172,6 +172,20 @@ function SelfOrderPage() {
 
   function newId() { return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`; }
 
+  // Upsell suggestions after adding an item
+  const [upsell, setUpsell] = useState<{ trigger: string; suggestions: UpsellChoice[] } | null>(null);
+  function maybeOfferUpsell(it: Item, currentCart: CartLine[]) {
+    const ids = it.options?.upsell_item_ids ?? [];
+    if (!ids.length) return;
+    const suggestions: UpsellChoice[] = ids
+      .map((id) => items.find((x) => x.id === id))
+      .filter((x): x is Item => !!x)
+      .filter((x) => !currentCart.some((l) => l.menu_item_id === x.id))
+      .map((x) => ({ id: x.id, name: x.name, price: Number(x.price) }));
+    if (suggestions.length === 0) return;
+    setUpsell({ trigger: it.name, suggestions });
+  }
+
   function tap(it: Item) {
     const vs = itemVariants(it.id);
     const needsDialog = vs.length > 0 || hasAnyCustomization(it.options);
@@ -188,6 +202,7 @@ function SelfOrderPage() {
         customization: null, notes: null, variant_id: null,
       }];
     });
+    maybeOfferUpsell(it, cart);
   }
 
   function addBundle(b: Bundle) {
