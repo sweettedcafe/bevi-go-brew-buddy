@@ -18,6 +18,12 @@ export const Route = createFileRoute("/_authenticated/end-of-shift")({
 });
 
 const MANILA_TZ = "Asia/Manila";
+const fmtDate = (iso: string | null) => iso
+  ? new Intl.DateTimeFormat("en-PH", { timeZone: MANILA_TZ, dateStyle: "medium" }).format(new Date(iso))
+  : "—";
+const fmtClock = (iso: string | null) => iso
+  ? new Intl.DateTimeFormat("en-PH", { timeZone: MANILA_TZ, timeStyle: "short" }).format(new Date(iso))
+  : "—";
 const fmtTime = (iso: string | null) => iso
   ? new Intl.DateTimeFormat("en-PH", { timeZone: MANILA_TZ, dateStyle: "medium", timeStyle: "short" }).format(new Date(iso))
   : "—";
@@ -34,7 +40,7 @@ type EOS = {
   leave_hours_deducted: number;
   net_worked_hours: number;
   payments: Array<{ method: string; gross: number; change: number; net: number; count: number }>;
-  expenses: Array<{ id: string; description: string; amount: number; quantity?: number | null; unit_price?: number | null; category: string | null; created_at: string }>;
+  expenses: Array<{ id: string; description: string; amount: number; quantity?: number | null; unit_price?: number | null; category: string | null; created_at: string; invoice_number?: string | null; receipt_url?: string | null }>;
   total_expenses: number;
   breaks: Array<{ id: string; type: "break" | "lunch"; started_at: string; ended_at: string | null }>;
 };
