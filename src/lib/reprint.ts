@@ -53,7 +53,49 @@ export async function reprintReceiptById(orderId: string, fallbackCashier = "—
     })),
     change: (payments ?? []).reduce((s: number, p: any) => s + Number(p.change_due ?? 0), 0),
   };
-  printHTML(receiptHTML(data, loadPrintSettings()), `Receipt #${ord.order_no}`);
+  const html = receiptHTML(data, loadPrintSettings());
+  printHTML(html, `Receipt #${ord.order_no}`);
+  return { html, orderNo: ord.order_no };
+}
+
+export async function saveReceiptPdfById(orderId: string, fallbackCashier = "—") {
+  const res = await buildReceiptHtml(orderId, fallbackCashier);
+  await savePdfFromHTML(res.html, `receipt-${String(res.orderNo).padStart(3, "0")}.pdf`, 80);
+}
+
+async function buildReceiptHtml(orderId: string, fallbackCashier: string) {
+  const [{ data: ord }, { data: items }, { data: payments }, pms] = await Promise.all([
+    db.from("orders").select("*").eq("id", orderId).maybeSingle(),
+    db.from("order_items").select("*").eq("order_id", orderId),
+    db.from("order_payments").select("*").eq("order_id", orderId).order("created_at"),
+    db.from("payment_methods").select("code,label"),
+  ]);
+  if (!ord) throw new Error("Order not found");
+  const labelMap = new Map<string, string>(
+    ((pms.data ?? []) as { code: string; label: string }[]).map((p) => [p.code, p.label]),
+  );
+  const data: ReceiptData = {
+    orderNo: ord.order_no,
+    businessDate: ord.business_date,
+    createdAt: ord.created_at,
+    cashier: fallbackCashier,
+    orderType: ord.order_type,
+    customerName: ord.customer_name,
+    lines: (items ?? []).map((l: any) => ({
+      name: l.name_snapshot, qty: l.qty,
+      unit_price: Number(l.unit_price), line_total: Number(l.line_total),
+    })),
+    subtotal: Number(ord.subtotal),
+    discountLabel: ord.discount_label,
+    discountAmount: Number(ord.discount_total),
+    total: Number(ord.total),
+    payments: (payments ?? []).map((p: any) => ({
+      label: labelMap.get(p.method_code) ?? p.method_code ?? p.method ?? "Payment",
+      amount: Number(p.amount),
+    })),
+    change: (payments ?? []).reduce((s: number, p: any) => s + Number(p.change_due ?? 0), 0),
+  };
+  return { html: receiptHTML(data, loadPrintSettings()), orderNo: ord.order_no as number };
 }
 
 export async function reprintLabelsById(orderId: string) {
