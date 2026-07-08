@@ -12,7 +12,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Trash2, Plus, Minus, ShoppingCart, Coffee, Search, X, Tag, Pause, PlayCircle, ClipboardList, Star, Printer, ScanLine, UserCircle2, Camera, Sparkles } from "lucide-react";
+import { Trash2, Plus, Minus, ShoppingCart, Coffee, Search, X, Tag, Pause, PlayCircle, ClipboardList, Star, Printer, ScanLine, UserCircle2, Camera, Sparkles, Bell } from "lucide-react";
 import { toast } from "sonner";
 import { loadPrintSettings } from "@/lib/print-settings";
 import { loadPosSettings } from "@/lib/pos-settings";
@@ -456,16 +456,47 @@ function POSPage() {
   }
 
   async function openTodayList() {
-    const today = new Date().toISOString().slice(0, 10);
+    // Use the local calendar day so orders show up regardless of how
+    // business_date is stored/timezoned on the server.
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 1);
     const { data, error } = await db
       .from("orders")
-      .select("id, order_no, customer_name, created_at, total, order_type")
-      .eq("business_date", today)
-      .eq("status", "completed")
+      .select("id, order_no, customer_name, created_at, total, order_type, status")
+      .gte("created_at", start.toISOString())
+      .lt("created_at", end.toISOString())
+      .in("status", ["completed", "ready"])
       .order("created_at", { ascending: false });
     if (error) { toast.error(error.message); return; }
     setTodayOrders((data ?? []) as any);
     setTodayOpen(true);
+  }
+
+  function notifyOrderReady(o: { order_no: number; customer_name: string | null }) {
+    // Audible + visual counter alert. No push infra required — the barista
+    // uses this to call the customer to the counter.
+    try {
+      const AC = (window as any).AudioContext ?? (window as any).webkitAudioContext;
+      if (AC) {
+        const ctx = new AC();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.type = "sine"; osc.frequency.value = 880;
+        gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.6);
+        osc.start(); osc.stop(ctx.currentTime + 0.65);
+        setTimeout(() => ctx.close?.(), 900);
+      }
+    } catch { /* ignore audio errors */ }
+    const name = o.customer_name?.trim() || "Customer";
+    toast.success(
+      `Order #${String(o.order_no).padStart(3, "0")} ready — ${name}, please proceed to the counter.`,
+      { duration: 6000 },
+    );
   }
 
   async function resumeHeld(id: string) {
@@ -868,7 +899,7 @@ function POSPage() {
           )}
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+        <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
           {cart.length === 0 ? (
             <div className="text-sm text-muted-foreground text-center py-10">Tap a menu item to add it.</div>
           ) : (
@@ -877,19 +908,22 @@ function POSPage() {
               const itemRef = items.find((x) => x.id === l.menu_item_id);
               const editable = hasAnyCustomization(itemRef?.options ?? null);
               return (
-                <Card key={l.lineId} className="p-3">
-                  <div className="flex items-start gap-2">
+                <Card key={l.lineId} className="px-2.5 py-2">
+                  <div className="flex items-center gap-2">
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium truncate">{l.name}</div>
-                      <div className="text-xs text-muted-foreground">{fmt(l.unit_price)} × {l.qty} = {fmt(l.unit_price * l.qty)}</div>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-sm font-medium truncate">{l.name}</span>
+                        <span className="text-[11px] text-muted-foreground shrink-0">
+                          {fmt(l.unit_price)} × {l.qty} = <span className="text-foreground font-medium">{fmt(l.unit_price * l.qty)}</span>
+                        </span>
+                      </div>
                       {(desc.length > 0 || l.notes) && (
-                        <div className="mt-1 text-[11px] text-muted-foreground space-y-0.5">
-                          {desc.map((d, i) => <div key={i}>• {d}</div>)}
-                          {l.notes && <div className="italic">“{l.notes}”</div>}
+                        <div className="mt-0.5 text-[10px] text-muted-foreground leading-tight line-clamp-2">
+                          {desc.join(" · ")}{l.notes ? ` — “${l.notes}”` : ""}
                         </div>
                       )}
                       {lineDiscounts[l.lineId] > 0 && (
-                        <div className="mt-1 flex items-center justify-between gap-2 text-[11px] rounded bg-primary/10 text-primary px-2 py-1">
+                        <div className="mt-1 flex items-center justify-between gap-2 text-[10px] rounded bg-primary/10 text-primary px-2 py-0.5">
                           <span className="flex items-center gap-1 truncate">
                             <Tag className="h-3 w-3" />
                             {appliedPromo?.label ?? manual?.label ?? "Discount"}
@@ -900,22 +934,22 @@ function POSPage() {
                         </div>
                       )}
                     </div>
-                    <Button size="icon" variant="ghost" onClick={() => removeLine(l.lineId)}><Trash2 className="h-4 w-4" /></Button>
-                  </div>
-                  <div className="flex items-center gap-2 mt-2">
-                    <Button size="icon" variant="outline" onClick={() => changeQty(l.lineId, -1)}><Minus className="h-3 w-3" /></Button>
-                    <span className="w-8 text-center font-medium">{l.qty}</span>
-                    <Button size="icon" variant="outline" onClick={() => changeQty(l.lineId, 1)}><Plus className="h-3 w-3" /></Button>
-                    {editable && itemRef && (
-                      <Button size="sm" variant="ghost" className="ml-auto h-7 text-xs"
-                        onClick={() => setCustomizing({
-                          item: itemRef,
-                          initial: { custom: l.customization, qty: l.qty, notes: l.notes ?? "" },
-                          editingLineId: l.lineId,
-                        })}>
-                        Edit
-                      </Button>
-                    )}
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => changeQty(l.lineId, -1)}><Minus className="h-3 w-3" /></Button>
+                      <span className="w-6 text-center text-sm font-medium">{l.qty}</span>
+                      <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => changeQty(l.lineId, 1)}><Plus className="h-3 w-3" /></Button>
+                      {editable && itemRef && (
+                        <Button size="sm" variant="ghost" className="h-7 px-2 text-[11px]"
+                          onClick={() => setCustomizing({
+                            item: itemRef,
+                            initial: { custom: l.customization, qty: l.qty, notes: l.notes ?? "" },
+                            editingLineId: l.lineId,
+                          })}>
+                          Edit
+                        </Button>
+                      )}
+                      <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => removeLine(l.lineId)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                    </div>
                   </div>
                 </Card>
               );
@@ -1161,7 +1195,10 @@ function POSPage() {
                     </div>
                   </div>
                   <div className="font-medium">{fmt(Number(o.total))}</div>
-                  <div className="flex gap-1">
+                  <div className="flex flex-wrap gap-1">
+                    <Button size="sm" onClick={() => notifyOrderReady(o)}>
+                      <Bell className="h-3 w-3 mr-1" /> Notify ready
+                    </Button>
                     <Button size="sm" variant="outline" onClick={async () => {
                       try {
                         setPrintDocs([await buildReceiptPreviewById(o.id, user?.email ?? "—")]);
