@@ -323,10 +323,12 @@ function POSPage() {
   const changeQty = (lineId: string, d: number) =>
     setCart((c) => c.map((l) => l.lineId === lineId ? { ...l, qty: l.qty + d } : l).filter((l) => l.qty > 0));
   const removeLine = (lineId: string) => setCart((c) => c.filter((l) => l.lineId !== lineId));
+  const [resumedOrderId, setResumedOrderId] = useState<string | null>(null);
   function clearAll() {
     setCart([]); setCustomerName("");
     setPromoCode(""); setAppliedPromo(null); setManual(null);
     setCustomer(null); setRedeem(""); setScanInput("");
+    setResumedOrderId(null);
   }
 
   async function lookupCustomerByCode(raw: string) {
