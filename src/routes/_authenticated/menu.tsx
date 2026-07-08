@@ -256,6 +256,7 @@ function MenuPage() {
           initialRecipes={editing.id ? itemRecipes(editing.id) : []}
           initialVariants={editing.id ? variants.filter((v) => v.menu_item_id === editing.id) : []}
           allVariantRecipes={vrecipes}
+          allItems={items}
           onClose={() => setEditing(null)}
           onSaved={() => { setEditing(null); void load(); }}
           onOwnersChanged={() => void load()}
