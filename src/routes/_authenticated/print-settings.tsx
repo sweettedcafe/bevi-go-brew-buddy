@@ -5,12 +5,13 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Printer, Save, TestTube } from "lucide-react";
+import { Printer, Save, TestTube, Bluetooth, Wifi } from "lucide-react";
 import { toast } from "sonner";
 import { loadPrintSettings, savePrintSettings, type PrintSettings } from "@/lib/print-settings";
 import { loadPosSettings, savePosSettings, type PosSettings } from "@/lib/pos-settings";
 import { printHTML } from "@/lib/print";
 import { receiptHTML, labelsHTML } from "@/lib/print-templates";
+import { findBluetoothPrinter, isBluetoothSupported } from "@/lib/bt-printer";
 import { ScanLine } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/print-settings")({
@@ -108,6 +109,47 @@ function PrintSettingsPage() {
           <Button onClick={save}><Save className="h-3 w-3 mr-1" /> Save</Button>
           <Button variant="outline" onClick={testReceipt}><TestTube className="h-3 w-3 mr-1" /> Test receipt</Button>
           <Button variant="outline" onClick={testLabel}><TestTube className="h-3 w-3 mr-1" /> Test label</Button>
+        </div>
+
+        <div className="pt-4 border-t space-y-2">
+          <div className="flex items-center gap-2">
+            <Bluetooth className="h-4 w-4 text-primary" />
+            <div className="font-medium text-sm">Find a label / receipt printer</div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Pair a nearby Bluetooth printer so it appears in the browser print dialog. For WiFi / AirPrint printers,
+            add them once in your operating system's <b>Printers &amp; Scanners</b> settings — they'll show up in the
+            print dialog automatically after that.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={async () => {
+                try {
+                  const p = await findBluetoothPrinter();
+                  if (p) { toast.success(`Paired: ${p.name}`); update("labelPrinter", p.name); }
+                } catch (e: any) {
+                  toast.error(e?.message ?? "Bluetooth pairing failed");
+                }
+              }}
+              disabled={!isBluetoothSupported()}
+            >
+              <Bluetooth className="h-3 w-3 mr-1" /> Find Bluetooth printer
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                toast.message("Open your OS settings → Printers & Scanners → Add a WiFi/network printer. It will then appear in the browser print dialog.");
+              }}
+            >
+              <Wifi className="h-3 w-3 mr-1" /> Find WiFi printer
+            </Button>
+          </div>
+          {!isBluetoothSupported() && (
+            <p className="text-xs text-destructive">
+              Web Bluetooth is not available here. Use Chrome/Edge on desktop or Android.
+            </p>
+          )}
         </div>
       </Card>
 
