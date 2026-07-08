@@ -448,7 +448,42 @@ function SelfOrderPage() {
           options={customizing.options ?? {}}
           variants={customizingVariants}
           hideOther
-          onConfirm={(res) => { addCustom(customizing, res); setCustomizing(null); }}
+          onConfirm={(res) => {
+            const it = customizing;
+            addCustom(it, res);
+            setCustomizing(null);
+            maybeOfferUpsell(it, cart);
+          }}
+        />
+      )}
+
+      {upsell && (
+        <UpsellDialog
+          open
+          onOpenChange={(o) => !o && setUpsell(null)}
+          triggerName={upsell.trigger}
+          suggestions={upsell.suggestions}
+          onSkip={() => setUpsell(null)}
+          onAdd={(picked) => {
+            for (const p of picked) {
+              const it = items.find((x) => x.id === p.id);
+              if (!it) continue;
+              // Add plain (no customization) — matches simple tap flow
+              setCart((c) => {
+                const f = c.find((l) =>
+                  l.kind === "item" && l.menu_item_id === it.id
+                  && !l.customization && !l.notes && !l.variant_id);
+                if (f) return c.map((l) => l.lineId === f.lineId ? { ...l, qty: l.qty + 1 } : l);
+                return [...c, {
+                  lineId: newId(), kind: "item",
+                  menu_item_id: it.id, bundle_id: null, name: it.name,
+                  unit_price: Number(it.price), qty: 1, addon_total: 0,
+                  customization: null, notes: null, variant_id: null,
+                }];
+              });
+            }
+            setUpsell(null);
+          }}
         />
       )}
     </div>
