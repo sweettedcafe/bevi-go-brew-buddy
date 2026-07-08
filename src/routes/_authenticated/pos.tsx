@@ -22,6 +22,7 @@ import { randomQuote } from "@/lib/quotes";
 import { CustomizeDialog } from "@/components/pos/CustomizeDialog";
 import { CameraScannerDialog } from "@/components/pos/CameraScannerDialog";
 import { PrintPreviewDialog, type PrintPreviewDocument } from "@/components/print/PrintPreviewDialog";
+import { UpsellDialog, type UpsellChoice } from "@/components/pos/UpsellDialog";
 import {
   type MenuOptions, type SelectedCustom,
   hasAnyCustomization, addonTotal, customSignature, describeCustom,
