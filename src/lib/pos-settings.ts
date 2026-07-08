@@ -8,7 +8,8 @@ export type PosSettings = {
 
 const DEFAULTS: PosSettings = {
   scanEnabled: true,
-  scanAutoFocus: true,
+  // Don't hijack focus by default — lets barista click into the input when needed
+  scanAutoFocus: false,
 };
 
 export function loadPosSettings(): PosSettings {

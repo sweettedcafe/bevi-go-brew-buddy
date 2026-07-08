@@ -22,6 +22,8 @@ export type MenuOptions = {
   // NEW: generalize "Size" heading and add dynamic groups
   variant_group_label?: string; // e.g. "Color", "Pack"
   groups?: OptionGroup[];
+  // NEW: upsell suggestions — menu item ids to recommend alongside this item
+  upsell_item_ids?: string[];
 };
 
 export type SelectedCustom = {

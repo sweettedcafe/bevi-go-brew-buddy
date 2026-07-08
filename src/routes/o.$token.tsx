@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Coffee, Plus, Minus, Star, Trash2, Package, BellRing } from "lucide-react";
 import { toast } from "sonner";
 import { CustomizeDialog, type VariantChoice } from "@/components/pos/CustomizeDialog";
+import { UpsellDialog, type UpsellChoice } from "@/components/pos/UpsellDialog";
 import {
   type MenuOptions, type SelectedCustom,
   hasAnyCustomization, customSignature, describeCustom,
@@ -55,6 +56,8 @@ function SelfOrderPage() {
   const [done, setDone] = useState<{ order_no: number; order_id: string; total: number } | null>(null);
   const [orderStatus, setOrderStatus] = useState<string | null>(null);
   const [alerting, setAlerting] = useState(false);
+  // Once the customer dismisses the alert for an order, don't re-alert
+  const dismissedRef = useRef<Set<string>>(new Set());
 
   async function loadMenu() {
     const { data: m } = await db.rpc("public_menu");
@@ -101,7 +104,9 @@ function SelfOrderPage() {
       const s = (data as any).status as string;
       const alerted = Boolean((data as any).alerted);
       setOrderStatus(s);
-      if (alerted || s === "completed") setAlerting(true);
+      if ((alerted || s === "completed") && !dismissedRef.current.has(done!.order_id)) {
+        setAlerting(true);
+      }
     }
     void check();
     const t = window.setInterval(check, 5000);
@@ -167,6 +172,20 @@ function SelfOrderPage() {
 
   function newId() { return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`; }
 
+  // Upsell suggestions after adding an item
+  const [upsell, setUpsell] = useState<{ trigger: string; suggestions: UpsellChoice[] } | null>(null);
+  function maybeOfferUpsell(it: Item, currentCart: CartLine[]) {
+    const ids = it.options?.upsell_item_ids ?? [];
+    if (!ids.length) return;
+    const suggestions: UpsellChoice[] = ids
+      .map((id) => items.find((x) => x.id === id))
+      .filter((x): x is Item => !!x)
+      .filter((x) => !currentCart.some((l) => l.menu_item_id === x.id))
+      .map((x) => ({ id: x.id, name: x.name, price: Number(x.price) }));
+    if (suggestions.length === 0) return;
+    setUpsell({ trigger: it.name, suggestions });
+  }
+
   function tap(it: Item) {
     const vs = itemVariants(it.id);
     const needsDialog = vs.length > 0 || hasAnyCustomization(it.options);
@@ -183,6 +202,7 @@ function SelfOrderPage() {
         customization: null, notes: null, variant_id: null,
       }];
     });
+    maybeOfferUpsell(it, cart);
   }
 
   function addBundle(b: Bundle) {
@@ -287,11 +307,19 @@ function SelfOrderPage() {
             </div>
           )}
           {alerting && (
-            <Button className="w-full" size="lg" variant="destructive" onClick={() => setAlerting(false)}>
+            <Button className="w-full" size="lg" variant="destructive"
+              onClick={() => {
+                if (done) dismissedRef.current.add(done.order_id);
+                setAlerting(false);
+              }}>
               <BellRing className="h-4 w-4 mr-2 animate-pulse" /> Stop alert
             </Button>
           )}
-          <Button className="w-full" variant={alerting ? "outline" : "default"} onClick={() => { setAlerting(false); setDone(null); }}>
+          <Button className="w-full" variant={alerting ? "outline" : "default"}
+            onClick={() => {
+              if (done) dismissedRef.current.add(done.order_id);
+              setAlerting(false); setDone(null);
+            }}>
             Order again
           </Button>
         </Card>
@@ -420,7 +448,42 @@ function SelfOrderPage() {
           options={customizing.options ?? {}}
           variants={customizingVariants}
           hideOther
-          onConfirm={(res) => { addCustom(customizing, res); setCustomizing(null); }}
+          onConfirm={(res) => {
+            const it = customizing;
+            addCustom(it, res);
+            setCustomizing(null);
+            maybeOfferUpsell(it, cart);
+          }}
+        />
+      )}
+
+      {upsell && (
+        <UpsellDialog
+          open
+          onOpenChange={(o) => !o && setUpsell(null)}
+          triggerName={upsell.trigger}
+          suggestions={upsell.suggestions}
+          onSkip={() => setUpsell(null)}
+          onAdd={(picked) => {
+            for (const p of picked) {
+              const it = items.find((x) => x.id === p.id);
+              if (!it) continue;
+              // Add plain (no customization) — matches simple tap flow
+              setCart((c) => {
+                const f = c.find((l) =>
+                  l.kind === "item" && l.menu_item_id === it.id
+                  && !l.customization && !l.notes && !l.variant_id);
+                if (f) return c.map((l) => l.lineId === f.lineId ? { ...l, qty: l.qty + 1 } : l);
+                return [...c, {
+                  lineId: newId(), kind: "item",
+                  menu_item_id: it.id, bundle_id: null, name: it.name,
+                  unit_price: Number(it.price), qty: 1, addon_total: 0,
+                  customization: null, notes: null, variant_id: null,
+                }];
+              });
+            }
+            setUpsell(null);
+          }}
         />
       )}
     </div>

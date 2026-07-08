@@ -22,6 +22,7 @@ import { randomQuote } from "@/lib/quotes";
 import { CustomizeDialog } from "@/components/pos/CustomizeDialog";
 import { CameraScannerDialog } from "@/components/pos/CameraScannerDialog";
 import { PrintPreviewDialog, type PrintPreviewDocument } from "@/components/print/PrintPreviewDialog";
+import { UpsellDialog, type UpsellChoice } from "@/components/pos/UpsellDialog";
 import {
   type MenuOptions, type SelectedCustom,
   hasAnyCustomization, addonTotal, customSignature, describeCustom,
@@ -245,6 +246,22 @@ function POSPage() {
     editingLineId?: string;
   } | null>(null);
 
+  // Upsell state — offer complementary items after adding a line
+  const [upsell, setUpsell] = useState<{ trigger: string; suggestions: UpsellChoice[] } | null>(null);
+
+  function maybeOfferUpsell(item: MenuItem) {
+    const ids = item.options?.upsell_item_ids ?? [];
+    if (!ids.length) return;
+    const suggestions: UpsellChoice[] = ids
+      .map((id) => items.find((x) => x.id === id))
+      .filter((x): x is MenuItem => !!x && x.is_active)
+      .filter((x) => !cart.some((l) => l.menu_item_id === x.id))
+      .map((x) => ({ id: x.id, name: x.name, price: Number(x.price) }));
+    if (suggestions.length === 0) return;
+    setUpsell({ trigger: item.name, suggestions });
+  }
+
+
   function newLineId() {
     return (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
   }
@@ -261,6 +278,7 @@ function POSPage() {
       return;
     }
     addPlainLine(it, null);
+    maybeOfferUpsell(it);
   }
 
   function addPlainLine(it: MenuItem, variant: Variant | null) {
@@ -346,8 +364,10 @@ function POSPage() {
     } finally {
       setScanBusy(false);
       setScanInput("");
-      // refocus for the next scan
-      requestAnimationFrame(() => scanRef.current?.focus());
+      // refocus only when user opted in
+      if (posSettings.scanAutoFocus) {
+        requestAnimationFrame(() => scanRef.current?.focus());
+      }
     }
   }
 
@@ -1271,8 +1291,10 @@ function POSPage() {
           }
           initial={customizing.initial}
           onConfirm={(res) => {
+            const it = customizing.item;
+            const wasEdit = !!customizing.editingLineId;
             addCustomizedLine({
-              item: customizing.item,
+              item: it,
               custom: res.custom,
               addon: res.addon,
               qty: res.qty,
@@ -1281,9 +1303,28 @@ function POSPage() {
               editingLineId: customizing.editingLineId,
             });
             setCustomizing(null);
+            if (!wasEdit) maybeOfferUpsell(it);
           }}
         />
       )}
+
+      {upsell && (
+        <UpsellDialog
+          open
+          onOpenChange={(o) => !o && setUpsell(null)}
+          triggerName={upsell.trigger}
+          suggestions={upsell.suggestions}
+          onSkip={() => setUpsell(null)}
+          onAdd={(picked) => {
+            for (const p of picked) {
+              const it = items.find((x) => x.id === p.id);
+              if (it) addPlainLine(it, null);
+            }
+            setUpsell(null);
+          }}
+        />
+      )}
+
 
     </div>
   );
