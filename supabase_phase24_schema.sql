@@ -112,3 +112,18 @@ end $$;
 grant execute on function public.dev_delete_expense(uuid) to authenticated;
 
 notify pgrst, 'reload schema';
+
+-- =====================================================================
+-- MANUAL STEP (one-time): create the storage bucket for receipt images.
+-- The migration tool cannot write to storage.buckets. Ask Lovable in
+-- chat to create a PUBLIC bucket named `expense-receipts`, or run in the
+-- Supabase dashboard: Storage → New bucket → name = expense-receipts,
+-- Public = ON.
+--
+-- Optional RLS policies on storage.objects (recommended):
+--   create policy "staff upload receipts" on storage.objects
+--     for insert to authenticated
+--     with check (bucket_id = 'expense-receipts' and public.is_staff(auth.uid()));
+--   create policy "anyone read receipts" on storage.objects
+--     for select using (bucket_id = 'expense-receipts');
+-- =====================================================================
