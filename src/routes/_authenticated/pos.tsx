@@ -476,9 +476,8 @@ function POSPage() {
     setTodayOpen(true);
   }
 
-  function notifyOrderReady(o: { order_no: number; customer_name: string | null }) {
-    // Audible + visual counter alert. No push infra required — the barista
-    // uses this to call the customer to the counter.
+  async function notifyOrderReady(o: { id: string; order_no: number; customer_name: string | null }) {
+    // Local counter chime + toast so the barista hears it too.
     try {
       const AC = (window as any).AudioContext ?? (window as any).webkitAudioContext;
       if (AC) {
@@ -495,6 +494,12 @@ function POSPage() {
       }
     } catch { /* ignore audio errors */ }
     const name = o.customer_name?.trim() || "Customer";
+    // Ping the customer's device page so it starts its own looping beep.
+    const { error } = await db.rpc("pos_notify_customer", { p_order_id: o.id });
+    if (error) {
+      toast.error(`Notify failed: ${error.message}`);
+      return;
+    }
     toast.success(
       `Order #${String(o.order_no).padStart(3, "0")} ready — ${name}, please proceed to the counter.`,
       { duration: 6000 },
