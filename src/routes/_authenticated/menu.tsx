@@ -905,3 +905,53 @@ function parseCsv(text: string): Record<string, string>[] {
     return o;
   });
 }
+
+// ---- Upsell picker (used in EditMenuDialog) ----
+function UpsellPicker({
+  allItems, selected, onChange,
+}: {
+  allItems: Item[];
+  selected: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  const [q, setQ] = useState("");
+  const set = new Set(selected);
+  const filtered = allItems
+    .filter((it) => !q.trim() || it.name.toLowerCase().includes(q.trim().toLowerCase()))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const picked = allItems.filter((i) => set.has(i.id));
+
+  function toggle(id: string) {
+    if (set.has(id)) onChange(selected.filter((x) => x !== id));
+    else onChange([...selected, id]);
+  }
+
+  return (
+    <div className="space-y-2">
+      {picked.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {picked.map((p) => (
+            <Badge key={p.id} className="cursor-pointer" onClick={() => toggle(p.id)}>
+              {p.name} <span className="ml-1 opacity-70">×</span>
+            </Badge>
+          ))}
+        </div>
+      )}
+      <Input placeholder="Search items to add…" value={q} onChange={(e) => setQ(e.target.value)} />
+      <div className="max-h-40 overflow-y-auto border rounded divide-y">
+        {filtered.length === 0 ? (
+          <div className="text-xs text-muted-foreground p-2">No items.</div>
+        ) : filtered.slice(0, 30).map((it) => {
+          const on = set.has(it.id);
+          return (
+            <button key={it.id} type="button" onClick={() => toggle(it.id)}
+              className={`w-full flex items-center justify-between px-2 py-1.5 text-sm text-left ${on ? "bg-primary/10" : "hover:bg-accent"}`}>
+              <span>{it.name}</span>
+              <span className="text-xs text-muted-foreground">{on ? "Added" : "+ Add"}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
