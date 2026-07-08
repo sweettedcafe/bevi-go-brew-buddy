@@ -237,6 +237,11 @@ export function PrintPreviewDialog({
           >
             <Wifi className="h-4 w-4 mr-2" /> WiFi printer
           </Button>
+          {active.id === "receipt" && documents.some((d) => d.id === "labels") && (
+            <Button variant="secondary" onClick={() => setActiveId("labels")}>
+              Go to Labels →
+            </Button>
+          )}
           <Button variant="ghost" className="ml-auto" onClick={() => onOpenChange(false)}>
             Close
           </Button>
@@ -247,16 +252,16 @@ export function PrintPreviewDialog({
 }
 
 function wrapPrintHtml(html: string, title: string, paper: PaperSize) {
-  // Center the content within whatever @page size the browser uses,
-  // and override the template's @page rule so the chosen paper wins.
+  // Override the template's @page rule so the chosen paper wins, and center
+  // the receipt block on wider sheets. We DO NOT set display:flex on body —
+  // that turns receipt rows into flex items and breaks the layout.
   const pageRule =
     paper.kind === "roll"
       ? `@page { size: ${paper.widthMm}mm auto; margin: 3mm; }`
       : `@page { size: ${paper.widthMm}mm ${paper.heightMm}mm; margin: 4mm; }`;
   const centerCss = `
-    html, body { margin: 0; padding: 0; }
-    body { display: flex; justify-content: center; }
-    body > * { max-width: 100%; }
+    html, body { margin: 0; padding: 0; background: #fff; color: #000; }
+    body > * { margin-left: auto !important; margin-right: auto !important; }
   `;
   return `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>${pageRule}${centerCss}</style></head><body>${html}</body></html>`;
 }

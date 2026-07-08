@@ -467,7 +467,7 @@ function POSPage() {
       .select("id, order_no, customer_name, created_at, total, order_type, status")
       .gte("created_at", start.toISOString())
       .lt("created_at", end.toISOString())
-      .in("status", ["completed", "ready"])
+      .eq("status", "completed")
       .order("created_at", { ascending: false });
     if (error) { toast.error(error.message); return; }
     setTodayOrders((data ?? []) as any);
