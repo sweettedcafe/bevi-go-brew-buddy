@@ -285,6 +285,7 @@ function MenuPage() {
 
 function EditMenuDialog({
   item, cats, owners, invs, initialRecipes, initialVariants, allVariantRecipes,
+  allItems,
   onClose, onSaved, onOwnersChanged,
 }: {
   item: Item;
@@ -294,6 +295,7 @@ function EditMenuDialog({
   initialRecipes: Recipe[];
   initialVariants: Variant[];
   allVariantRecipes: VariantRecipe[];
+  allItems: Item[];
   onClose: () => void;
   onSaved: () => void;
   onOwnersChanged: () => void;
