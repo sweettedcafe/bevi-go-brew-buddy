@@ -40,6 +40,12 @@ function RegisterPage() {
     });
     if (error) { setBusy(false); toast.error(error.message); return; }
     const r = data as any;
+    if (r?.existed) {
+      setBusy(false);
+      const field = r.matched_by === "email" ? "Email address" : r.matched_by === "phone" ? "Mobile number" : "Email or mobile number";
+      toast.error(`${field} is already used.`);
+      return;
+    }
     setResult(r);
 
     // Fire welcome email (non-blocking UX; show status)

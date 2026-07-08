@@ -7,14 +7,25 @@
 -- =====================================================================
 
 -- Optional but recommended: prevent new duplicate active phone/email values.
--- If this fails, remove/merge old duplicate customer rows first, then rerun.
-create unique index if not exists customers_email_unique_active_idx
-  on public.customers (lower(trim(email)))
-  where email is not null and trim(email) <> '' and deleted_at is null;
+-- If old duplicate rows exist, keep going; the registration RPC below still
+-- blocks new duplicate registrations and tells the customer what is reused.
+do $$ begin
+  begin
+    create unique index if not exists customers_email_unique_active_idx
+      on public.customers (lower(trim(email)))
+      where email is not null and trim(email) <> '' and deleted_at is null;
+  exception when unique_violation then
+    raise notice 'Skipping customers_email_unique_active_idx because existing duplicate emails need cleanup first.';
+  end;
 
-create unique index if not exists customers_phone_unique_active_idx
-  on public.customers ((regexp_replace(phone, '\D', '', 'g')))
-  where phone is not null and regexp_replace(phone, '\D', '', 'g') <> '' and deleted_at is null;
+  begin
+    create unique index if not exists customers_phone_unique_active_idx
+      on public.customers ((regexp_replace(phone, '\D', '', 'g')))
+      where phone is not null and regexp_replace(phone, '\D', '', 'g') <> '' and deleted_at is null;
+  exception when unique_violation then
+    raise notice 'Skipping customers_phone_unique_active_idx because existing duplicate phone numbers need cleanup first.';
+  end;
+end $$;
 
 create or replace function public._normalize_customer_token(p_token text)
 returns text language plpgsql immutable as $$
