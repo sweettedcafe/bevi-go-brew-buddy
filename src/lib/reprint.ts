@@ -1,10 +1,10 @@
 // Reusable reprint helpers — receipt + drink labels — used by /history and /pos
 import { supabase } from "@/integrations/supabase/client";
 import { loadPrintSettings } from "./print-settings";
-import { printHTML } from "./print";
 import { savePdfFromHTML } from "./print-pdf";
 import { receiptHTML, labelsHTML, type ReceiptData, type DrinkLabel } from "./print-templates";
 import { randomQuote } from "./quotes";
+import type { PrintPreviewDocument } from "@/components/print/PrintPreviewDialog";
 
 const db = supabase as any;
 
@@ -22,6 +22,22 @@ export type AnyOrder = {
 };
 
 export async function reprintReceiptById(orderId: string, fallbackCashier = "—") {
+  return buildReceiptPreviewById(orderId, fallbackCashier);
+}
+
+export async function buildReceiptPreviewById(orderId: string, fallbackCashier = "—"): Promise<PrintPreviewDocument> {
+  const res = await buildReceiptHtml(orderId, fallbackCashier);
+  return {
+    id: "receipt",
+    label: "Receipt",
+    title: `Receipt #${res.orderNo}`,
+    html: res.html,
+    filename: `receipt-${String(res.orderNo).padStart(3, "0")}.pdf`,
+    widthMm: 80,
+  };
+}
+
+async function loadReceiptData(orderId: string, fallbackCashier: string) {
   const [{ data: ord }, { data: items }, { data: payments }, pms] = await Promise.all([
     db.from("orders").select("*").eq("id", orderId).maybeSingle(),
     db.from("order_items").select("*").eq("order_id", orderId),
@@ -53,9 +69,7 @@ export async function reprintReceiptById(orderId: string, fallbackCashier = "—
     })),
     change: (payments ?? []).reduce((s: number, p: any) => s + Number(p.change_due ?? 0), 0),
   };
-  const html = receiptHTML(data, loadPrintSettings());
-  printHTML(html, `Receipt #${ord.order_no}`);
-  return { html, orderNo: ord.order_no };
+  return { data, orderNo: ord.order_no as number };
 }
 
 export async function saveReceiptPdfById(orderId: string, fallbackCashier = "—") {
@@ -64,41 +78,11 @@ export async function saveReceiptPdfById(orderId: string, fallbackCashier = "—
 }
 
 async function buildReceiptHtml(orderId: string, fallbackCashier: string) {
-  const [{ data: ord }, { data: items }, { data: payments }, pms] = await Promise.all([
-    db.from("orders").select("*").eq("id", orderId).maybeSingle(),
-    db.from("order_items").select("*").eq("order_id", orderId),
-    db.from("order_payments").select("*").eq("order_id", orderId).order("created_at"),
-    db.from("payment_methods").select("code,label"),
-  ]);
-  if (!ord) throw new Error("Order not found");
-  const labelMap = new Map<string, string>(
-    ((pms.data ?? []) as { code: string; label: string }[]).map((p) => [p.code, p.label]),
-  );
-  const data: ReceiptData = {
-    orderNo: ord.order_no,
-    businessDate: ord.business_date,
-    createdAt: ord.created_at,
-    cashier: fallbackCashier,
-    orderType: ord.order_type,
-    customerName: ord.customer_name,
-    lines: (items ?? []).map((l: any) => ({
-      name: l.name_snapshot, qty: l.qty,
-      unit_price: Number(l.unit_price), line_total: Number(l.line_total),
-    })),
-    subtotal: Number(ord.subtotal),
-    discountLabel: ord.discount_label,
-    discountAmount: Number(ord.discount_total),
-    total: Number(ord.total),
-    payments: (payments ?? []).map((p: any) => ({
-      label: labelMap.get(p.method_code) ?? p.method_code ?? p.method ?? "Payment",
-      amount: Number(p.amount),
-    })),
-    change: (payments ?? []).reduce((s: number, p: any) => s + Number(p.change_due ?? 0), 0),
-  };
-  return { html: receiptHTML(data, loadPrintSettings()), orderNo: ord.order_no as number };
+  const { data, orderNo } = await loadReceiptData(orderId, fallbackCashier);
+  return { html: receiptHTML(data, loadPrintSettings()), orderNo };
 }
 
-export async function reprintLabelsById(orderId: string) {
+export async function reprintLabelsById(orderId: string): Promise<PrintPreviewDocument | false> {
   const { data: ord } = await db.from("orders").select("order_no, customer_name, created_at").eq("id", orderId).maybeSingle();
   if (!ord) throw new Error("Order not found");
   const { data: items } = await db
@@ -123,6 +107,13 @@ export async function reprintLabelsById(orderId: string) {
     }
   }
   if (labels.length === 0) return false;
-  printHTML(labelsHTML(labels, loadPrintSettings()), `Labels #${ord.order_no}`);
-  return true;
+  const orderNo = ord.order_no as number;
+  return {
+    id: "labels",
+    label: "Labels",
+    title: `Labels #${orderNo}`,
+    html: labelsHTML(labels, loadPrintSettings()),
+    filename: `labels-${String(orderNo).padStart(3, "0")}.pdf`,
+    widthMm: 58,
+  };
 }
