@@ -1192,7 +1192,10 @@ function POSPage() {
                     </div>
                   </div>
                   <div className="font-medium">{fmt(Number(o.total))}</div>
-                  <div className="flex gap-1">
+                  <div className="flex flex-wrap gap-1">
+                    <Button size="sm" onClick={() => notifyOrderReady(o)}>
+                      <Bell className="h-3 w-3 mr-1" /> Notify ready
+                    </Button>
                     <Button size="sm" variant="outline" onClick={async () => {
                       try {
                         setPrintDocs([await buildReceiptPreviewById(o.id, user?.email ?? "—")]);
