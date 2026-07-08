@@ -141,7 +141,7 @@ function SelfOrderPage() {
         };
         beep();
         aTimer = window.setInterval(beep, 1200);
-        audioRef.current = { ctx, timer: aTimer };
+        audioRef.current = { ctx: ctx as AudioContext, timer: aTimer };
       }
     } catch { /* ignore */ }
 
