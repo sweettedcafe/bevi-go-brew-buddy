@@ -54,6 +54,9 @@ function EndOfShiftPage() {
   const [qty, setQty] = useState("1");
   const [unitPrice, setUnitPrice] = useState("");
   const [category, setCategory] = useState("");
+  const [invoiceNo, setInvoiceNo] = useState("");
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [uploadingReceipt, setUploadingReceipt] = useState(false);
 
   const refresh = async () => {
     setLoading(true);
@@ -68,18 +71,47 @@ function EndOfShiftPage() {
   };
   useEffect(() => { void refresh(); }, []);
 
+  async function uploadReceipt(file: File): Promise<string | null> {
+    setUploadingReceipt(true);
+    try {
+      const ext = file.name.split(".").pop() || "jpg";
+      const path = `receipts/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const { error: upErr } = await (supabase.storage.from("expense-receipts") as any).upload(path, file, {
+        upsert: false, contentType: file.type || undefined,
+      });
+      if (upErr) throw upErr;
+      const { data: pub } = (supabase.storage.from("expense-receipts") as any).getPublicUrl(path);
+      return pub?.publicUrl ?? null;
+    } catch (e: any) {
+      toast.error(`Upload failed: ${e?.message ?? e}. You can still save the expense without the image.`);
+      return null;
+    } finally {
+      setUploadingReceipt(false);
+    }
+  }
+
   const addExpense = async () => {
     const q = Number(qty);
     const up = Number(unitPrice);
     if (!desc.trim()) { toast.error("Description required"); return; }
     if (!Number.isFinite(q) || q <= 0) { toast.error("Quantity must be > 0"); return; }
     if (!Number.isFinite(up) || up < 0) { toast.error("Unit price must be ≥ 0"); return; }
-    const { error } = await (supabase as any).rpc("tc_add_expense_v2", {
-      p_description: desc.trim(), p_quantity: q, p_unit_price: up, p_category: category.trim() || null,
+    let receiptUrl: string | null = null;
+    if (receiptFile) {
+      receiptUrl = await uploadReceipt(receiptFile);
+    }
+    const { error } = await (supabase as any).rpc("tc_add_expense_v3", {
+      p_description: desc.trim(),
+      p_quantity: q,
+      p_unit_price: up,
+      p_category: category.trim() || null,
+      p_invoice_number: invoiceNo.trim() || null,
+      p_receipt_url: receiptUrl,
     });
     if (error) { toast.error(error.message); return; }
     toast.success("Expense saved");
     setDesc(""); setQty("1"); setUnitPrice(""); setCategory("");
+    setInvoiceNo(""); setReceiptFile(null);
     await refresh();
   };
   const deleteExpense = async (id: string) => {
