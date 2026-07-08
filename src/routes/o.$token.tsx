@@ -99,8 +99,9 @@ function SelfOrderPage() {
       });
       if (cancelled || !data) return;
       const s = (data as any).status as string;
+      const alerted = Boolean((data as any).alerted);
       setOrderStatus(s);
-      if (s === "completed") setAlerting(true);
+      if (alerted || s === "completed") setAlerting(true);
     }
     void check();
     const t = window.setInterval(check, 5000);
