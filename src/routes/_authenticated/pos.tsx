@@ -522,6 +522,7 @@ function POSPage() {
     }));
     setCustomerName(r.customer_name ?? "");
     setOrderType((r.order_type as OrderType) ?? "takeout");
+    setResumedOrderId((r.order_id as string) ?? id);
     setHoldOpen(false);
     toast.success("Order resumed");
   }
