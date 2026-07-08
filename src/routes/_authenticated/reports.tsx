@@ -270,13 +270,13 @@ function ReportsPage() {
 
   function exportCurrent() {
     if (tab === "order") {
-      const rows = orders.map((o) => Object.fromEntries(PER_ORDER_COLS.map((c) => [c.key, fmt(o[c.key], c.key)])));
+      const rows = orders.map((o) => Object.fromEntries(PER_ORDER_COLS.map((c) => [c.key, fmt(o[c.key], c.key, o)])));
       downloadCsv(`per-order-${todayIso()}.csv`, toCsv(rows, PER_ORDER_COLS.map((c) => c.label)));
     } else if (tab === "item") {
       const rows = itemRows.map((r) => Object.fromEntries(PER_ITEM_COLS.map((c) => [c.label, (r as any)[c.key]])));
       downloadCsv(`per-item-${todayIso()}.csv`, toCsv(rows, PER_ITEM_COLS.map((c) => c.label)));
     } else {
-      const rows = discountRows.map((o) => Object.fromEntries(DISCOUNT_COLS.map((c) => [c.label, fmt(o[c.key], c.key)])));
+      const rows = discountRows.map((o) => Object.fromEntries(DISCOUNT_COLS.map((c) => [c.label, fmt(o[c.key], c.key, o)])));
       downloadCsv(`discounts-${todayIso()}.csv`, toCsv(rows, DISCOUNT_COLS.map((c) => c.label)));
     }
   }
@@ -289,7 +289,7 @@ function ReportsPage() {
       const perOrder = {
         title: "Per order",
         headers: PER_ORDER_COLS.map((c) => c.label),
-        rows: orders.map((o) => PER_ORDER_COLS.map((c) => String(fmt(o[c.key], c.key)))),
+        rows: orders.map((o) => PER_ORDER_COLS.map((c) => String(fmt(o[c.key], c.key, o)))),
       };
       const perItem = {
         title: "Per item",
@@ -305,7 +305,7 @@ function ReportsPage() {
       const discounts = {
         title: "Discounts",
         headers: DISCOUNT_COLS.map((c) => c.label),
-        rows: discountRows.map((o) => DISCOUNT_COLS.map((c) => String(fmt(o[c.key], c.key)))),
+        rows: discountRows.map((o) => DISCOUNT_COLS.map((c) => String(fmt(o[c.key], c.key, o)))),
       };
       const res = await exportSheets({
         data: {
@@ -412,7 +412,7 @@ function ReportsPage() {
                 const n = Number(row[key]);
                 return <span className={n < 0 ? "text-destructive" : ""}>{`₱${n.toFixed(2)}`}</span>;
               }
-              return fmt(row[key], key);
+              return fmt(row[key], key, row);
             }}
             actions={(row) => {
               const isSale = (row.txn_kind ?? "sale") === "sale";
@@ -483,7 +483,7 @@ function ReportsPage() {
             rows={discountRows}
             render={(row, key) => {
               if (key === "discount_label") return row.discount_label ?? <Tag className="h-3 w-3 inline" />;
-              return fmt(row[key], key);
+              return fmt(row[key], key, row);
             }}
             empty="No discounted orders in this range."
           />
