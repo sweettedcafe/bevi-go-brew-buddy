@@ -323,10 +323,12 @@ function POSPage() {
   const changeQty = (lineId: string, d: number) =>
     setCart((c) => c.map((l) => l.lineId === lineId ? { ...l, qty: l.qty + d } : l).filter((l) => l.qty > 0));
   const removeLine = (lineId: string) => setCart((c) => c.filter((l) => l.lineId !== lineId));
+  const [resumedOrderId, setResumedOrderId] = useState<string | null>(null);
   function clearAll() {
     setCart([]); setCustomerName("");
     setPromoCode(""); setAppliedPromo(null); setManual(null);
     setCustomer(null); setRedeem(""); setScanInput("");
+    setResumedOrderId(null);
   }
 
   async function lookupCustomerByCode(raw: string) {
@@ -474,9 +476,8 @@ function POSPage() {
     setTodayOpen(true);
   }
 
-  function notifyOrderReady(o: { order_no: number; customer_name: string | null }) {
-    // Audible + visual counter alert. No push infra required — the barista
-    // uses this to call the customer to the counter.
+  async function notifyOrderReady(o: { id: string; order_no: number; customer_name: string | null }) {
+    // Local counter chime + toast so the barista hears it too.
     try {
       const AC = (window as any).AudioContext ?? (window as any).webkitAudioContext;
       if (AC) {
@@ -493,6 +494,12 @@ function POSPage() {
       }
     } catch { /* ignore audio errors */ }
     const name = o.customer_name?.trim() || "Customer";
+    // Ping the customer's device page so it starts its own looping beep.
+    const { error } = await db.rpc("pos_notify_customer", { p_order_id: o.id });
+    if (error) {
+      toast.error(`Notify failed: ${error.message}`);
+      return;
+    }
     toast.success(
       `Order #${String(o.order_no).padStart(3, "0")} ready — ${name}, please proceed to the counter.`,
       { duration: 6000 },
@@ -520,6 +527,7 @@ function POSPage() {
     }));
     setCustomerName(r.customer_name ?? "");
     setOrderType((r.order_type as OrderType) ?? "takeout");
+    setResumedOrderId((r.order_id as string) ?? id);
     setHoldOpen(false);
     toast.success("Order resumed");
   }
@@ -1106,6 +1114,7 @@ function POSPage() {
             customer_name: customerName || null,
             redeem_points: redeemPts,
             notes: null,
+            existing_order_id: resumedOrderId,
             items: cart.map((l) => ({
               menu_item_id: l.menu_item_id, variant_id: l.variant_id,
               name: l.name, qty: l.qty,
