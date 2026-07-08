@@ -68,15 +68,30 @@ function ExpensesReportPage() {
         .gte("created_at", startIso).lte("created_at", endIso)
         .order("created_at", { ascending: false });
       if (fb.error) toast.error(fb.error.message);
-      setRows(((fb.data ?? []) as any[]).map((r) => ({
+      setRowsAll(((fb.data ?? []) as any[]).map((r) => ({
         ...r, cashier_user_id: null, cashier_email: null,
       })) as Row[]);
     } else {
-      setRows((data ?? []) as Row[]);
+      setRowsAll((data ?? []) as Row[]);
     }
     setLoading(false);
   }
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, []);
+
+  const rows = useMemo(() => {
+    const c = cashierQuery.trim().toLowerCase();
+    const inv = invoiceQuery.trim().toLowerCase();
+    return rowsAll.filter((r) => {
+      if (c && !(r.cashier_email ?? "").toLowerCase().includes(c)) return false;
+      if (inv && !(r.invoice_number ?? "").toLowerCase().includes(inv)) return false;
+      return true;
+    });
+  }, [rowsAll, cashierQuery, invoiceQuery]);
+  const cashierOptions = useMemo(() => {
+    const s = new Set<string>();
+    rowsAll.forEach((r) => r.cashier_email && s.add(r.cashier_email));
+    return [...s].sort();
+  }, [rowsAll]);
 
   const total = useMemo(() => rows.reduce((s, r) => s + Number(r.amount || 0), 0), [rows]);
   const byCategory = useMemo(() => {
