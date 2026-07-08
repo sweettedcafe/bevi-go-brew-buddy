@@ -9,10 +9,10 @@ import { Printer, Save, TestTube, Bluetooth, Wifi } from "lucide-react";
 import { toast } from "sonner";
 import { loadPrintSettings, savePrintSettings, type PrintSettings } from "@/lib/print-settings";
 import { loadPosSettings, savePosSettings, type PosSettings } from "@/lib/pos-settings";
-import { printHTML } from "@/lib/print";
 import { receiptHTML, labelsHTML } from "@/lib/print-templates";
 import { findBluetoothPrinter, isBluetoothSupported } from "@/lib/bt-printer";
 import { ScanLine } from "lucide-react";
+import { PrintPreviewDialog, type PrintPreviewDocument } from "@/components/print/PrintPreviewDialog";
 
 export const Route = createFileRoute("/_authenticated/print-settings")({
   component: PrintSettingsPage,
@@ -21,6 +21,8 @@ export const Route = createFileRoute("/_authenticated/print-settings")({
 function PrintSettingsPage() {
   const [s, setS] = useState<PrintSettings>(() => loadPrintSettings());
   const [pos, setPos] = useState<PosSettings>(() => loadPosSettings());
+  const [printOpen, setPrintOpen] = useState(false);
+  const [printDocs, setPrintDocs] = useState<PrintPreviewDocument[]>([]);
 
   function save() {
     savePrintSettings(s);
@@ -34,7 +36,13 @@ function PrintSettingsPage() {
     setPos((p) => ({ ...p, [k]: v }));
   }
   function testReceipt() {
-    printHTML(receiptHTML({
+    setPrintDocs([{
+      id: "receipt",
+      label: "Receipt",
+      title: "Test Receipt",
+      filename: "test-receipt.pdf",
+      widthMm: 80,
+      html: receiptHTML({
       orderNo: 1, businessDate: "today", createdAt: new Date().toISOString(),
       cashier: "test@bevi.go", orderType: "takeout", customerName: "Test Customer",
       lines: [
@@ -43,14 +51,24 @@ function PrintSettingsPage() {
       ],
       subtotal: 40, discountLabel: null, discountAmount: 0, total: 40,
       payments: [{ label: "Cash", amount: 50 }], change: 10,
-    }, s), "Test Receipt");
+      }, s),
+    }]);
+    setPrintOpen(true);
   }
   function testLabel() {
-    printHTML(labelsHTML([{
-      orderNo: 1, drinkName: "Latte", cupIndex: 1, cupTotal: 2,
-      customerName: "Test Customer", notes: "extra hot",
-      createdAt: new Date().toISOString(),
-    }], s), "Test Label");
+    setPrintDocs([{
+      id: "labels",
+      label: "Labels",
+      title: "Test Label",
+      filename: "test-label.pdf",
+      widthMm: 58,
+      html: labelsHTML([{
+        orderNo: 1, drinkName: "Latte", cupIndex: 1, cupTotal: 2,
+        customerName: "Test Customer", notes: "extra hot",
+        createdAt: new Date().toISOString(),
+      }], s),
+    }]);
+    setPrintOpen(true);
   }
 
   return (
@@ -184,6 +202,12 @@ function PrintSettingsPage() {
           <Button onClick={save}><Save className="h-3 w-3 mr-1" /> Save</Button>
         </div>
       </Card>
+
+      <PrintPreviewDialog
+        open={printOpen}
+        onOpenChange={setPrintOpen}
+        documents={printDocs}
+      />
     </div>
   );
 }
