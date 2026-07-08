@@ -184,7 +184,7 @@ function ExpensesReportPage() {
         </div>
       </header>
 
-      <Card className="p-4 grid sm:grid-cols-[auto,auto,auto,1fr] gap-3 items-end">
+      <Card className="p-4 grid gap-3 items-end sm:grid-cols-2 lg:grid-cols-[auto,auto,1fr,1fr,auto,auto]">
         <div>
           <Label className="text-xs">From</Label>
           <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
@@ -192,6 +192,22 @@ function ExpensesReportPage() {
         <div>
           <Label className="text-xs">To</Label>
           <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+        </div>
+        <div>
+          <Label className="text-xs">Cashier (name/email)</Label>
+          <Input
+            list="expense-cashiers"
+            placeholder="Filter by cashier"
+            value={cashierQuery}
+            onChange={(e) => setCashierQuery(e.target.value)}
+          />
+          <datalist id="expense-cashiers">
+            {cashierOptions.map((c) => <option key={c} value={c} />)}
+          </datalist>
+        </div>
+        <div>
+          <Label className="text-xs">Invoice #</Label>
+          <Input placeholder="Filter by invoice #" value={invoiceQuery} onChange={(e) => setInvoiceQuery(e.target.value)} />
         </div>
         <Button size="sm" onClick={() => void load()} disabled={loading}>
           {loading ? "Loading…" : "Apply"}
