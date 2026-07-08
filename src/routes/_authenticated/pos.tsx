@@ -246,6 +246,22 @@ function POSPage() {
     editingLineId?: string;
   } | null>(null);
 
+  // Upsell state — offer complementary items after adding a line
+  const [upsell, setUpsell] = useState<{ trigger: string; suggestions: UpsellChoice[] } | null>(null);
+
+  function maybeOfferUpsell(item: MenuItem) {
+    const ids = item.options?.upsell_item_ids ?? [];
+    if (!ids.length) return;
+    const suggestions: UpsellChoice[] = ids
+      .map((id) => items.find((x) => x.id === id))
+      .filter((x): x is MenuItem => !!x && x.is_active)
+      .filter((x) => !cart.some((l) => l.menu_item_id === x.id))
+      .map((x) => ({ id: x.id, name: x.name, price: Number(x.price) }));
+    if (suggestions.length === 0) return;
+    setUpsell({ trigger: item.name, suggestions });
+  }
+
+
   function newLineId() {
     return (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
   }
