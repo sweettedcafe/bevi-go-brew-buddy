@@ -366,8 +366,6 @@ function EndOfShiftPage() {
                       <TableCell className="text-right font-semibold">{peso(report.total_expenses)}</TableCell>
                       <TableCell colSpan={2} />
                     </TableRow>
-                      <TableCell />
-                    </TableRow>
                   </TableBody>
                 </Table>
               )}
