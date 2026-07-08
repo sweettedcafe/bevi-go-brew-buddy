@@ -291,11 +291,19 @@ function SelfOrderPage() {
             </div>
           )}
           {alerting && (
-            <Button className="w-full" size="lg" variant="destructive" onClick={() => setAlerting(false)}>
+            <Button className="w-full" size="lg" variant="destructive"
+              onClick={() => {
+                if (done) dismissedRef.current.add(done.order_id);
+                setAlerting(false);
+              }}>
               <BellRing className="h-4 w-4 mr-2 animate-pulse" /> Stop alert
             </Button>
           )}
-          <Button className="w-full" variant={alerting ? "outline" : "default"} onClick={() => { setAlerting(false); setDone(null); }}>
+          <Button className="w-full" variant={alerting ? "outline" : "default"}
+            onClick={() => {
+              if (done) dismissedRef.current.add(done.order_id);
+              setAlerting(false); setDone(null);
+            }}>
             Order again
           </Button>
         </Card>
