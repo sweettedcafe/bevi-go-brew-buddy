@@ -528,7 +528,7 @@ function EditMenuDialog({
             {vEdits.map((v, i) => (
               <Card key={i} className="p-3 space-y-2">
                 <div className="grid grid-cols-[1fr,90px,auto,auto] gap-2 items-center">
-                  <Input placeholder="Size name (12oz)" value={v.name}
+                  <Input placeholder="Variant name (e.g. 12oz, Red, 6-pack)" value={v.name}
                     onChange={(e) => updateVariant(i, { name: e.target.value })} />
                   <Input type="number" step="0.01" placeholder="Price" value={v.price}
                     onChange={(e) => updateVariant(i, { price: e.target.value })} />
