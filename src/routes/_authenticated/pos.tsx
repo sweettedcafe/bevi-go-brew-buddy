@@ -85,7 +85,7 @@ const fmt = (n: number) => n.toFixed(2);
 
 function POSPage() {
   const { user, primaryRole, roleError } = useAuth();
-  const isAdmin = primaryRole === "admin" || primaryRole === "developer";
+  void primaryRole;
   const [cats, setCats] = useState<Category[]>([]);
   const [items, setItems] = useState<MenuItem[]>([]);
   const [variants, setVariants] = useState<Variant[]>([]);
