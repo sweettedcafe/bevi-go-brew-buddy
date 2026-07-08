@@ -502,7 +502,15 @@ function ReportsPage() {
   );
 }
 
-function fmt(v: any, key: string) {
+function fmt(v: any, key: string, row?: any) {
+  if (key === "date_only") {
+    const iso = row?.created_at;
+    return iso ? new Date(iso).toLocaleDateString() : "—";
+  }
+  if (key === "time_only") {
+    const iso = row?.created_at;
+    return iso ? new Date(iso).toLocaleTimeString() : "—";
+  }
   if (v == null) return "—";
   if (key === "created_at") return new Date(v).toLocaleString();
   if (key === "subtotal" || key === "discount_total" || key === "total" || key === "fee_amount")
