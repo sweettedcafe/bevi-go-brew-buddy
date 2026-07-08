@@ -507,7 +507,7 @@ function EditMenuDialog({
           </div>
           <div className="col-span-2 flex items-center gap-2 mt-1">
             <Switch checked={f.has_variants} onCheckedChange={(v) => setF({ ...f, has_variants: v })} />
-            <span className="text-sm">Has size variants (12oz, 16oz, etc.)</span>
+            <span className="text-sm">Has custom variants (sizes, colors, packs, flavors…)</span>
           </div>
         </div>
 
