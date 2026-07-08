@@ -19,53 +19,51 @@ export const Route = createFileRoute("/api/public/send-welcome-email")({
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
           return json({ error: "invalid_email" }, 400);
         }
-        // Only same-origin ordering URLs
         if (!/^https?:\/\//.test(orderUrl) || !orderUrl.includes("/o/")) {
           return json({ error: "invalid_url" }, 400);
         }
 
-        const apiKey = process.env.RESEND_API_KEY;
-        if (!apiKey) {
-          console.warn("[welcome-email] RESEND_API_KEY not configured — skipping send");
+        const lovableKey = process.env.LOVABLE_API_KEY;
+        const gmailKey = process.env.GOOGLE_MAIL_API_KEY;
+        if (!lovableKey || !gmailKey) {
+          console.warn("[welcome-email] Gmail connector not configured — skipping send");
           return json({ ok: false, reason: "email_not_configured" }, 200);
         }
-        const from = process.env.RESEND_FROM_EMAIL || "Bevi & Go <onboarding@resend.dev>";
 
-        // QR code image via public API — embedded in the email
         const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(orderUrl)}`;
-
         const html = renderWelcomeHtml({ name, code, orderUrl, qrUrl });
-        const text = [
-          `Hi ${name},`,
-          ``,
-          `Welcome to Bevi & Go Rewards! 🎉`,
-          ``,
-          `Your loyalty code: ${code}`,
-          `Order any time from this link (also embedded as a QR in this email):`,
-          orderUrl,
-          ``,
-          `See you at the counter,`,
-          `— The Bevi & Go team`,
-        ].join("\n");
+        const subject = "Welcome to Bevi & Go — your loyalty QR is inside \u2615";
+
+        // Build RFC 2822 MIME message. Subject is encoded (RFC 2047) to allow non-ASCII.
+        const encodedSubject = `=?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`;
+        const mime = [
+          `To: ${email}`,
+          `Subject: ${encodedSubject}`,
+          "MIME-Version: 1.0",
+          'Content-Type: text/html; charset="UTF-8"',
+          "Content-Transfer-Encoding: base64",
+          "",
+          chunk(btoa(unescape(encodeURIComponent(html))), 76),
+        ].join("\r\n");
+
+        const raw = base64url(mime);
 
         try {
-          const res = await fetch("https://api.resend.com/emails", {
-            method: "POST",
-            headers: {
-              "Authorization": `Bearer ${apiKey}`,
-              "Content-Type": "application/json",
+          const res = await fetch(
+            "https://connector-gateway.lovable.dev/google_mail/gmail/v1/users/me/messages/send",
+            {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${lovableKey}`,
+                "X-Connection-Api-Key": gmailKey,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ raw }),
             },
-            body: JSON.stringify({
-              from,
-              to: [email],
-              subject: "Welcome to Bevi & Go — your loyalty QR is inside ☕",
-              html,
-              text,
-            }),
-          });
+          );
           if (!res.ok) {
             const errBody = await res.text();
-            console.error(`[welcome-email] Resend failed [${res.status}]: ${errBody}`);
+            console.error(`[welcome-email] Gmail send failed [${res.status}]: ${errBody}`);
             return json({ ok: false, error: "provider_error", status: res.status }, 200);
           }
           return json({ ok: true }, 200);
@@ -85,6 +83,19 @@ function json(data: unknown, status: number) {
   });
 }
 
+function base64url(s: string) {
+  return btoa(unescape(encodeURIComponent(s)))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+
+function chunk(s: string, size: number) {
+  const out: string[] = [];
+  for (let i = 0; i < s.length; i += size) out.push(s.slice(i, i + size));
+  return out.join("\r\n");
+}
+
 function renderWelcomeHtml(o: { name: string; code: string; orderUrl: string; qrUrl: string }) {
   const safeName = escapeHtml(o.name);
   const safeCode = escapeHtml(o.code);
@@ -95,9 +106,9 @@ function renderWelcomeHtml(o: { name: string; code: string; orderUrl: string; qr
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff;padding:24px 0;">
     <tr><td align="center">
       <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#fff;border:1px solid #eee;border-radius:12px;padding:32px;">
-        <tr><td align="center" style="font-size:28px;font-weight:700;letter-spacing:-0.5px;color:#6b3f1d;">☕ Bevi &amp; Go</td></tr>
+        <tr><td align="center" style="font-size:28px;font-weight:700;letter-spacing:-0.5px;color:#6b3f1d;">&#9749; Bevi &amp; Go</td></tr>
         <tr><td style="height:8px;"></td></tr>
-        <tr><td style="font-size:20px;font-weight:600;">Welcome, ${safeName}! 🎉</td></tr>
+        <tr><td style="font-size:20px;font-weight:600;">Welcome, ${safeName}! &#127881;</td></tr>
         <tr><td style="height:8px;"></td></tr>
         <tr><td style="font-size:14px;line-height:1.6;color:#444;">
           Thanks for joining <strong>Bevi &amp; Go Rewards</strong>. Show the QR below at the counter — or open the link on your phone — to pre-order and earn loyalty points on every drink.
