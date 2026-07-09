@@ -48,6 +48,7 @@ type EOS = {
 function EndOfShiftPage() {
   const [report, setReport] = useState<EOS | null>(null);
   const [loading, setLoading] = useState(true);
+  const [upsellStats, setUpsellStats] = useState<{ offers: number; added: number; skipped: number } | null>(null);
 
   // expense form
   const [desc, setDesc] = useState("");
@@ -64,8 +65,16 @@ function EndOfShiftPage() {
     if (error) {
       toast.error(error.message);
       setReport(null);
+      setUpsellStats(null);
     } else {
       setReport(data as EOS);
+      const shiftId = (data as EOS | null)?.shift?.id ?? null;
+      const { data: us } = await (supabase as any).rpc("shift_upsell_stats", { p_shift_id: shiftId });
+      if (us) setUpsellStats({
+        offers: Number(us.offers ?? 0),
+        added: Number(us.added ?? 0),
+        skipped: Number(us.skipped ?? 0),
+      });
     }
     setLoading(false);
   };
@@ -223,6 +232,22 @@ function EndOfShiftPage() {
                 <Field label="Breaks (total)" value={`${(report.break_seconds / 60).toFixed(0)} min`} />
                 <Field label="Approved leave deduction" value={`${report.leave_hours_deducted} h`} />
                 <Field label="Net worked hours" value={`${report.net_worked_hours} h`} />
+                <Field
+                  label="Upsell rate"
+                  value={
+                    upsellStats && upsellStats.offers > 0
+                      ? `${((upsellStats.added / upsellStats.offers) * 100).toFixed(1)}% (${upsellStats.added}/${upsellStats.offers})`
+                      : "—"
+                  }
+                />
+                <Field
+                  label="Skip rate"
+                  value={
+                    upsellStats && upsellStats.offers > 0
+                      ? `${((upsellStats.skipped / upsellStats.offers) * 100).toFixed(1)}%`
+                      : "—"
+                  }
+                />
               </div>
               {report.breaks.length > 0 && (
                 <div className="mt-4">

@@ -11,9 +11,9 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid, Cell,
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid, Cell, Legend,
 } from "recharts";
-import { BarChart3, Filter, TrendingUp, TrendingDown, RefreshCw, Radio } from "lucide-react";
+import { BarChart3, Filter, TrendingUp, TrendingDown, RefreshCw, Radio, Sparkles, Coins, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
 import { useRealtime } from "@/lib/use-realtime";
 
@@ -56,6 +56,14 @@ function AnalyticsPage() {
   const [data, setData] = useState<Analytics | null>(null);
   const [loading, setLoading] = useState(false);
   const [realtime, setRealtime] = useState(true);
+  const [expVsSales, setExpVsSales] = useState<{ days: Array<{ day: string; sales: number; expenses: number }>; totals: { sales: number; expenses: number } } | null>(null);
+  const [upsell, setUpsell] = useState<{
+    barista: { offers: number; added: number; skipped: number };
+    customer: { offers: number; added: number; skipped: number };
+    per_barista: Array<{ user_id: string; email: string; offers: number; added: number; skipped: number }>;
+  } | null>(null);
+  const [showBaristaDetail, setShowBaristaDetail] = useState(false);
+  const [showSkipDetail, setShowSkipDetail] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -73,15 +81,31 @@ function AnalyticsPage() {
   async function load() {
     if (!canSee) return;
     setLoading(true);
-    const { data, error } = await db.rpc("pos_analytics", {
-      p_from: from, p_to: to,
-      p_owner_id: ownerId || null,
-      p_category_id: categoryId || null,
-      p_menu_item_id: menuItemId || null,
-    });
+    const [{ data, error }, evs, ups] = await Promise.all([
+      db.rpc("pos_analytics", {
+        p_from: from, p_to: to,
+        p_owner_id: ownerId || null,
+        p_category_id: categoryId || null,
+        p_menu_item_id: menuItemId || null,
+      }),
+      db.rpc("analytics_expenses_vs_sales", { p_from: from, p_to: to }),
+      db.rpc("analytics_upsell", { p_from: from, p_to: to }),
+    ]);
     setLoading(false);
     if (error) { toast.error(error.message); return; }
     setData(data as Analytics);
+    if (!evs.error && evs.data) {
+      setExpVsSales({
+        days: (evs.data.days ?? []).map((d: any) => ({
+          day: d.day, sales: Number(d.sales), expenses: Number(d.expenses),
+        })),
+        totals: {
+          sales: Number(evs.data.totals?.sales ?? 0),
+          expenses: Number(evs.data.totals?.expenses ?? 0),
+        },
+      });
+    }
+    if (!ups.error && ups.data) setUpsell(ups.data as any);
   }
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, []);
 
@@ -307,6 +331,160 @@ function AnalyticsPage() {
             ))}
           </div>
         </Card>
+      </div>
+
+      {/* Expenses vs Sales */}
+      <Card className="p-3">
+        <div className="flex items-center gap-2 mb-2">
+          <Coins className="h-4 w-4 text-primary" />
+          <div className="font-medium text-sm">Expenses vs Sales</div>
+          {expVsSales && (
+            <div className="ml-auto flex gap-3 text-xs">
+              <span>Sales: <b className="text-primary">{PESO(expVsSales.totals.sales)}</b></span>
+              <span>Expenses: <b className="text-destructive">{PESO(expVsSales.totals.expenses)}</b></span>
+              <span>Net: <b>{PESO(expVsSales.totals.sales - expVsSales.totals.expenses)}</b></span>
+            </div>
+          )}
+        </div>
+        <ResponsiveContainer width="100%" height={260}>
+          <BarChart data={expVsSales?.days ?? []}>
+            <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+            <XAxis dataKey="day" tick={{ fontSize: 10 }} />
+            <YAxis tick={{ fontSize: 10 }} />
+            <Tooltip formatter={(v: any) => PESO(Number(v))} />
+            <Legend wrapperStyle={{ fontSize: 11 }} />
+            <Bar dataKey="sales" name="Sales" fill="hsl(var(--primary))" radius={[4,4,0,0]} />
+            <Bar dataKey="expenses" name="Expenses" fill="hsl(var(--destructive))" radius={[4,4,0,0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </Card>
+
+      {/* Upsell + Skip rates */}
+      <Card className="p-3">
+        <div className="flex items-center gap-2 mb-3">
+          <Sparkles className="h-4 w-4 text-primary" />
+          <div className="font-medium text-sm">Upsell performance</div>
+        </div>
+        {!upsell ? (
+          <div className="text-xs text-muted-foreground">Loading…</div>
+        ) : (
+          <div className="space-y-4">
+            <div className="grid md:grid-cols-2 gap-3">
+              <UpsellSourceCard title="Barista upsell rate" stat={upsell.barista} accent="primary" />
+              <UpsellSourceCard title="Customer upsell rate" stat={upsell.customer} accent="primary" />
+            </div>
+
+            <div>
+              <button
+                type="button"
+                onClick={() => setShowBaristaDetail((v) => !v)}
+                className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+              >
+                {showBaristaDetail ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                Detailed view — Barista upsell rate
+              </button>
+              {showBaristaDetail && (
+                <div className="mt-2 border rounded-md overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/40 text-xs">
+                      <tr>
+                        <th className="text-left p-2">Barista</th>
+                        <th className="text-right p-2">Offers</th>
+                        <th className="text-right p-2">Added</th>
+                        <th className="text-right p-2">Upsell rate</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {upsell.per_barista.length === 0 && (
+                        <tr><td colSpan={4} className="p-3 text-xs text-muted-foreground text-center">No barista upsell events in range.</td></tr>
+                      )}
+                      {upsell.per_barista.map((r) => {
+                        const rate = r.offers > 0 ? (r.added / r.offers) * 100 : 0;
+                        return (
+                          <tr key={r.user_id} className="border-t">
+                            <td className="p-2">{r.email}</td>
+                            <td className="p-2 text-right">{r.offers}</td>
+                            <td className="p-2 text-right">{r.added}</td>
+                            <td className="p-2 text-right font-medium text-primary">{rate.toFixed(1)}%</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="border-t pt-3">
+              <div className="font-medium text-sm mb-2">Skip rate</div>
+              <div className="grid md:grid-cols-2 gap-3">
+                <UpsellSourceCard title="Barista skip rate" stat={upsell.barista} accent="destructive" showSkip />
+                <UpsellSourceCard title="Customer skip rate" stat={upsell.customer} accent="destructive" showSkip />
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowSkipDetail((v) => !v)}
+                className="mt-3 flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+              >
+                {showSkipDetail ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                Detailed view — Barista skip rate
+              </button>
+              {showSkipDetail && (
+                <div className="mt-2 border rounded-md overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/40 text-xs">
+                      <tr>
+                        <th className="text-left p-2">Barista</th>
+                        <th className="text-right p-2">Offers</th>
+                        <th className="text-right p-2">Skipped</th>
+                        <th className="text-right p-2">Skip rate</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {upsell.per_barista.length === 0 && (
+                        <tr><td colSpan={4} className="p-3 text-xs text-muted-foreground text-center">No barista upsell events in range.</td></tr>
+                      )}
+                      {upsell.per_barista.map((r) => {
+                        const rate = r.offers > 0 ? (r.skipped / r.offers) * 100 : 0;
+                        return (
+                          <tr key={r.user_id} className="border-t">
+                            <td className="p-2">{r.email}</td>
+                            <td className="p-2 text-right">{r.offers}</td>
+                            <td className="p-2 text-right">{r.skipped}</td>
+                            <td className="p-2 text-right font-medium text-destructive">{rate.toFixed(1)}%</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+function UpsellSourceCard({
+  title, stat, accent, showSkip,
+}: {
+  title: string;
+  stat: { offers: number; added: number; skipped: number };
+  accent: "primary" | "destructive";
+  showSkip?: boolean;
+}) {
+  const num = showSkip ? stat.skipped : stat.added;
+  const rate = stat.offers > 0 ? (num / stat.offers) * 100 : 0;
+  const color = accent === "destructive" ? "text-destructive" : "text-primary";
+  return (
+    <div className="border rounded-md p-3">
+      <div className="text-xs text-muted-foreground">{title}</div>
+      <div className={`font-display text-2xl mt-1 ${color}`}>{rate.toFixed(1)}%</div>
+      <div className="text-[11px] text-muted-foreground mt-1">
+        {num} {showSkip ? "skipped" : "added"} of {stat.offers} offers
       </div>
     </div>
   );

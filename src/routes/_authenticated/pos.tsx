@@ -1314,12 +1314,24 @@ function POSPage() {
           onOpenChange={(o) => !o && setUpsell(null)}
           triggerName={upsell.trigger}
           suggestions={upsell.suggestions}
-          onSkip={() => setUpsell(null)}
+          onSkip={() => {
+            void (supabase as any).rpc("log_upsell_event", {
+              p_source: "barista",
+              p_suggestions_count: upsell?.suggestions.length ?? 0,
+              p_added_count: 0,
+            });
+            setUpsell(null);
+          }}
           onAdd={(picked) => {
             for (const p of picked) {
               const it = items.find((x) => x.id === p.id);
               if (it) addPlainLine(it, null);
             }
+            void (supabase as any).rpc("log_upsell_event", {
+              p_source: "barista",
+              p_suggestions_count: upsell?.suggestions.length ?? 0,
+              p_added_count: picked.length,
+            });
             setUpsell(null);
           }}
         />
