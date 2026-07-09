@@ -424,7 +424,7 @@ function AnalyticsPage() {
                 className="mt-3 flex items-center gap-1 text-xs font-medium text-primary hover:underline"
               >
                 {showSkipDetail ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                Detailed view — Barista skip rate
+                Detailed view — Cashier skip rate
               </button>
               {showSkipDetail && (
                 <div className="mt-2 border rounded-md overflow-x-auto">
