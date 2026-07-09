@@ -366,7 +366,7 @@ function AnalyticsPage() {
         ) : (
           <div className="space-y-4">
             <div className="grid md:grid-cols-2 gap-3">
-              <UpsellSourceCard title="Barista upsell rate" stat={upsell.barista} accent="primary" />
+              <UpsellSourceCard title="Cashier upsell rate" stat={upsell.barista} accent="primary" />
               <UpsellSourceCard title="Customer upsell rate" stat={upsell.customer} accent="primary" />
             </div>
 
@@ -377,14 +377,14 @@ function AnalyticsPage() {
                 className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
               >
                 {showBaristaDetail ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                Detailed view — Barista upsell rate
+                Detailed view — Cashier upsell rate
               </button>
               {showBaristaDetail && (
                 <div className="mt-2 border rounded-md overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead className="bg-muted/40 text-xs">
                       <tr>
-                        <th className="text-left p-2">Barista</th>
+                        <th className="text-left p-2">Cashier</th>
                         <th className="text-right p-2">Offers</th>
                         <th className="text-right p-2">Added</th>
                         <th className="text-right p-2">Upsell rate</th>
@@ -392,7 +392,7 @@ function AnalyticsPage() {
                     </thead>
                     <tbody>
                       {upsell.per_barista.length === 0 && (
-                        <tr><td colSpan={4} className="p-3 text-xs text-muted-foreground text-center">No barista upsell events in range.</td></tr>
+                        <tr><td colSpan={4} className="p-3 text-xs text-muted-foreground text-center">No cashier upsell events in range.</td></tr>
                       )}
                       {upsell.per_barista.map((r) => {
                         const rate = r.offers > 0 ? (r.added / r.offers) * 100 : 0;
@@ -414,7 +414,7 @@ function AnalyticsPage() {
             <div className="border-t pt-3">
               <div className="font-medium text-sm mb-2">Skip rate</div>
               <div className="grid md:grid-cols-2 gap-3">
-                <UpsellSourceCard title="Barista skip rate" stat={upsell.barista} accent="destructive" showSkip />
+                <UpsellSourceCard title="Cashier skip rate" stat={upsell.barista} accent="destructive" showSkip />
                 <UpsellSourceCard title="Customer skip rate" stat={upsell.customer} accent="destructive" showSkip />
               </div>
 
@@ -424,14 +424,14 @@ function AnalyticsPage() {
                 className="mt-3 flex items-center gap-1 text-xs font-medium text-primary hover:underline"
               >
                 {showSkipDetail ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                Detailed view — Barista skip rate
+                Detailed view — Cashier skip rate
               </button>
               {showSkipDetail && (
                 <div className="mt-2 border rounded-md overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead className="bg-muted/40 text-xs">
                       <tr>
-                        <th className="text-left p-2">Barista</th>
+                        <th className="text-left p-2">Cashier</th>
                         <th className="text-right p-2">Offers</th>
                         <th className="text-right p-2">Skipped</th>
                         <th className="text-right p-2">Skip rate</th>
@@ -439,7 +439,7 @@ function AnalyticsPage() {
                     </thead>
                     <tbody>
                       {upsell.per_barista.length === 0 && (
-                        <tr><td colSpan={4} className="p-3 text-xs text-muted-foreground text-center">No barista upsell events in range.</td></tr>
+                        <tr><td colSpan={4} className="p-3 text-xs text-muted-foreground text-center">No cashier upsell events in range.</td></tr>
                       )}
                       {upsell.per_barista.map((r) => {
                         const rate = r.offers > 0 ? (r.skipped / r.offers) * 100 : 0;
