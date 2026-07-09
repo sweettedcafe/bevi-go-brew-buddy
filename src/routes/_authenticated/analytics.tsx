@@ -82,27 +82,38 @@ function AnalyticsPage() {
     if (!canSee) return;
     setLoading(true);
     const [{ data, error }, evs, ups] = await Promise.all([
+    const startIso = new Date(`${from}T00:00:00`).toISOString();
+    const endIso = new Date(`${to}T23:59:59`).toISOString();
+    const [{ data, error }, exp, ups] = await Promise.all([
       db.rpc("pos_analytics", {
         p_from: from, p_to: to,
         p_owner_id: ownerId || null,
         p_category_id: categoryId || null,
         p_menu_item_id: menuItemId || null,
       }),
-      db.rpc("analytics_expenses_vs_sales", { p_from: from, p_to: to }),
+      db.rpc("admin_list_expenses", { p_from: startIso, p_to: endIso }),
       db.rpc("analytics_upsell", { p_from: from, p_to: to }),
     ]);
     setLoading(false);
     if (error) { toast.error(error.message); return; }
     setData(data as Analytics);
-    if (!evs.error && evs.data) {
+    if (!exp.error) {
+      // Build daily series and totals directly from the same list the
+      // Expenses Report uses, so figures match reliably.
+      const list = (exp.data ?? []) as Array<{ created_at: string; amount: number }>;
+      const byDay = new Map<string, number>();
+      let totalExp = 0;
+      for (const r of list) {
+        const amt = Number(r.amount || 0);
+        totalExp += amt;
+        const day = new Date(r.created_at).toISOString().slice(0, 10);
+        byDay.set(day, (byDay.get(day) ?? 0) + amt);
+      }
       setExpVsSales({
-        days: (evs.data.days ?? []).map((d: any) => ({
-          day: d.day, sales: Number(d.sales), expenses: Number(d.expenses),
-        })),
-        totals: {
-          sales: Number(evs.data.totals?.sales ?? 0),
-          expenses: Number(evs.data.totals?.expenses ?? 0),
-        },
+        days: [...byDay.entries()]
+          .sort((a, b) => a[0].localeCompare(b[0]))
+          .map(([day, expenses]) => ({ day, sales: 0, expenses })),
+        totals: { sales: 0, expenses: totalExp },
       });
     }
     if (!ups.error && ups.data) setUpsell(ups.data as any);
