@@ -1,7 +1,5 @@
 -- =====================================================================
 -- BEVI & GO — Phase 33: developer resets for expenses + timeclock
--- Adds dev_reset_expenses and dev_reset_timeclock RPCs.
--- Run after phase 32.
 -- =====================================================================
 
 create or replace function public.dev_reset_expenses()
@@ -9,7 +7,7 @@ returns jsonb
 language plpgsql
 security definer
 set search_path = public
-as $$
+as $fn_exp$
 declare
   v_actor uuid := auth.uid();
   v_count int;
@@ -24,16 +22,20 @@ begin
 
   return jsonb_build_object('ok', true, 'deleted_expenses', v_count);
 end
-$$;
-revoke all on function public.dev_reset_expenses() from public, anon, authenticated;
+$fn_exp$;
+
+revoke all on function public.dev_reset_expenses() from public;
+revoke all on function public.dev_reset_expenses() from anon;
+revoke all on function public.dev_reset_expenses() from authenticated;
 grant execute on function public.dev_reset_expenses() to authenticated;
+
 
 create or replace function public.dev_reset_timeclock()
 returns jsonb
 language plpgsql
 security definer
 set search_path = public
-as $$
+as $fn_tc$
 declare
   v_actor uuid := auth.uid();
   v_count int;
@@ -43,7 +45,6 @@ begin
     raise exception 'only developers can reset the timeclock';
   end if;
 
-  -- shift_expenses & shift_breaks reference shifts; clear them first
   delete from public.shift_expenses where true;
   begin delete from public.shift_breaks where true; exception when undefined_table then null; end;
   delete from public.shifts where true;
@@ -51,8 +52,11 @@ begin
 
   return jsonb_build_object('ok', true, 'deleted_shifts', v_count);
 end
-$$;
-revoke all on function public.dev_reset_timeclock() from public, anon, authenticated;
+$fn_tc$;
+
+revoke all on function public.dev_reset_timeclock() from public;
+revoke all on function public.dev_reset_timeclock() from anon;
+revoke all on function public.dev_reset_timeclock() from authenticated;
 grant execute on function public.dev_reset_timeclock() to authenticated;
 
 notify pgrst, 'reload schema';
