@@ -58,9 +58,9 @@ function AnalyticsPage() {
   const [realtime, setRealtime] = useState(true);
   const [expVsSales, setExpVsSales] = useState<{ days: Array<{ day: string; sales: number; expenses: number }>; totals: { sales: number; expenses: number } } | null>(null);
   const [upsell, setUpsell] = useState<{
-    barista: { offers: number; added: number; skipped: number };
-    customer: { offers: number; added: number; skipped: number };
-    per_barista: Array<{ user_id: string; email: string; offers: number; added: number; skipped: number }>;
+    barista: { orders: number; yes: number; no: number };
+    customer: { orders: number; yes: number; no: number };
+    per_barista: Array<{ user_id: string; email: string; orders: number; yes: number; no: number }>;
   } | null>(null);
   const [showBaristaDetail, setShowBaristaDetail] = useState(false);
   const [showSkipDetail, setShowSkipDetail] = useState(false);
