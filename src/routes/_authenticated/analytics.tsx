@@ -58,9 +58,9 @@ function AnalyticsPage() {
   const [realtime, setRealtime] = useState(true);
   const [expVsSales, setExpVsSales] = useState<{ days: Array<{ day: string; sales: number; expenses: number }>; totals: { sales: number; expenses: number } } | null>(null);
   const [upsell, setUpsell] = useState<{
-    barista: { offers: number; added: number; skipped: number };
-    customer: { offers: number; added: number; skipped: number };
-    per_barista: Array<{ user_id: string; email: string; offers: number; added: number; skipped: number }>;
+    barista: { orders: number; yes: number; no: number };
+    customer: { orders: number; yes: number; no: number };
+    per_barista: Array<{ user_id: string; email: string; orders: number; yes: number; no: number }>;
   } | null>(null);
   const [showBaristaDetail, setShowBaristaDetail] = useState(false);
   const [showSkipDetail, setShowSkipDetail] = useState(false);
@@ -83,7 +83,7 @@ function AnalyticsPage() {
     setLoading(true);
     const startIso = new Date(`${from}T00:00:00`).toISOString();
     const endIso = new Date(`${to}T23:59:59`).toISOString();
-    const [{ data, error }, exp, ups] = await Promise.all([
+    const [{ data, error }, exp, ordersRes, emailsRes] = await Promise.all([
       db.rpc("pos_analytics", {
         p_from: from, p_to: to,
         p_owner_id: ownerId || null,
@@ -91,7 +91,11 @@ function AnalyticsPage() {
         p_menu_item_id: menuItemId || null,
       }),
       db.rpc("admin_list_expenses", { p_from: startIso, p_to: endIso }),
-      db.rpc("analytics_upsell", { p_from: from, p_to: to }),
+      db.from("orders")
+        .select("id,cashier_id,source,status,txn_kind,order_items(is_upsell)")
+        .gte("created_at", `${from}T00:00:00`)
+        .lte("created_at", `${to}T23:59:59`),
+      db.rpc("staff_emails"),
     ]);
     setLoading(false);
     if (error) { toast.error(error.message); return; }
@@ -115,7 +119,40 @@ function AnalyticsPage() {
         totals: { sales: 0, expenses: totalExp },
       });
     }
-    if (!ups.error && ups.data) setUpsell(ups.data as any);
+    // Compute upsell stats from per-item flags so numbers match Reports > Per Item.
+    // Rate = (yes items / total orders) * 100. Skip = (no items / total orders) * 100.
+    if (!ordersRes.error) {
+      const emailMap: Record<string, string> = {};
+      ((emailsRes?.data ?? []) as any[]).forEach((e) => { emailMap[e.user_id] = e.email; });
+      const ordersList = ((ordersRes.data ?? []) as any[]).filter(
+        (o) => (o.txn_kind ?? "sale") === "sale" && o.status !== "voided" && o.status !== "refunded",
+      );
+      const bar = { orders: 0, yes: 0, no: 0 };
+      const cust = { orders: 0, yes: 0, no: 0 };
+      const perBar = new Map<string, { user_id: string; email: string; orders: number; yes: number; no: number }>();
+      for (const o of ordersList) {
+        const items = (o.order_items ?? []) as Array<{ is_upsell: boolean }>;
+        const yes = items.reduce((s, it) => s + (it.is_upsell ? 1 : 0), 0);
+        const no = items.length - yes;
+        if (o.source === "self") {
+          cust.orders += 1; cust.yes += yes; cust.no += no;
+        } else {
+          bar.orders += 1; bar.yes += yes; bar.no += no;
+          if (o.cashier_id) {
+            const cur = perBar.get(o.cashier_id) ?? {
+              user_id: o.cashier_id, email: emailMap[o.cashier_id] ?? o.cashier_id, orders: 0, yes: 0, no: 0,
+            };
+            cur.orders += 1; cur.yes += yes; cur.no += no;
+            perBar.set(o.cashier_id, cur);
+          }
+        }
+      }
+      setUpsell({
+        barista: bar,
+        customer: cust,
+        per_barista: [...perBar.values()].sort((a, b) => b.orders - a.orders),
+      });
+    }
   }
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, []);
 
@@ -403,7 +440,7 @@ function AnalyticsPage() {
                         <tr><td colSpan={2} className="p-3 text-xs text-muted-foreground text-center">No cashier upsell events in range.</td></tr>
                       )}
                       {upsell.per_barista.map((r) => {
-                        const rate = r.offers > 0 ? (r.added / r.offers) * 100 : 0;
+                        const rate = r.orders > 0 ? (r.yes / r.orders) * 100 : 0;
                         return (
                           <tr key={r.user_id} className="border-t">
                             <td className="p-2">{r.email}</td>
@@ -446,7 +483,7 @@ function AnalyticsPage() {
                         <tr><td colSpan={2} className="p-3 text-xs text-muted-foreground text-center">No cashier upsell events in range.</td></tr>
                       )}
                       {upsell.per_barista.map((r) => {
-                        const rate = r.offers > 0 ? (r.skipped / r.offers) * 100 : 0;
+                        const rate = r.orders > 0 ? (r.no / r.orders) * 100 : 0;
                         return (
                           <tr key={r.user_id} className="border-t">
                             <td className="p-2">{r.email}</td>
@@ -470,19 +507,19 @@ function UpsellSourceCard({
   title, stat, accent, showSkip,
 }: {
   title: string;
-  stat: { offers: number; added: number; skipped: number };
+  stat: { orders: number; yes: number; no: number };
   accent: "primary" | "destructive";
   showSkip?: boolean;
 }) {
-  const num = showSkip ? stat.skipped : stat.added;
-  const rate = stat.offers > 0 ? (num / stat.offers) * 100 : 0;
+  const num = showSkip ? stat.no : stat.yes;
+  const rate = stat.orders > 0 ? (num / stat.orders) * 100 : 0;
   const color = accent === "destructive" ? "text-destructive" : "text-primary";
   return (
     <div className="border rounded-md p-3">
       <div className="text-xs text-muted-foreground">{title}</div>
       <div className={`font-display text-2xl mt-1 ${color}`}>{rate.toFixed(1)}%</div>
       <div className="text-[11px] text-muted-foreground mt-1">
-        {num} {showSkip ? "skipped" : "added"} of {stat.offers} offers
+        {num} {showSkip ? "no" : "yes"} of {stat.orders} orders
       </div>
     </div>
   );
