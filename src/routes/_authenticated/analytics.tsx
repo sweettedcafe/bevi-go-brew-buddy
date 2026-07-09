@@ -438,22 +438,18 @@ function AnalyticsPage() {
                     <thead className="bg-muted/40 text-xs">
                       <tr>
                         <th className="text-left p-2">Cashier</th>
-                        <th className="text-right p-2">Offers</th>
-                        <th className="text-right p-2">Skipped</th>
                         <th className="text-right p-2">Skip rate</th>
                       </tr>
                     </thead>
                     <tbody>
                       {upsell.per_barista.length === 0 && (
-                        <tr><td colSpan={4} className="p-3 text-xs text-muted-foreground text-center">No cashier upsell events in range.</td></tr>
+                        <tr><td colSpan={2} className="p-3 text-xs text-muted-foreground text-center">No cashier upsell events in range.</td></tr>
                       )}
                       {upsell.per_barista.map((r) => {
                         const rate = r.offers > 0 ? (r.skipped / r.offers) * 100 : 0;
                         return (
                           <tr key={r.user_id} className="border-t">
                             <td className="p-2">{r.email}</td>
-                            <td className="p-2 text-right">{r.offers}</td>
-                            <td className="p-2 text-right">{r.skipped}</td>
                             <td className="p-2 text-right font-medium text-destructive">{rate.toFixed(1)}%</td>
                           </tr>
                         );
