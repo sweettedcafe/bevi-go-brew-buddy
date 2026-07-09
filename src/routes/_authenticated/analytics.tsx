@@ -11,9 +11,9 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid, Cell,
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid, Cell, Legend,
 } from "recharts";
-import { BarChart3, Filter, TrendingUp, TrendingDown, RefreshCw, Radio } from "lucide-react";
+import { BarChart3, Filter, TrendingUp, TrendingDown, RefreshCw, Radio, Sparkles, Coins, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
 import { useRealtime } from "@/lib/use-realtime";
 
