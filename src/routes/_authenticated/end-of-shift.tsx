@@ -48,6 +48,7 @@ type EOS = {
 function EndOfShiftPage() {
   const [report, setReport] = useState<EOS | null>(null);
   const [loading, setLoading] = useState(true);
+  const [upsellStats, setUpsellStats] = useState<{ offers: number; added: number; skipped: number } | null>(null);
 
   // expense form
   const [desc, setDesc] = useState("");
@@ -64,8 +65,16 @@ function EndOfShiftPage() {
     if (error) {
       toast.error(error.message);
       setReport(null);
+      setUpsellStats(null);
     } else {
       setReport(data as EOS);
+      const shiftId = (data as EOS | null)?.shift?.id ?? null;
+      const { data: us } = await (supabase as any).rpc("shift_upsell_stats", { p_shift_id: shiftId });
+      if (us) setUpsellStats({
+        offers: Number(us.offers ?? 0),
+        added: Number(us.added ?? 0),
+        skipped: Number(us.skipped ?? 0),
+      });
     }
     setLoading(false);
   };
