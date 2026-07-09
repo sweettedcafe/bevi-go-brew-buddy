@@ -1,11 +1,10 @@
 -- =====================================================================
--- BEVI & GO — Phase 31: Fix dev_wipe_all_orders + add reset RPCs
--- for inventory, menu, recipes. DEVELOPER role ONLY.
+-- BEVI & GO — Phase 32: safe-delete fix for developer reset RPCs
+-- Adds explicit WHERE clauses to all destructive developer deletes so
+-- database safe-update protection allows the wipe/reset functions.
+-- Run after phase 31.
 -- =====================================================================
 
--- ---------- 1. Fix dev_wipe_all_orders --------------------------------
--- Correct table name is order_payments (not payments). Also clear
--- upsell_events and daily_order_counter so numbering restarts cleanly.
 create or replace function public.dev_wipe_all_orders()
 returns jsonb
 language plpgsql
@@ -24,7 +23,6 @@ begin
     raise exception 'only developers can wipe orders';
   end if;
 
-  -- 1) Restock inventory for every non-voided/refunded order item
   for v_o in
     select id from public.orders
     where status not in ('voided','refunded')
@@ -45,7 +43,6 @@ begin
     v_orders := v_orders + 1;
   end loop;
 
-  -- 2) Reverse loyalty
   update public.customers c
      set points = greatest(0, c.points - coalesce(o.earned, 0)) + coalesce(o.redeemed, 0),
          updated_at = now()
@@ -60,7 +57,6 @@ begin
     ) o
    where c.id = o.customer_id;
 
-  -- 3) Hard delete dependent rows then orders
   delete from public.inventory_movements where ref_table = 'orders';
   begin
     delete from public.upsell_events where true;
@@ -70,7 +66,6 @@ begin
   delete from public.order_items where true;
   delete from public.orders where true;
 
-  -- 4) Reset daily order counter
   begin
     delete from public.daily_order_counter where true;
   exception when undefined_table then null;
@@ -79,13 +74,9 @@ begin
   return jsonb_build_object('ok', true, 'deleted_orders', v_orders);
 end
 $$;
-
 revoke all on function public.dev_wipe_all_orders() from public, anon, authenticated;
 grant execute on function public.dev_wipe_all_orders() to authenticated;
 
--- ---------- 2. Reset inventory ----------------------------------------
--- Wipes all inventory items, their movements, and any recipe rows that
--- depend on them. Menu items remain but will have no recipes attached.
 create or replace function public.dev_reset_inventory()
 returns jsonb
 language plpgsql
@@ -101,7 +92,6 @@ begin
     raise exception 'only developers can reset inventory';
   end if;
 
-  -- recipes reference inventory_items — drop them first
   begin delete from public.variant_recipes where true; exception when undefined_table then null; end;
   delete from public.recipes where true;
   delete from public.inventory_movements where true;
@@ -114,9 +104,6 @@ $$;
 revoke all on function public.dev_reset_inventory() from public, anon, authenticated;
 grant execute on function public.dev_reset_inventory() to authenticated;
 
--- ---------- 3. Reset menu (items, variants, bundles, categories) ------
--- Requires orders to be wiped first (order_items FK). Also drops recipes
--- that reference menu items.
 create or replace function public.dev_reset_menu()
 returns jsonb
 language plpgsql
@@ -138,12 +125,12 @@ begin
 
   begin delete from public.variant_recipes where true; exception when undefined_table then null; end;
   delete from public.recipes where true;
-  begin delete from public.bundle_items where true;    exception when undefined_table then null; end;
-  begin delete from public.bundles where true;         exception when undefined_table then null; end;
+  begin delete from public.bundle_items where true; exception when undefined_table then null; end;
+  begin delete from public.bundles where true; exception when undefined_table then null; end;
   begin delete from public.menu_item_variants where true; exception when undefined_table then null; end;
   delete from public.menu_items where true;
   get diagnostics v_count = row_count;
-  begin delete from public.categories where true;      exception when undefined_table then null; end;
+  begin delete from public.categories where true; exception when undefined_table then null; end;
 
   return jsonb_build_object('ok', true, 'deleted_menu_items', v_count);
 end
@@ -151,7 +138,6 @@ $$;
 revoke all on function public.dev_reset_menu() from public, anon, authenticated;
 grant execute on function public.dev_reset_menu() to authenticated;
 
--- ---------- 4. Reset recipes only -------------------------------------
 create or replace function public.dev_reset_recipes()
 returns jsonb
 language plpgsql
