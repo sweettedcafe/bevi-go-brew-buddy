@@ -1,78 +1,32 @@
-# Unified Customization, Owners, Void/Refund Accounting, Barista Actions & EOS Expenses
+## Goal
 
-Six related changes across POS, Menu, Reports, History (Today's Orders), and End of Shift.
+Rename every user-facing "Barista" label to "Cashier" in the Upsell Performance reports (Analytics page and End-of-Shift report). Keep the underlying data model unchanged — the DB source values stay `'barista'` / `'customer'` and existing Add/Skip tracking is already correct.
 
----
+## Confirmation of data flow (no code change needed here)
 
-## 1. POS — Single unified customize dialog
+Current logging already matches the requested scheme:
+- Add button click → `log_upsell_event(source, suggestions_count, added_count>0)` → action `added` (drives Upsell rate)
+- Skip button click → `log_upsell_event(source, suggestions_count, 0)` → action `skipped` (drives Skip rate)
+- POS (`_authenticated/pos.tsx`) logs with `p_source: 'barista'`
+- Customer page (`o.$token.tsx`) logs with `p_source: 'customer'`
 
-Today, picking a size closes the variant picker and skips the milk/extras/notes step.
+## Changes
 
-- Merge `variantPick` and `CustomizeDialog` into one dialog opened when an item has **either** variants **or** any customization (`hasAnyCustomization(menu.options)`).
-- Layout (one form, one Add-to-cart button):
-  1. **Size** section (radio list) — only if `has_variants`. Required when shown. Pre-selects the first active variant; price line updates live.
-  2. **Milk** section — if `options.milks?.length`.
-  3. **Extras** section (checkboxes) — if `options.extras?.length`.
-  4. **Other add-on** (label + price) — if `allow_other`.
-  5. **Special instructions** (textarea) — if `allow_notes`.
-  6. **Quantity** stepper + live total preview.
-- Submit writes one cart line with `variant_id`, `unit_price = variant.price + addonTotal`, `custom`, and `notes`.
-- Backward compatible: items with no variants and no options still bypass the dialog.
+### 1. `src/routes/_authenticated/analytics.tsx` — Upsell Performance section
+- Section heading: "Upsell Performance" stays; scorecards retitled:
+  - "Barista upsell rate" → "Cashier upsell rate"
+  - "Barista skip rate" → "Cashier skip rate"
+  - Customer cards unchanged.
+- Detailed drill-down blocks:
+  - "Detailed view — Barista upsell rate" → "Detailed view — Cashier upsell rate"
+  - "Detailed view — Barista skip rate" → "Detailed view — Cashier skip rate"
+  - Table column header currently reading "Barista" → "Cashier"
+  - Empty-state text "No barista upsell events in range." → "No cashier upsell events in range."
 
-## 2. Menu & Recipes — Delete + Owner
+### 2. `src/routes/_authenticated/end-of-shift.tsx` — per-shift upsell block
+- Any "Barista" wording in the shift Upsell/Skip rate card → "Cashier".
+- Keep metric values, layout, and RPC calls (`shift_upsell_stats`) as-is.
 
-- **Delete**: visible to `admin` and `developer` only. Confirm dialog → soft delete (`is_active=false`) if the item has historical `order_items`; hard delete otherwise. Same control for variants (inline trash icon).
-- **Owner field**: add `menu_items.owner TEXT` (free text, e.g. "Coffee Bar", "Pastry Co."). Editor shows a combobox populated with distinct existing owners + free text. Default null → displayed as "—".
-- Migration: `ALTER TABLE menu_items ADD COLUMN owner TEXT;` + index.
-
-## 3. Reports — Owner filter + per-item refund/void
-
-- **Per-item report**: add an **Owner** dropdown filter (distinct owners). Show an `Owner` column and a per-owner subtotal section.
-- Add **Refund** and **Void** buttons per item row (admin/developer only) that open the same dialogs used in History — see §4.
-
-## 4. Void / Refund duplication for accounting
-
-Currently void/refund just flips status. Per client: keep the original row, plus insert a **mirror negative transaction** so every event is visible in reports.
-
-- New columns on `orders`: `parent_order_id UUID NULL`, `txn_kind TEXT DEFAULT 'sale'` (`sale | void | refund`).
-- New RPCs:
-  - `pos_void_order(p_order_id uuid, p_reason text)` — sets original `status='voided'`, then inserts a new order with `txn_kind='void'`, `parent_order_id=original`, negated `subtotal/discount/total`, mirror `order_items` with negative `qty` and negative `line_total`, mirror `order_payments` with negative `amount`. Reverses inventory (re-adds stock based on variant recipe).
-  - `pos_refund_order_item(p_order_item_id uuid, p_qty numeric, p_reason text)` — partial-qty refund; inserts a void/refund order containing only the refunded items with negative quantities. Stock re-added.
-  - `pos_void_order_item(...)` — same shape but `txn_kind='void'`.
-- Reports automatically reflect mirrors because they sum signed `total`/`line_total`. Add a **Transaction kind** column and color-coded badge.
-
-## 5. Barista — Today's Orders per-item void/refund
-
-- In `history.tsx` (Today's Orders), make each row clickable → opens an **Order Detail** sheet showing line items, payments, totals.
-- Each line item has **Void** and **Refund** buttons (qty selector defaults to full qty, reason required). Available to `barista`, `admin`, `developer`.
-- Header-level **Void entire order** also available.
-- All actions call the RPCs from §4 → realtime list refresh.
-
-## 6. End Of Shift — Expense qty × unit price
-
-- Add `quantity NUMERIC DEFAULT 1` and `unit_price NUMERIC` to `eos_expenses` (or current expense table — to confirm during impl).
-- Expense form: `Item | Qty | Unit price | Total (computed, read-only) | Notes`. Existing rows backfilled (`quantity=1`, `unit_price=amount`).
-- EOS summary and report use computed total = `quantity * unit_price` (keep `amount` synced via trigger for backward compatibility).
-
----
-
-## Rollout order
-
-1. **Migration** (`supabase_phase16_schema.sql`): `menu_items.owner`, `orders.parent_order_id`, `orders.txn_kind`, expense `quantity`/`unit_price`, new void/refund RPCs.
-2. POS unified dialog.
-3. Menu owner + delete.
-4. History order-detail sheet + per-item void/refund (barista access).
-5. Reports owner filter + per-item void/refund (admin).
-6. EOS expense qty/unit price form.
-
-Each phase is independently testable; nothing breaks existing data (all new columns are nullable / defaulted, RPCs are additive).
-
----
-
-## Open questions (please confirm before I start)
-
-1. **Owner list** — free-text field with autocomplete of past owners, or a managed `owners` table with its own admin page? Free text is faster; managed table is cleaner for long-term reporting.
-2. **Void/refund permissions on barista** — confirm baristas may void **and** refund (full + partial), or only refund?
-3. **Expense backfill** — OK to set existing rows to `quantity=1, unit_price=amount`?
-
-Reply with answers (or "go with defaults: free-text owner, baristas can void+refund, backfill qty=1") and I'll start with the migration.
+### 3. Not changed
+- DB schema, RPCs (`analytics_upsell`, `log_upsell_event`, `shift_upsell_stats`), and the `upsell_events.source` enum values (`'barista'` / `'customer'`) stay identical — this is a labels-only rename so historical data continues to aggregate correctly.
+- POS "Today's orders" Badge that reads "Barista" / "Customer" is a separate feature (order origin, not upsell) and stays as-is unless you also want it renamed — say the word and I'll include it.
