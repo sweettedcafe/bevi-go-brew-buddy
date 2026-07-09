@@ -507,19 +507,19 @@ function UpsellSourceCard({
   title, stat, accent, showSkip,
 }: {
   title: string;
-  stat: { offers: number; added: number; skipped: number };
+  stat: { orders: number; yes: number; no: number };
   accent: "primary" | "destructive";
   showSkip?: boolean;
 }) {
-  const num = showSkip ? stat.skipped : stat.added;
-  const rate = stat.offers > 0 ? (num / stat.offers) * 100 : 0;
+  const num = showSkip ? stat.no : stat.yes;
+  const rate = stat.orders > 0 ? (num / stat.orders) * 100 : 0;
   const color = accent === "destructive" ? "text-destructive" : "text-primary";
   return (
     <div className="border rounded-md p-3">
       <div className="text-xs text-muted-foreground">{title}</div>
       <div className={`font-display text-2xl mt-1 ${color}`}>{rate.toFixed(1)}%</div>
       <div className="text-[11px] text-muted-foreground mt-1">
-        {num} {showSkip ? "skipped" : "added"} of {stat.offers} offers
+        {num} {showSkip ? "no" : "yes"} of {stat.orders} orders
       </div>
     </div>
   );
