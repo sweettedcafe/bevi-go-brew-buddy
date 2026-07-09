@@ -354,31 +354,6 @@ function AnalyticsPage() {
         </Card>
       </div>
 
-      {/* Expenses vs Sales */}
-      <Card className="p-3">
-        <div className="flex items-center gap-2 mb-2">
-          <Coins className="h-4 w-4 text-primary" />
-          <div className="font-medium text-sm">Revenue vs Expenses</div>
-          {expVsSales && (
-            <div className="ml-auto flex gap-3 text-xs">
-              <span>Sales: <b className="text-primary">{PESO(expVsSales.totals.sales)}</b></span>
-              <span>Expenses: <b className="text-destructive">{PESO(expVsSales.totals.expenses)}</b></span>
-              <span>Net: <b>{PESO(expVsSales.totals.sales - expVsSales.totals.expenses)}</b></span>
-            </div>
-          )}
-        </div>
-        <ResponsiveContainer width="100%" height={260}>
-          <BarChart data={expVsSales?.days ?? []}>
-            <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-            <XAxis dataKey="day" tick={{ fontSize: 10 }} />
-            <YAxis tick={{ fontSize: 10 }} />
-            <Tooltip formatter={(v: any) => PESO(Number(v))} />
-            <Legend wrapperStyle={{ fontSize: 11 }} />
-            <Bar dataKey="sales" name="Sales" fill="hsl(var(--primary))" radius={[4,4,0,0]} />
-            <Bar dataKey="expenses" name="Expenses" fill="hsl(var(--destructive))" radius={[4,4,0,0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      </Card>
 
       {/* Upsell + Skip rates */}
       <Card className="p-3">
