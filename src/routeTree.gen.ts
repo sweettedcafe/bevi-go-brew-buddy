@@ -37,6 +37,7 @@ import { Route as AuthenticatedCustomersRouteImport } from './routes/_authentica
 import { Route as AuthenticatedBundlesRouteImport } from './routes/_authenticated/bundles'
 import { Route as AuthenticatedAuditLogRouteImport } from './routes/_authenticated/audit-log'
 import { Route as AuthenticatedAnalyticsRouteImport } from './routes/_authenticated/analytics'
+import { Route as AuthenticatedAccessControlRouteImport } from './routes/_authenticated/access-control'
 import { Route as ApiPublicSendWelcomeEmailRouteImport } from './routes/api/public/send-welcome-email'
 
 const RegisterRoute = RegisterRouteImport.update({
@@ -182,6 +183,12 @@ const AuthenticatedAnalyticsRoute = AuthenticatedAnalyticsRouteImport.update({
   path: '/analytics',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedAccessControlRoute =
+  AuthenticatedAccessControlRouteImport.update({
+    id: '/access-control',
+    path: '/access-control',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const ApiPublicSendWelcomeEmailRoute =
   ApiPublicSendWelcomeEmailRouteImport.update({
     id: '/api/public/send-welcome-email',
@@ -193,6 +200,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
+  '/access-control': typeof AuthenticatedAccessControlRoute
   '/analytics': typeof AuthenticatedAnalyticsRoute
   '/audit-log': typeof AuthenticatedAuditLogRoute
   '/bundles': typeof AuthenticatedBundlesRoute
@@ -223,6 +231,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
+  '/access-control': typeof AuthenticatedAccessControlRoute
   '/analytics': typeof AuthenticatedAnalyticsRoute
   '/audit-log': typeof AuthenticatedAuditLogRoute
   '/bundles': typeof AuthenticatedBundlesRoute
@@ -255,6 +264,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
+  '/_authenticated/access-control': typeof AuthenticatedAccessControlRoute
   '/_authenticated/analytics': typeof AuthenticatedAnalyticsRoute
   '/_authenticated/audit-log': typeof AuthenticatedAuditLogRoute
   '/_authenticated/bundles': typeof AuthenticatedBundlesRoute
@@ -287,6 +297,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/register'
+    | '/access-control'
     | '/analytics'
     | '/audit-log'
     | '/bundles'
@@ -317,6 +328,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/register'
+    | '/access-control'
     | '/analytics'
     | '/audit-log'
     | '/bundles'
@@ -348,6 +360,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/login'
     | '/register'
+    | '/_authenticated/access-control'
     | '/_authenticated/analytics'
     | '/_authenticated/audit-log'
     | '/_authenticated/bundles'
@@ -582,6 +595,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAnalyticsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/access-control': {
+      id: '/_authenticated/access-control'
+      path: '/access-control'
+      fullPath: '/access-control'
+      preLoaderRoute: typeof AuthenticatedAccessControlRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/api/public/send-welcome-email': {
       id: '/api/public/send-welcome-email'
       path: '/api/public/send-welcome-email'
@@ -593,6 +613,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteChildren {
+  AuthenticatedAccessControlRoute: typeof AuthenticatedAccessControlRoute
   AuthenticatedAnalyticsRoute: typeof AuthenticatedAnalyticsRoute
   AuthenticatedAuditLogRoute: typeof AuthenticatedAuditLogRoute
   AuthenticatedBundlesRoute: typeof AuthenticatedBundlesRoute
@@ -619,6 +640,7 @@ interface AuthenticatedRouteChildren {
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedAccessControlRoute: AuthenticatedAccessControlRoute,
   AuthenticatedAnalyticsRoute: AuthenticatedAnalyticsRoute,
   AuthenticatedAuditLogRoute: AuthenticatedAuditLogRoute,
   AuthenticatedBundlesRoute: AuthenticatedBundlesRoute,

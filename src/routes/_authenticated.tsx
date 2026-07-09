@@ -1,6 +1,7 @@
 import { createFileRoute, Outlet, Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { supabase } from "@/integrations/supabase/client";
 import logo from "@/assets/bevi-logo.jpg";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -8,7 +9,7 @@ import {
   LayoutDashboard, ShoppingCart, Package, BookOpen, Users, Tag,
   CreditCard, BarChart3, Clock, ShieldCheck, LogOut, Receipt, Printer, Menu,
   ClipboardList, FileText, ChevronDown, ChevronRight, Coffee, Wallet, Settings, Gift, History,
-  HelpCircle, Wrench,
+  HelpCircle, Wrench, KeyRound,
 } from "lucide-react";
 import type { AppRole } from "@/integrations/supabase/client";
 import { LowStockAlert } from "@/components/LowStockAlert";
@@ -17,10 +18,11 @@ export const Route = createFileRoute("/_authenticated")({
   component: AuthenticatedLayout,
 });
 
-type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; roles: AppRole[] };
-type NavGroup = { id: string; label: string; icon: typeof LayoutDashboard; items: NavItem[] };
+export type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; roles: AppRole[] };
+export type NavGroup = { id: string; label: string; icon: typeof LayoutDashboard; items: NavItem[] };
 
-const GROUPS: NavGroup[] = [
+
+export const GROUPS: NavGroup[] = [
   {
     id: "overview", label: "Overview", icon: LayoutDashboard, items: [
       { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["developer", "admin"] },
@@ -67,6 +69,7 @@ const GROUPS: NavGroup[] = [
       { to: "/payments", label: "Payment Methods", icon: CreditCard, roles: ["developer", "admin"] },
       { to: "/print-settings", label: "Print Settings", icon: Printer, roles: ["developer", "admin"] },
       { to: "/staff", label: "Staff & Roles", icon: ShieldCheck, roles: ["developer", "admin"] },
+      { to: "/access-control", label: "Access Control", icon: KeyRound, roles: ["developer", "admin"] },
       { to: "/audit-log", label: "Audit Log", icon: History, roles: ["developer", "admin"] },
     ],
   },
@@ -87,6 +90,19 @@ function AuthenticatedLayout() {
   const navigate = useNavigate();
   const path = useRouterState({ select: (s) => s.location.pathname });
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [grants, setGrants] = useState<Array<{ role: AppRole; path: string }>>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (supabase as any)
+      .from("role_access_grants")
+      .select("role, path")
+      .then(({ data }: any) => {
+        if (!cancelled) setGrants(((data ?? []) as any[]).map((r) => ({ role: r.role, path: r.path })));
+      });
+    return () => { cancelled = true; };
+  }, [user]);
 
   if (loading) {
     return (
@@ -110,14 +126,20 @@ function AuthenticatedLayout() {
   }
 
   const effectiveRoles: AppRole[] = roles.length > 0 ? roles : [primaryRole ?? "barista"];
+  const grantedPaths = new Set(
+    grants.filter((g) => effectiveRoles.includes(g.role)).map((g) => g.path),
+  );
   const visibleGroups = GROUPS
     .map((g) => ({
       ...g,
-      items: g.items.filter((i) =>
-        i.roles.some((r) => effectiveRoles.includes(r)) &&
-        // Developer-only items require the developer role explicitly
-        (!i.roles.every((r) => r === "developer") || effectiveRoles.includes("developer"))
-      ),
+      items: g.items.filter((i) => {
+        const roleAllowed = i.roles.some((r) => effectiveRoles.includes(r));
+        const granted = grantedPaths.has(i.to);
+        // Developer-only items require the developer role explicitly (no granting)
+        const isDevOnly = i.roles.length === 1 && i.roles[0] === "developer";
+        if (isDevOnly) return effectiveRoles.includes("developer");
+        return roleAllowed || granted;
+      }),
     }))
     .filter((g) => g.items.length > 0);
 
