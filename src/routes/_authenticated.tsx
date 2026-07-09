@@ -90,6 +90,19 @@ function AuthenticatedLayout() {
   const navigate = useNavigate();
   const path = useRouterState({ select: (s) => s.location.pathname });
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [grants, setGrants] = useState<Array<{ role: AppRole; path: string }>>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (supabase as any)
+      .from("role_access_grants")
+      .select("role, path")
+      .then(({ data }: any) => {
+        if (!cancelled) setGrants(((data ?? []) as any[]).map((r) => ({ role: r.role, path: r.path })));
+      });
+    return () => { cancelled = true; };
+  }, [user]);
 
   if (loading) {
     return (
