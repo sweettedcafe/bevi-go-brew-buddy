@@ -102,7 +102,7 @@ function POSPage() {
   const [holdOpen, setHoldOpen] = useState(false);
   const [heldOrders, setHeldOrders] = useState<Array<{ id: string; order_no: number; customer_name: string | null; held_at: string; total: number; held_by: string | null; source: string | null }>>([]);
   const [todayOpen, setTodayOpen] = useState(false);
-  const [todayOrders, setTodayOrders] = useState<Array<{ id: string; order_no: number; customer_name: string | null; created_at: string; total: number; order_type: string }>>([]);
+  const [todayOrders, setTodayOrders] = useState<Array<{ id: string; order_no: number; customer_name: string | null; created_at: string; total: number; order_type: string; source: string | null }>>([]);
   const [printOpen, setPrintOpen] = useState(false);
   const [printDocs, setPrintDocs] = useState<PrintPreviewDocument[]>([]);
 
@@ -486,7 +486,7 @@ function POSPage() {
     end.setDate(end.getDate() + 1);
     const { data, error } = await db
       .from("orders")
-      .select("id, order_no, customer_name, created_at, total, order_type, status")
+      .select("id, order_no, customer_name, created_at, total, order_type, status, source")
       .gte("created_at", start.toISOString())
       .lt("created_at", end.toISOString())
       .eq("status", "completed")
@@ -1218,7 +1218,14 @@ function POSPage() {
                 <div key={o.id} className="rounded-md border p-3 flex flex-wrap items-center gap-3">
                   <div className="font-display text-lg">#{String(o.order_no).padStart(3, "0")}</div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate">{o.customer_name || "Walk-in"}</div>
+                    <div className="text-sm font-medium truncate flex items-center gap-2">
+                      <span className="truncate">{o.customer_name || "Walk-in"}</span>
+                      {o.source === "self" ? (
+                        <Badge variant="secondary" className="text-[10px]">Customer</Badge>
+                      ) : (
+                        <Badge className="text-[10px]">Barista</Badge>
+                      )}
+                    </div>
                     <div className="text-xs text-muted-foreground">
                       {new Date(o.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · {o.order_type}
                     </div>

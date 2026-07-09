@@ -223,10 +223,15 @@ function AnalyticsPage() {
         </div>
       </Card>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
         <Stat label="Orders" value={String(data?.summary.orders ?? 0)} />
         <Stat label="Items sold" value={String(Number(data?.summary.qty ?? 0))} />
         <Stat label="Revenue" value={PESO(Number(data?.summary.revenue ?? 0))} />
+        <Stat label="Expenses" value={PESO(Number(expVsSales?.totals.expenses ?? 0))} />
+        <Stat
+          label="Net (Rev − Exp)"
+          value={PESO(Number(data?.summary.revenue ?? 0) - Number(expVsSales?.totals.expenses ?? 0))}
+        />
         <Stat label="Avg / order"
           value={PESO((data?.summary.orders ?? 0) > 0
             ? Number(data!.summary.revenue) / Number(data!.summary.orders) : 0)} />
@@ -289,14 +294,29 @@ function AnalyticsPage() {
       </div>
 
       <Card className="p-3">
-        <div className="font-medium text-sm mb-2">Daily revenue trend</div>
-        <ResponsiveContainer width="100%" height={240}>
-          <LineChart data={daySeries}>
+        <div className="flex items-center gap-2 mb-2">
+          <div className="font-medium text-sm">Daily revenue trend</div>
+          <span className="text-xs text-muted-foreground">Revenue vs Expenses over time</span>
+        </div>
+        <ResponsiveContainer width="100%" height={260}>
+          <LineChart data={(() => {
+            const map = new Map<string, { label: string; revenue: number; expenses: number }>();
+            for (const r of daySeries) map.set(r.label, { label: r.label, revenue: Number(r.revenue), expenses: 0 });
+            for (const d of (expVsSales?.days ?? [])) {
+              const cur = map.get(d.day) ?? { label: d.day, revenue: 0, expenses: 0 };
+              cur.expenses = Number(d.expenses);
+              if (!map.has(d.day)) cur.revenue = Number(d.sales);
+              map.set(d.day, cur);
+            }
+            return [...map.values()].sort((a, b) => a.label.localeCompare(b.label));
+          })()}>
             <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
             <XAxis dataKey="label" tick={{ fontSize: 10 }} />
             <YAxis tick={{ fontSize: 10 }} />
             <Tooltip formatter={(v: any) => PESO(Number(v))} />
-            <Line type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
+            <Legend wrapperStyle={{ fontSize: 11 }} />
+            <Line type="monotone" dataKey="revenue" name="Revenue" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+            <Line type="monotone" dataKey="expenses" name="Expenses" stroke="hsl(var(--destructive))" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
           </LineChart>
         </ResponsiveContainer>
       </Card>
@@ -337,7 +357,7 @@ function AnalyticsPage() {
       <Card className="p-3">
         <div className="flex items-center gap-2 mb-2">
           <Coins className="h-4 w-4 text-primary" />
-          <div className="font-medium text-sm">Expenses vs Sales</div>
+          <div className="font-medium text-sm">Revenue vs Expenses</div>
           {expVsSales && (
             <div className="ml-auto flex gap-3 text-xs">
               <span>Sales: <b className="text-primary">{PESO(expVsSales.totals.sales)}</b></span>
