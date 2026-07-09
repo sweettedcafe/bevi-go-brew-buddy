@@ -152,7 +152,7 @@ function ReportsPage() {
     const ids = list.map((r) => r.id);
     if (ids.length) {
       const [{ data: items }, { data: pays }, { data: pms }] = await Promise.all([
-        db.from("order_items").select("order_id,qty,line_total,menu_item_id,name_snapshot,menu_items(category_id,owner_id,categories(name),owners(name))").in("order_id", ids),
+        db.from("order_items").select("order_id,qty,line_total,menu_item_id,name_snapshot,is_upsell,menu_items(category_id,owner_id,categories(name),owners(name))").in("order_id", ids),
         db.from("order_payments").select("order_id,method,method_code,amount,fee_amount,change_due").in("order_id", ids),
         db.from("payment_methods").select("code,label"),
       ]);
