@@ -38,6 +38,7 @@ type CartLine = {
   unit_price: number; qty: number; addon_total: number;
   customization: SelectedCustom | null; notes: string | null;
   variant_id: string | null;
+  is_upsell?: boolean;
 };
 
 function SelfOrderPage() {
