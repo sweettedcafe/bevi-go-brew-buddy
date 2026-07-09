@@ -1218,7 +1218,14 @@ function POSPage() {
                 <div key={o.id} className="rounded-md border p-3 flex flex-wrap items-center gap-3">
                   <div className="font-display text-lg">#{String(o.order_no).padStart(3, "0")}</div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate">{o.customer_name || "Walk-in"}</div>
+                    <div className="text-sm font-medium truncate flex items-center gap-2">
+                      <span className="truncate">{o.customer_name || "Walk-in"}</span>
+                      {o.source === "self" ? (
+                        <Badge variant="secondary" className="text-[10px]">Customer</Badge>
+                      ) : (
+                        <Badge className="text-[10px]">Barista</Badge>
+                      )}
+                    </div>
                     <div className="text-xs text-muted-foreground">
                       {new Date(o.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · {o.order_type}
                     </div>
