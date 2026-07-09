@@ -223,10 +223,15 @@ function AnalyticsPage() {
         </div>
       </Card>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
         <Stat label="Orders" value={String(data?.summary.orders ?? 0)} />
         <Stat label="Items sold" value={String(Number(data?.summary.qty ?? 0))} />
         <Stat label="Revenue" value={PESO(Number(data?.summary.revenue ?? 0))} />
+        <Stat label="Expenses" value={PESO(Number(expVsSales?.totals.expenses ?? 0))} />
+        <Stat
+          label="Net (Rev − Exp)"
+          value={PESO(Number(data?.summary.revenue ?? 0) - Number(expVsSales?.totals.expenses ?? 0))}
+        />
         <Stat label="Avg / order"
           value={PESO((data?.summary.orders ?? 0) > 0
             ? Number(data!.summary.revenue) / Number(data!.summary.orders) : 0)} />
