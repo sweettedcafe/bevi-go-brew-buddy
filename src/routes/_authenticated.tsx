@@ -1,6 +1,7 @@
 import { createFileRoute, Outlet, Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { supabase } from "@/integrations/supabase/client";
 import logo from "@/assets/bevi-logo.jpg";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -8,7 +9,7 @@ import {
   LayoutDashboard, ShoppingCart, Package, BookOpen, Users, Tag,
   CreditCard, BarChart3, Clock, ShieldCheck, LogOut, Receipt, Printer, Menu,
   ClipboardList, FileText, ChevronDown, ChevronRight, Coffee, Wallet, Settings, Gift, History,
-  HelpCircle, Wrench,
+  HelpCircle, Wrench, KeyRound,
 } from "lucide-react";
 import type { AppRole } from "@/integrations/supabase/client";
 import { LowStockAlert } from "@/components/LowStockAlert";
@@ -17,8 +18,9 @@ export const Route = createFileRoute("/_authenticated")({
   component: AuthenticatedLayout,
 });
 
-type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; roles: AppRole[] };
-type NavGroup = { id: string; label: string; icon: typeof LayoutDashboard; items: NavItem[] };
+export type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; roles: AppRole[] };
+export type NavGroup = { id: string; label: string; icon: typeof LayoutDashboard; items: NavItem[] };
+
 
 const GROUPS: NavGroup[] = [
   {
