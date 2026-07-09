@@ -66,6 +66,7 @@ const PER_ITEM_COLS = [
   { key: "name", label: "Item" },
   { key: "category", label: "Category" },
   { key: "owner", label: "Owner" },
+  { key: "cashier_email", label: "Cashier" },
   { key: "placed_by", label: "Placed by" },
   { key: "upsell", label: "Upsell" },
   { key: "qty", label: "Qty" },
