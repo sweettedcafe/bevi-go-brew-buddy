@@ -357,7 +357,7 @@ function AnalyticsPage() {
       <Card className="p-3">
         <div className="flex items-center gap-2 mb-2">
           <Coins className="h-4 w-4 text-primary" />
-          <div className="font-medium text-sm">Expenses vs Sales</div>
+          <div className="font-medium text-sm">Revenue vs Expenses</div>
           {expVsSales && (
             <div className="ml-auto flex gap-3 text-xs">
               <span>Sales: <b className="text-primary">{PESO(expVsSales.totals.sales)}</b></span>
