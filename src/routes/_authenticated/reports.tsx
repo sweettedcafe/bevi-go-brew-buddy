@@ -473,6 +473,16 @@ function ReportsPage() {
               if (key === "time_only") return row.created_at ? new Date(row.created_at).toLocaleTimeString() : "—";
               if (key === "order_no") return `#${String(row.order_no).padStart(3, "0")}`;
               if (key === "order_id_short") return <span className="font-mono text-xs">{row.order_id_short}</span>;
+              if (key === "placed_by") return (
+                <Badge variant={row.placed_by === "Customer" ? "default" : "secondary"} className="text-[10px]">
+                  {row.placed_by}
+                </Badge>
+              );
+              if (key === "upsell") return (
+                <Badge variant={row.upsell === "Yes" ? "default" : "outline"} className="text-[10px]">
+                  {row.upsell}
+                </Badge>
+              );
               return (row as any)[key];
             }}
             actions={(row) => (
