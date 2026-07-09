@@ -1336,7 +1336,7 @@ function POSPage() {
           onAdd={(picked) => {
             for (const p of picked) {
               const it = items.find((x) => x.id === p.id);
-              if (it) addPlainLine(it, null);
+              if (it) addPlainLine(it, null, true);
             }
             void (supabase as any).rpc("log_upsell_event", {
               p_source: "barista",
