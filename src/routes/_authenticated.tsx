@@ -69,6 +69,7 @@ export const GROUPS: NavGroup[] = [
       { to: "/payments", label: "Payment Methods", icon: CreditCard, roles: ["developer", "admin"] },
       { to: "/print-settings", label: "Print Settings", icon: Printer, roles: ["developer", "admin"] },
       { to: "/staff", label: "Staff & Roles", icon: ShieldCheck, roles: ["developer", "admin"] },
+      { to: "/access-control", label: "Access Control", icon: KeyRound, roles: ["developer", "admin"] },
       { to: "/audit-log", label: "Audit Log", icon: History, roles: ["developer", "admin"] },
     ],
   },
