@@ -294,14 +294,29 @@ function AnalyticsPage() {
       </div>
 
       <Card className="p-3">
-        <div className="font-medium text-sm mb-2">Daily revenue trend</div>
-        <ResponsiveContainer width="100%" height={240}>
-          <LineChart data={daySeries}>
+        <div className="flex items-center gap-2 mb-2">
+          <div className="font-medium text-sm">Daily revenue trend</div>
+          <span className="text-xs text-muted-foreground">Revenue vs Expenses over time</span>
+        </div>
+        <ResponsiveContainer width="100%" height={260}>
+          <LineChart data={(() => {
+            const map = new Map<string, { label: string; revenue: number; expenses: number }>();
+            for (const r of daySeries) map.set(r.label, { label: r.label, revenue: Number(r.revenue), expenses: 0 });
+            for (const d of (expVsSales?.days ?? [])) {
+              const cur = map.get(d.day) ?? { label: d.day, revenue: 0, expenses: 0 };
+              cur.expenses = Number(d.expenses);
+              if (!map.has(d.day)) cur.revenue = Number(d.sales);
+              map.set(d.day, cur);
+            }
+            return [...map.values()].sort((a, b) => a.label.localeCompare(b.label));
+          })()}>
             <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
             <XAxis dataKey="label" tick={{ fontSize: 10 }} />
             <YAxis tick={{ fontSize: 10 }} />
             <Tooltip formatter={(v: any) => PESO(Number(v))} />
-            <Line type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
+            <Legend wrapperStyle={{ fontSize: 11 }} />
+            <Line type="monotone" dataKey="revenue" name="Revenue" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+            <Line type="monotone" dataKey="expenses" name="Expenses" stroke="hsl(var(--destructive))" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
           </LineChart>
         </ResponsiveContainer>
       </Card>
