@@ -126,14 +126,20 @@ function AuthenticatedLayout() {
   }
 
   const effectiveRoles: AppRole[] = roles.length > 0 ? roles : [primaryRole ?? "barista"];
+  const grantedPaths = new Set(
+    grants.filter((g) => effectiveRoles.includes(g.role)).map((g) => g.path),
+  );
   const visibleGroups = GROUPS
     .map((g) => ({
       ...g,
-      items: g.items.filter((i) =>
-        i.roles.some((r) => effectiveRoles.includes(r)) &&
-        // Developer-only items require the developer role explicitly
-        (!i.roles.every((r) => r === "developer") || effectiveRoles.includes("developer"))
-      ),
+      items: g.items.filter((i) => {
+        const roleAllowed = i.roles.some((r) => effectiveRoles.includes(r));
+        const granted = grantedPaths.has(i.to);
+        // Developer-only items require the developer role explicitly (no granting)
+        const isDevOnly = i.roles.length === 1 && i.roles[0] === "developer";
+        if (isDevOnly) return effectiveRoles.includes("developer");
+        return roleAllowed || granted;
+      }),
     }))
     .filter((g) => g.items.length > 0);
 
