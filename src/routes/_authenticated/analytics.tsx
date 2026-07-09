@@ -414,7 +414,7 @@ function AnalyticsPage() {
             <div className="border-t pt-3">
               <div className="font-medium text-sm mb-2">Skip rate</div>
               <div className="grid md:grid-cols-2 gap-3">
-                <UpsellSourceCard title="Barista skip rate" stat={upsell.barista} accent="destructive" showSkip />
+                <UpsellSourceCard title="Cashier skip rate" stat={upsell.barista} accent="destructive" showSkip />
                 <UpsellSourceCard title="Customer skip rate" stat={upsell.customer} accent="destructive" showSkip />
               </div>
 
