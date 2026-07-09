@@ -431,7 +431,7 @@ function AnalyticsPage() {
                   <table className="w-full text-sm">
                     <thead className="bg-muted/40 text-xs">
                       <tr>
-                        <th className="text-left p-2">Barista</th>
+                        <th className="text-left p-2">Cashier</th>
                         <th className="text-right p-2">Offers</th>
                         <th className="text-right p-2">Skipped</th>
                         <th className="text-right p-2">Skip rate</th>
