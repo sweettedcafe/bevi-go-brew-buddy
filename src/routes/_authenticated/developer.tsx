@@ -170,6 +170,16 @@ function DeveloperPage() {
         successKey="deleted_recipes"
         successLabel="Deleted recipes"
       />
+
+      <DangerCard
+        title="Danger Zone — Reset expenses"
+        description="Hard-deletes every shift expense entry. Shifts themselves are kept, but their recorded expenses (with invoice numbers and receipts) are removed. Use before switching from sample data to real operating expenses."
+        confirmPhrase="RESET EXPENSES"
+        buttonLabel="Reset expenses now"
+        rpc="dev_reset_expenses"
+        successKey="deleted_expenses"
+        successLabel="Deleted expenses"
+      />
     </div>
   );
 }
