@@ -81,28 +81,38 @@ function AnalyticsPage() {
   async function load() {
     if (!canSee) return;
     setLoading(true);
-    const [{ data, error }, evs, ups] = await Promise.all([
+    const startIso = new Date(`${from}T00:00:00`).toISOString();
+    const endIso = new Date(`${to}T23:59:59`).toISOString();
+    const [{ data, error }, exp, ups] = await Promise.all([
       db.rpc("pos_analytics", {
         p_from: from, p_to: to,
         p_owner_id: ownerId || null,
         p_category_id: categoryId || null,
         p_menu_item_id: menuItemId || null,
       }),
-      db.rpc("analytics_expenses_vs_sales", { p_from: from, p_to: to }),
+      db.rpc("admin_list_expenses", { p_from: startIso, p_to: endIso }),
       db.rpc("analytics_upsell", { p_from: from, p_to: to }),
     ]);
     setLoading(false);
     if (error) { toast.error(error.message); return; }
     setData(data as Analytics);
-    if (!evs.error && evs.data) {
+    if (!exp.error) {
+      // Build daily series and totals directly from the same list the
+      // Expenses Report uses, so figures match reliably.
+      const list = (exp.data ?? []) as Array<{ created_at: string; amount: number }>;
+      const byDay = new Map<string, number>();
+      let totalExp = 0;
+      for (const r of list) {
+        const amt = Number(r.amount || 0);
+        totalExp += amt;
+        const day = new Date(r.created_at).toISOString().slice(0, 10);
+        byDay.set(day, (byDay.get(day) ?? 0) + amt);
+      }
       setExpVsSales({
-        days: (evs.data.days ?? []).map((d: any) => ({
-          day: d.day, sales: Number(d.sales), expenses: Number(d.expenses),
-        })),
-        totals: {
-          sales: Number(evs.data.totals?.sales ?? 0),
-          expenses: Number(evs.data.totals?.expenses ?? 0),
-        },
+        days: [...byDay.entries()]
+          .sort((a, b) => a[0].localeCompare(b[0]))
+          .map(([day, expenses]) => ({ day, sales: 0, expenses })),
+        totals: { sales: 0, expenses: totalExp },
       });
     }
     if (!ups.error && ups.data) setUpsell(ups.data as any);
@@ -385,22 +395,18 @@ function AnalyticsPage() {
                     <thead className="bg-muted/40 text-xs">
                       <tr>
                         <th className="text-left p-2">Cashier</th>
-                        <th className="text-right p-2">Offers</th>
-                        <th className="text-right p-2">Added</th>
                         <th className="text-right p-2">Upsell rate</th>
                       </tr>
                     </thead>
                     <tbody>
                       {upsell.per_barista.length === 0 && (
-                        <tr><td colSpan={4} className="p-3 text-xs text-muted-foreground text-center">No cashier upsell events in range.</td></tr>
+                        <tr><td colSpan={2} className="p-3 text-xs text-muted-foreground text-center">No cashier upsell events in range.</td></tr>
                       )}
                       {upsell.per_barista.map((r) => {
                         const rate = r.offers > 0 ? (r.added / r.offers) * 100 : 0;
                         return (
                           <tr key={r.user_id} className="border-t">
                             <td className="p-2">{r.email}</td>
-                            <td className="p-2 text-right">{r.offers}</td>
-                            <td className="p-2 text-right">{r.added}</td>
                             <td className="p-2 text-right font-medium text-primary">{rate.toFixed(1)}%</td>
                           </tr>
                         );
@@ -432,22 +438,18 @@ function AnalyticsPage() {
                     <thead className="bg-muted/40 text-xs">
                       <tr>
                         <th className="text-left p-2">Cashier</th>
-                        <th className="text-right p-2">Offers</th>
-                        <th className="text-right p-2">Skipped</th>
                         <th className="text-right p-2">Skip rate</th>
                       </tr>
                     </thead>
                     <tbody>
                       {upsell.per_barista.length === 0 && (
-                        <tr><td colSpan={4} className="p-3 text-xs text-muted-foreground text-center">No cashier upsell events in range.</td></tr>
+                        <tr><td colSpan={2} className="p-3 text-xs text-muted-foreground text-center">No cashier upsell events in range.</td></tr>
                       )}
                       {upsell.per_barista.map((r) => {
                         const rate = r.offers > 0 ? (r.skipped / r.offers) * 100 : 0;
                         return (
                           <tr key={r.user_id} className="border-t">
                             <td className="p-2">{r.email}</td>
-                            <td className="p-2 text-right">{r.offers}</td>
-                            <td className="p-2 text-right">{r.skipped}</td>
                             <td className="p-2 text-right font-medium text-destructive">{rate.toFixed(1)}%</td>
                           </tr>
                         );

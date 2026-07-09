@@ -38,6 +38,7 @@ type CartLine = {
   unit_price: number; qty: number; addon_total: number;
   customization: SelectedCustom | null; notes: string | null;
   variant_id: string | null;
+  is_upsell?: boolean;
 };
 
 function SelfOrderPage() {
@@ -265,6 +266,7 @@ function SelfOrderPage() {
         items: cart.filter((l) => l.kind === "item").map((l) => ({
           menu_item_id: l.menu_item_id, qty: l.qty,
           addon_total: l.addon_total, customization: l.customization, notes: l.notes,
+          is_upsell: !!l.is_upsell,
         })),
         bundles: cart.filter((l) => l.kind === "bundle").map((l) => ({
           bundle_id: l.bundle_id, qty: l.qty,
@@ -479,6 +481,7 @@ function SelfOrderPage() {
               setCart((c) => {
                 const f = c.find((l) =>
                   l.kind === "item" && l.menu_item_id === it.id
+                  && l.is_upsell === true
                   && !l.customization && !l.notes && !l.variant_id);
                 if (f) return c.map((l) => l.lineId === f.lineId ? { ...l, qty: l.qty + 1 } : l);
                 return [...c, {
@@ -486,6 +489,7 @@ function SelfOrderPage() {
                   menu_item_id: it.id, bundle_id: null, name: it.name,
                   unit_price: Number(it.price), qty: 1, addon_total: 0,
                   customization: null, notes: null, variant_id: null,
+                  is_upsell: true,
                 }];
               });
             }

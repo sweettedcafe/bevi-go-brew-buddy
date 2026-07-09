@@ -66,6 +66,8 @@ const PER_ITEM_COLS = [
   { key: "name", label: "Item" },
   { key: "category", label: "Category" },
   { key: "owner", label: "Owner" },
+  { key: "placed_by", label: "Placed by" },
+  { key: "upsell", label: "Upsell" },
   { key: "qty", label: "Qty" },
   { key: "revenue", label: "Revenue" },
 ];
@@ -150,7 +152,7 @@ function ReportsPage() {
     const ids = list.map((r) => r.id);
     if (ids.length) {
       const [{ data: items }, { data: pays }, { data: pms }] = await Promise.all([
-        db.from("order_items").select("order_id,qty,line_total,menu_item_id,name_snapshot,menu_items(category_id,owner_id,categories(name),owners(name))").in("order_id", ids),
+        db.from("order_items").select("order_id,qty,line_total,menu_item_id,name_snapshot,is_upsell,menu_items(category_id,owner_id,categories(name),owners(name))").in("order_id", ids),
         db.from("order_payments").select("order_id,method,method_code,amount,fee_amount,change_due").in("order_id", ids),
         db.from("payment_methods").select("code,label"),
       ]);
@@ -185,6 +187,7 @@ function ReportsPage() {
   const itemRowsAll = useMemo(() => {
     const rows: AnyRow[] = [];
     for (const o of orders) {
+      const placedByCustomer = o.source === "self";
       for (const it of (o._items ?? [])) {
         rows.push({
           id: it.id,
@@ -196,6 +199,8 @@ function ReportsPage() {
           name: it.name_snapshot,
           category: it.menu_items?.categories?.name ?? "—",
           owner: it.menu_items?.owners?.name ?? "—",
+          placed_by: placedByCustomer ? "Customer" : "Cashier",
+          upsell: it.is_upsell ? "Yes" : "No",
           qty: Number(it.qty || 0),
           revenue: Number(it.line_total || 0),
         });
@@ -468,6 +473,16 @@ function ReportsPage() {
               if (key === "time_only") return row.created_at ? new Date(row.created_at).toLocaleTimeString() : "—";
               if (key === "order_no") return `#${String(row.order_no).padStart(3, "0")}`;
               if (key === "order_id_short") return <span className="font-mono text-xs">{row.order_id_short}</span>;
+              if (key === "placed_by") return (
+                <Badge variant={row.placed_by === "Customer" ? "default" : "secondary"} className="text-[10px]">
+                  {row.placed_by}
+                </Badge>
+              );
+              if (key === "upsell") return (
+                <Badge variant={row.upsell === "Yes" ? "default" : "outline"} className="text-[10px]">
+                  {row.upsell}
+                </Badge>
+              );
               return (row as any)[key];
             }}
             actions={(row) => (

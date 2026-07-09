@@ -54,6 +54,7 @@ type CartLine = {
   addon_total: number;
   notes: string | null;
   bundle_id?: string | null;
+  is_upsell?: boolean;
 };
 type OrderType = "dine_in" | "takeout" | "delivery";
 type PMConfig = {
@@ -281,11 +282,12 @@ function POSPage() {
     maybeOfferUpsell(it);
   }
 
-  function addPlainLine(it: MenuItem, variant: Variant | null) {
+  function addPlainLine(it: MenuItem, variant: Variant | null, isUpsell = false) {
     setCart((c) => {
       const sig = customSignature(null, null);
       const f = c.find((l) => l.menu_item_id === it.id
         && l.variant_id === (variant?.id ?? null)
+        && !l.is_upsell === !isUpsell
         && customSignature(l.customization, l.notes) === sig);
       if (f) return c.map((l) => l.lineId === f.lineId ? { ...l, qty: l.qty + 1 } : l);
       const base = Number(variant?.price ?? it.price);
@@ -297,6 +299,7 @@ function POSPage() {
         name: variant ? `${it.name} — ${variant.name}` : it.name,
         base_price: base, unit_price: base, qty: 1,
         customization: null, addon_total: 0, notes: null,
+        is_upsell: isUpsell,
       }];
     });
   }
@@ -1140,6 +1143,7 @@ function POSPage() {
               name: l.name, qty: l.qty,
               unit_price: l.unit_price, addon_total: l.addon_total,
               customization: l.customization, notes: l.notes,
+              is_upsell: !!l.is_upsell,
             })),
             // Encode the combined client-side discount (item promo + whole-order)
             // as a single fixed manual_discount so server total matches the client.
@@ -1332,7 +1336,7 @@ function POSPage() {
           onAdd={(picked) => {
             for (const p of picked) {
               const it = items.find((x) => x.id === p.id);
-              if (it) addPlainLine(it, null);
+              if (it) addPlainLine(it, null, true);
             }
             void (supabase as any).rpc("log_upsell_event", {
               p_source: "barista",
