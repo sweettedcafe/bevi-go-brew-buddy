@@ -97,11 +97,12 @@ function chunk(s: string, size: number) {
   return out.join("\r\n");
 }
 
-function renderWelcomeHtml(o: { name: string; code: string; orderUrl: string; qrUrl: string }) {
+function renderWelcomeHtml(o: { name: string; code: string; orderUrl: string; qrUrl: string; qrCode: string }) {
   const safeName = escapeHtml(o.name);
   const safeCode = escapeHtml(o.code);
   const safeUrl = escapeHtml(o.orderUrl);
   const safeQr = escapeHtml(o.qrUrl);
+  const safeQrCode = escapeHtml(o.qrCode);
   return `<!doctype html>
 <html><body style="margin:0;padding:0;background:#ffffff;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#111;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff;padding:24px 0;">
@@ -112,11 +113,22 @@ function renderWelcomeHtml(o: { name: string; code: string; orderUrl: string; qr
         <tr><td style="font-size:20px;font-weight:600;">Welcome, ${safeName}! &#127881;</td></tr>
         <tr><td style="height:8px;"></td></tr>
         <tr><td style="font-size:14px;line-height:1.6;color:#444;">
-          Thanks for joining <strong>Bevi &amp; Go Rewards</strong>. Show the QR below at the counter — or open the link on your phone — to pre-order and earn loyalty points on every drink.
+          Thanks for joining <strong>Bevi &amp; Go Rewards</strong>. You have two QR codes below — one to pre-order from your phone, and one for the barista to scan when you order at the store.
         </td></tr>
         <tr><td style="height:24px;"></td></tr>
-        <tr><td align="center">
-          <img src="${safeQr}" alt="Your Bevi &amp; Go QR code" width="240" height="240" style="border-radius:8px;border:1px solid #eee;padding:8px;background:#fff;" />
+        <tr><td>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td align="center" width="50%" style="padding:8px;">
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:#888;margin-bottom:8px;">Order from phone</div>
+                <img src="${safeQr}" alt="Order online QR" width="200" height="200" style="border-radius:8px;border:1px solid #eee;padding:8px;background:#fff;" />
+              </td>
+              <td align="center" width="50%" style="padding:8px;">
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:#6b3f1d;margin-bottom:8px;">In-store scan</div>
+                <img src="${safeQrCode}" alt="Loyalty code QR — barista scans this in-store" width="200" height="200" style="border-radius:8px;border:2px solid #6b3f1d;padding:8px;background:#fff;" />
+              </td>
+            </tr>
+          </table>
         </td></tr>
         <tr><td align="center" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:14px;letter-spacing:2px;color:#6b3f1d;padding-top:12px;">
           ${safeCode}
@@ -126,6 +138,7 @@ function renderWelcomeHtml(o: { name: string; code: string; orderUrl: string; qr
           <a href="${safeUrl}" style="display:inline-block;background:#6b3f1d;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600;">Open my ordering page</a>
         </td></tr>
         <tr><td style="height:20px;"></td></tr>
+
         <tr><td style="font-size:12px;color:#888;line-height:1.6;">
           Keep this email — it's your rewards card. If you lose your QR, just ask a barista to look you up by phone or email.
         </td></tr>
