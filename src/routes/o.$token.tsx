@@ -481,6 +481,7 @@ function SelfOrderPage() {
               setCart((c) => {
                 const f = c.find((l) =>
                   l.kind === "item" && l.menu_item_id === it.id
+                  && l.is_upsell === true
                   && !l.customization && !l.notes && !l.variant_id);
                 if (f) return c.map((l) => l.lineId === f.lineId ? { ...l, qty: l.qty + 1 } : l);
                 return [...c, {
@@ -488,6 +489,7 @@ function SelfOrderPage() {
                   menu_item_id: it.id, bundle_id: null, name: it.name,
                   unit_price: Number(it.price), qty: 1, addon_total: 0,
                   customization: null, notes: null, variant_id: null,
+                  is_upsell: true,
                 }];
               });
             }
