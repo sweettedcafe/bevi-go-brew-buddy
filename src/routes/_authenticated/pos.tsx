@@ -102,7 +102,7 @@ function POSPage() {
   const [holdOpen, setHoldOpen] = useState(false);
   const [heldOrders, setHeldOrders] = useState<Array<{ id: string; order_no: number; customer_name: string | null; held_at: string; total: number; held_by: string | null; source: string | null }>>([]);
   const [todayOpen, setTodayOpen] = useState(false);
-  const [todayOrders, setTodayOrders] = useState<Array<{ id: string; order_no: number; customer_name: string | null; created_at: string; total: number; order_type: string }>>([]);
+  const [todayOrders, setTodayOrders] = useState<Array<{ id: string; order_no: number; customer_name: string | null; created_at: string; total: number; order_type: string; source: string | null }>>([]);
   const [printOpen, setPrintOpen] = useState(false);
   const [printDocs, setPrintDocs] = useState<PrintPreviewDocument[]>([]);
 
