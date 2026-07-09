@@ -81,7 +81,6 @@ function AnalyticsPage() {
   async function load() {
     if (!canSee) return;
     setLoading(true);
-    const [{ data, error }, evs, ups] = await Promise.all([
     const startIso = new Date(`${from}T00:00:00`).toISOString();
     const endIso = new Date(`${to}T23:59:59`).toISOString();
     const [{ data, error }, exp, ups] = await Promise.all([
