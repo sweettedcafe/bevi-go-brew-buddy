@@ -31,7 +31,8 @@ export const Route = createFileRoute("/api/public/send-welcome-email")({
         }
 
         const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(orderUrl)}`;
-        const html = renderWelcomeHtml({ name, code, orderUrl, qrUrl });
+        const qrCode = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(code)}`;
+        const html = renderWelcomeHtml({ name, code, orderUrl, qrUrl, qrCode });
         const subject = "Welcome to Bevi & Go — your loyalty QR is inside \u2615";
 
         // Build RFC 2822 MIME message. Subject is encoded (RFC 2047) to allow non-ASCII.
