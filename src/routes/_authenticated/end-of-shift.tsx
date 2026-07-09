@@ -232,6 +232,22 @@ function EndOfShiftPage() {
                 <Field label="Breaks (total)" value={`${(report.break_seconds / 60).toFixed(0)} min`} />
                 <Field label="Approved leave deduction" value={`${report.leave_hours_deducted} h`} />
                 <Field label="Net worked hours" value={`${report.net_worked_hours} h`} />
+                <Field
+                  label="Upsell rate"
+                  value={
+                    upsellStats && upsellStats.offers > 0
+                      ? `${((upsellStats.added / upsellStats.offers) * 100).toFixed(1)}% (${upsellStats.added}/${upsellStats.offers})`
+                      : "—"
+                  }
+                />
+                <Field
+                  label="Skip rate"
+                  value={
+                    upsellStats && upsellStats.offers > 0
+                      ? `${((upsellStats.skipped / upsellStats.offers) * 100).toFixed(1)}%`
+                      : "—"
+                  }
+                />
               </div>
               {report.breaks.length > 0 && (
                 <div className="mt-4">
