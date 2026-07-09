@@ -22,7 +22,7 @@ export type NavItem = { to: string; label: string; icon: typeof LayoutDashboard;
 export type NavGroup = { id: string; label: string; icon: typeof LayoutDashboard; items: NavItem[] };
 
 
-const GROUPS: NavGroup[] = [
+export const GROUPS: NavGroup[] = [
   {
     id: "overview", label: "Overview", icon: LayoutDashboard, items: [
       { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["developer", "admin"] },
