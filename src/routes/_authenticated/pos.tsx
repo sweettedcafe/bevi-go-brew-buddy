@@ -282,11 +282,12 @@ function POSPage() {
     maybeOfferUpsell(it);
   }
 
-  function addPlainLine(it: MenuItem, variant: Variant | null) {
+  function addPlainLine(it: MenuItem, variant: Variant | null, isUpsell = false) {
     setCart((c) => {
       const sig = customSignature(null, null);
       const f = c.find((l) => l.menu_item_id === it.id
         && l.variant_id === (variant?.id ?? null)
+        && !l.is_upsell === !isUpsell
         && customSignature(l.customization, l.notes) === sig);
       if (f) return c.map((l) => l.lineId === f.lineId ? { ...l, qty: l.qty + 1 } : l);
       const base = Number(variant?.price ?? it.price);
@@ -298,6 +299,7 @@ function POSPage() {
         name: variant ? `${it.name} — ${variant.name}` : it.name,
         base_price: base, unit_price: base, qty: 1,
         customization: null, addon_total: 0, notes: null,
+        is_upsell: isUpsell,
       }];
     });
   }
