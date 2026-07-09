@@ -104,7 +104,7 @@ function SelfOrderPage() {
       const s = (data as any).status as string;
       const alerted = Boolean((data as any).alerted);
       setOrderStatus(s);
-      if ((alerted || s === "completed") && !dismissedRef.current.has(done!.order_id)) {
+      if (alerted && !dismissedRef.current.has(done!.order_id)) {
         setAlerting(true);
       }
     }
