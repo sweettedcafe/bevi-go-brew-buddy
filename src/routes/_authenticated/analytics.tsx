@@ -483,7 +483,7 @@ function AnalyticsPage() {
                         <tr><td colSpan={2} className="p-3 text-xs text-muted-foreground text-center">No cashier upsell events in range.</td></tr>
                       )}
                       {upsell.per_barista.map((r) => {
-                        const rate = r.offers > 0 ? (r.skipped / r.offers) * 100 : 0;
+                        const rate = r.orders > 0 ? (r.no / r.orders) * 100 : 0;
                         return (
                           <tr key={r.user_id} className="border-t">
                             <td className="p-2">{r.email}</td>
