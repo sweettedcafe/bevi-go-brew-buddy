@@ -439,7 +439,7 @@ function AnalyticsPage() {
                     </thead>
                     <tbody>
                       {upsell.per_barista.length === 0 && (
-                        <tr><td colSpan={4} className="p-3 text-xs text-muted-foreground text-center">No barista upsell events in range.</td></tr>
+                        <tr><td colSpan={4} className="p-3 text-xs text-muted-foreground text-center">No cashier upsell events in range.</td></tr>
                       )}
                       {upsell.per_barista.map((r) => {
                         const rate = r.offers > 0 ? (r.skipped / r.offers) * 100 : 0;
