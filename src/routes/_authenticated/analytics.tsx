@@ -81,15 +81,31 @@ function AnalyticsPage() {
   async function load() {
     if (!canSee) return;
     setLoading(true);
-    const { data, error } = await db.rpc("pos_analytics", {
-      p_from: from, p_to: to,
-      p_owner_id: ownerId || null,
-      p_category_id: categoryId || null,
-      p_menu_item_id: menuItemId || null,
-    });
+    const [{ data, error }, evs, ups] = await Promise.all([
+      db.rpc("pos_analytics", {
+        p_from: from, p_to: to,
+        p_owner_id: ownerId || null,
+        p_category_id: categoryId || null,
+        p_menu_item_id: menuItemId || null,
+      }),
+      db.rpc("analytics_expenses_vs_sales", { p_from: from, p_to: to }),
+      db.rpc("analytics_upsell", { p_from: from, p_to: to }),
+    ]);
     setLoading(false);
     if (error) { toast.error(error.message); return; }
     setData(data as Analytics);
+    if (!evs.error && evs.data) {
+      setExpVsSales({
+        days: (evs.data.days ?? []).map((d: any) => ({
+          day: d.day, sales: Number(d.sales), expenses: Number(d.expenses),
+        })),
+        totals: {
+          sales: Number(evs.data.totals?.sales ?? 0),
+          expenses: Number(evs.data.totals?.expenses ?? 0),
+        },
+      });
+    }
+    if (!ups.error && ups.data) setUpsell(ups.data as any);
   }
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, []);
 
