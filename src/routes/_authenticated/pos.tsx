@@ -486,7 +486,7 @@ function POSPage() {
     end.setDate(end.getDate() + 1);
     const { data, error } = await db
       .from("orders")
-      .select("id, order_no, customer_name, created_at, total, order_type, status")
+      .select("id, order_no, customer_name, created_at, total, order_type, status, source")
       .gte("created_at", start.toISOString())
       .lt("created_at", end.toISOString())
       .eq("status", "completed")
