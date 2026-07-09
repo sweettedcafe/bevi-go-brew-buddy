@@ -1143,6 +1143,7 @@ function POSPage() {
               name: l.name, qty: l.qty,
               unit_price: l.unit_price, addon_total: l.addon_total,
               customization: l.customization, notes: l.notes,
+              is_upsell: !!l.is_upsell,
             })),
             // Encode the combined client-side discount (item promo + whole-order)
             // as a single fixed manual_discount so server total matches the client.
