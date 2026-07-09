@@ -180,6 +180,16 @@ function DeveloperPage() {
         successKey="deleted_expenses"
         successLabel="Deleted expenses"
       />
+
+      <DangerCard
+        title="Danger Zone — Reset timeclock"
+        description="Hard-deletes every shift, break, and shift expense. Clears the Timeclock Report and End-of-Shift history. Users, roles, and orders are untouched."
+        confirmPhrase="RESET TIMECLOCK"
+        buttonLabel="Reset timeclock now"
+        rpc="dev_reset_timeclock"
+        successKey="deleted_shifts"
+        successLabel="Deleted shifts"
+      />
     </div>
   );
 }
