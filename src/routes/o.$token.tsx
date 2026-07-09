@@ -266,6 +266,7 @@ function SelfOrderPage() {
         items: cart.filter((l) => l.kind === "item").map((l) => ({
           menu_item_id: l.menu_item_id, qty: l.qty,
           addon_total: l.addon_total, customization: l.customization, notes: l.notes,
+          is_upsell: !!l.is_upsell,
         })),
         bundles: cart.filter((l) => l.kind === "bundle").map((l) => ({
           bundle_id: l.bundle_id, qty: l.qty,
