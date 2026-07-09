@@ -187,6 +187,7 @@ function ReportsPage() {
   const itemRowsAll = useMemo(() => {
     const rows: AnyRow[] = [];
     for (const o of orders) {
+      const placedByCustomer = o.source === "self";
       for (const it of (o._items ?? [])) {
         rows.push({
           id: it.id,
@@ -198,6 +199,8 @@ function ReportsPage() {
           name: it.name_snapshot,
           category: it.menu_items?.categories?.name ?? "—",
           owner: it.menu_items?.owners?.name ?? "—",
+          placed_by: placedByCustomer ? "Customer" : "Cashier",
+          upsell: it.is_upsell ? "Yes" : "No",
           qty: Number(it.qty || 0),
           revenue: Number(it.line_total || 0),
         });
