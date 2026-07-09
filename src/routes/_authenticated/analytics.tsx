@@ -366,7 +366,7 @@ function AnalyticsPage() {
         ) : (
           <div className="space-y-4">
             <div className="grid md:grid-cols-2 gap-3">
-              <UpsellSourceCard title="Barista upsell rate" stat={upsell.barista} accent="primary" />
+              <UpsellSourceCard title="Cashier upsell rate" stat={upsell.barista} accent="primary" />
               <UpsellSourceCard title="Customer upsell rate" stat={upsell.customer} accent="primary" />
             </div>
 
