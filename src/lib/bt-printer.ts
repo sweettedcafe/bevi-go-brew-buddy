@@ -29,6 +29,10 @@ export function getPairedPrinter(): BtPrinter | null {
   return { id: pairedDevice.id ?? "", name: pairedDevice.name ?? "Bluetooth printer" };
 }
 
+export function getPairedDevice(): any {
+  return pairedDevice;
+}
+
 export async function findBluetoothPrinter(): Promise<BtPrinter | null> {
   const nav = navigator as any;
   if (!nav.bluetooth) {
