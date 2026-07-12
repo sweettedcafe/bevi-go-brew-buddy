@@ -330,9 +330,10 @@ export function renderFormattedLabelBitmap(
   }
 
   ctx.font = `italic ${quotePx}px system-ui, sans-serif`;
-  let quoteY = Math.max(y + Math.round(3 * scale), h - margin - brandH - quoteBlockH);
+  let quoteY = y + Math.round(2 * scale);
+  const quoteMaxY = h - margin - brandH;
   for (const line of quoteLines) {
-    if (quoteY > h - margin - brandH) break;
+    if (quoteY + quotePx > quoteMaxY) break;
     ctx.fillText(line, margin, quoteY);
     quoteY += quoteLineH;
   }
