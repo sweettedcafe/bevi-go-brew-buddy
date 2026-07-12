@@ -14,9 +14,11 @@
 // and try again.
 
 const NIIMBOT_SERVICES = [
+  // Prefer the well-known B1/B-series protocol service first. Some devices also
+  // expose FF00/FEE7 writable characteristics that accept bytes but do not print.
+  "e7810a71-73ae-499d-8c15-faa9aef0c3f2",
   "0000ff00-0000-1000-8000-00805f9b34fb",
   "0000fee7-0000-1000-8000-00805f9b34fb",
-  "e7810a71-73ae-499d-8c15-faa9aef0c3f2",
 ];
 
 const NIIMBOT_WRITE_CHARACTERISTIC = "bef8d6c9-9c21-4c9e-b632-bd58c1009f9f";
@@ -78,8 +80,19 @@ async function writePacket(ch: any, pkt: Uint8Array) {
   await writeBytes(ch, pkt);
 }
 
+const DPM = 8; // dots per mm at 203dpi
+const B1_PRINTHEAD_DOTS = 384; // Niimbot B1 printhead width for 50×30 labels
+
+function labelDots(widthMm: number, heightMm: number) {
+  const requestedW = Math.ceil(Math.round(widthMm * DPM) / 8) * 8;
+  const w = Math.min(B1_PRINTHEAD_DOTS, requestedW);
+  const h = Math.max(1, Math.round(heightMm * DPM));
+  return { w, h };
+}
+
 // Render a plain-text label to a monochrome bitmap. Width/height in mm,
-// converted to dots at 8 dots/mm (203dpi).
+// converted to dots at 8 dots/mm (203dpi). For the B1, a 50mm label is
+// printed through a 384-dot head, so we cap the raster width at 384 dots.
 export function renderLabelBitmap(
   text: string,
   widthMm: number,
@@ -87,9 +100,7 @@ export function renderLabelBitmap(
   fontPx = 22,
 ): { width: number; height: number; rows: Uint8Array[] } {
   if (typeof document === "undefined") throw new Error("Canvas not available");
-  const DPM = 8; // dots per mm at 203dpi
-  const w = Math.ceil(Math.round(widthMm * DPM) / 8) * 8;
-  const h = Math.round(heightMm * DPM);
+  const { w, h } = labelDots(widthMm, heightMm);
   const wBytes = Math.ceil(w / 8);
 
   const canvas = document.createElement("canvas");
@@ -227,9 +238,7 @@ export function renderFormattedLabelBitmap(
   heightMm: number,
 ): NiimbotBitmap {
   if (typeof document === "undefined") throw new Error("Canvas not available");
-  const DPM = 8;
-  const w = Math.ceil(Math.round(widthMm * DPM) / 8) * 8;
-  const h = Math.round(heightMm * DPM);
+  const { w, h } = labelDots(widthMm, heightMm);
   const scale = Math.max(0.72, Math.min(1.18, Math.min(widthMm / 58, heightMm / 40)));
   const margin = Math.max(10, Math.round(16 * scale));
   const canvas = document.createElement("canvas");
@@ -335,39 +344,51 @@ function u16(n: number): [number, number] {
   return [(n >> 8) & 0xff, n & 0xff];
 }
 
-function countBlackPixelsThirds(row: Uint8Array, width: number): [number, number, number] {
-  // Niimbot 0x85 requires 3 single-byte counts, one per horizontal third of the row.
-  const third = Math.ceil(width / 3);
-  const counts = [0, 0, 0];
+function countBlackPixelsTotal(row: Uint8Array, width: number): [number, number, number] {
+  // B1 expects total mode for 0x85 rows: [0x00, total_lo, total_hi].
+  // Split-third counts can make the printer feed/eject but produce a blank label.
+  let count = 0;
   for (let x = 0; x < width; x++) {
     const bit = row[x >> 3] & (0x80 >> (x & 7));
-    if (bit) {
-      const idx = Math.min(2, Math.floor(x / third));
-      counts[idx]++;
-    }
+    if (bit) count++;
   }
-  return [Math.min(255, counts[0]), Math.min(255, counts[1]), Math.min(255, counts[2])];
+  return [0x00, count & 0xff, (count >> 8) & 0xff];
+}
+
+function isBlankRow(row: Uint8Array) {
+  for (let i = 0; i < row.length; i++) if (row[i] !== 0) return false;
+  return true;
+}
+
+function sameRow(a: Uint8Array, b: Uint8Array) {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
 }
 
 async function printBitmapPage(ch: any, bmp: NiimbotBitmap, copies: number) {
   // B1 is more reliable with the 6-byte page-size payload: rows, cols, copies.
   await writePacket(ch, makePacket(0x03, [0x01])); // page start
   await writePacket(ch, makePacket(0x13, [...u16(bmp.height), ...u16(bmp.width), ...u16(copies)]));
-  await writePacket(ch, makePacket(0x15, [...u16(copies)]));
 
-  for (let y = 0; y < bmp.rows.length; y++) {
+  for (let y = 0; y < bmp.rows.length;) {
     const row = bmp.rows[y];
-    let any = false;
-    for (let i = 0; i < row.length; i++) if (row[i]) { any = true; break; }
-    if (!any) {
-      await writePacket(ch, makePacket(0x84, [...u16(y), 1]));
+    let repeat = 1;
+    while (y + repeat < bmp.rows.length && repeat < 255 && sameRow(row, bmp.rows[y + repeat])) repeat++;
+    if (isBlankRow(row)) {
+      await writePacket(ch, makePacket(0x84, [...u16(y), repeat]));
+      y += repeat;
       continue;
     }
-    await writePacket(ch, makePacket(0x85, [...u16(y), ...countBlackPixelsThirds(row, bmp.width), 1, ...row]));
+    await writePacket(ch, makePacket(0x85, [...u16(y), ...countBlackPixelsTotal(row, bmp.width), repeat, ...row]));
+    y += repeat;
   }
 
   await writePacket(ch, makePacket(0xe3, [0x01])); // page end
-  await sleep(120);
+  for (let i = 0; i < 6; i++) {
+    await sleep(90);
+    await writePacket(ch, makePacket(0xa3, [0x01])); // print status/keepalive for B1
+  }
 }
 
 export async function printNiimbotBitmaps(opts: {
@@ -410,4 +431,27 @@ export async function printNiimbotLabel(opts: NiimbotOptions) {
   const { device, text, widthMm, heightMm, quantity, fontPx, density } = opts;
   const bmp = renderLabelBitmap(text, widthMm, heightMm, fontPx);
   await printNiimbotBitmaps({ device, bitmaps: [bmp], density, copies: quantity });
+}
+
+export async function printNiimbotLabelHtml(opts: {
+  device: any;
+  html: string;
+  text: string;
+  density?: number;
+  copies?: number;
+  fontPx?: number;
+  widthMm?: number;
+  heightMm?: number;
+}) {
+  const widthMm = opts.widthMm ?? 50;
+  const heightMm = opts.heightMm ?? 30;
+  const bitmaps = hasNiimbotLabelHtml(opts.html)
+    ? renderLabelHtmlBitmaps(opts.html, widthMm, heightMm)
+    : [renderLabelBitmap(opts.text, widthMm, heightMm, opts.fontPx ?? 22)];
+  await printNiimbotBitmaps({
+    device: opts.device,
+    bitmaps,
+    density: opts.density ?? 3,
+    copies: opts.copies ?? 1,
+  });
 }

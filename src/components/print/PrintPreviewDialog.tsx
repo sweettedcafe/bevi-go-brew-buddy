@@ -13,10 +13,11 @@ import {
   findBluetoothPrinter,
   isBluetoothSupported,
   getPairedPrinter,
+  getOrRestorePairedDevice,
   printTextToBluetooth,
   htmlToPlainText,
 } from "@/lib/bt-printer";
-import { isLikelyNiimbot } from "@/lib/niimbot";
+import { isLikelyNiimbot, printNiimbotLabelHtml } from "@/lib/niimbot";
 import { NiimbotPrintDialog } from "@/components/print/NiimbotPrintDialog";
 import { toast } from "sonner";
 
@@ -44,6 +45,7 @@ const RECEIPT_PRESETS: PaperPreset[] = [
 ];
 
 const LABEL_PRESETS: PaperPreset[] = [
+  { id: "50x30", label: "50×30mm label", paper: { kind: "fixed", widthMm: 50, heightMm: 30 } },
   { id: "58x40", label: "58×40mm label", paper: { kind: "fixed", widthMm: 58, heightMm: 40 } },
   { id: "40x30", label: "40×30mm label", paper: { kind: "fixed", widthMm: 40, heightMm: 30 } },
   { id: "80mm", label: "80mm thermal (roll)", paper: { kind: "roll", widthMm: 80 } },
@@ -65,6 +67,7 @@ export function PrintPreviewDialog({
   const [customW, setCustomW] = useState<string>("80");
   const [customH, setCustomH] = useState<string>("");
   const [niimbotOpen, setNiimbotOpen] = useState(false);
+  const [sendingNiimbot, setSendingNiimbot] = useState(false);
 
   useEffect(() => {
     if (open) setActiveId(firstId);
@@ -74,6 +77,11 @@ export function PrintPreviewDialog({
     () => documents.find((doc) => doc.id === activeId) ?? documents[0] ?? null,
     [activeId, documents],
   );
+  const labelDocument = useMemo(
+    () => documents.find((doc) => doc.id === "labels") ?? null,
+    [documents],
+  );
+  const niimbotDocument = labelDocument ?? active;
 
   const presets = active?.id === "labels" ? LABEL_PRESETS : RECEIPT_PRESETS;
 
@@ -116,8 +124,32 @@ export function PrintPreviewDialog({
     }
   }
 
-  function printActive() {
+  async function sendNiimbotLabel(device: any, doc: PrintPreviewDocument) {
+    setSendingNiimbot(true);
+    try {
+      toast.message(`Sending label to ${device.name ?? "Niimbot"}…`);
+      await printNiimbotLabelHtml({
+        device,
+        html: doc.html,
+        text: htmlToPlainText(doc.html),
+        widthMm: 50,
+        heightMm: 30,
+      });
+      toast.success(`Label sent to ${device.name ?? "Niimbot"}`);
+    } catch (error: any) {
+      toast.error(error?.message ?? "Niimbot print failed");
+    } finally {
+      setSendingNiimbot(false);
+    }
+  }
+
+  async function printActive() {
     if (!active || typeof window === "undefined") return;
+    const pairedDevice = await getOrRestorePairedDevice();
+    if (active.id === "labels" && pairedDevice && isLikelyNiimbot(pairedDevice.name)) {
+      await sendNiimbotLabel(pairedDevice, active);
+      return;
+    }
     const iframe = document.createElement("iframe");
     iframe.setAttribute("aria-hidden", "true");
     iframe.style.position = "fixed";
@@ -153,9 +185,13 @@ export function PrintPreviewDialog({
       if (!already) toast.success(`Bluetooth printer paired: ${printer.name}`);
       if (!active) return;
       // Niimbot B-series uses a proprietary format — open the dedicated
-      // adjustment dialog instead of sending ESC/POS bytes.
+      // direct print path instead of sending ESC/POS bytes.
       if (isLikelyNiimbot(printer.name)) {
-        setNiimbotOpen(true);
+        const device = await getOrRestorePairedDevice();
+        const labelDoc = labelDocument ?? active;
+        if (labelDocument) setActiveId("labels");
+        if (device) await sendNiimbotLabel(device, labelDoc);
+        else setNiimbotOpen(true);
         return;
       }
       const text = htmlToPlainText(active.html);
@@ -245,7 +281,7 @@ export function PrintPreviewDialog({
         </Tabs>
 
         <div className="border-t px-4 sm:px-6 py-3 flex flex-wrap items-center gap-2">
-          <Button onClick={printActive}>
+          <Button onClick={printActive} disabled={sendingNiimbot}>
             <Printer className="h-4 w-4 mr-2" /> Print
           </Button>
           <Button variant="outline" onClick={savePdf}>
@@ -274,10 +310,10 @@ export function PrintPreviewDialog({
     <NiimbotPrintDialog
       open={niimbotOpen}
       onOpenChange={setNiimbotOpen}
-      initialText={active ? htmlToPlainText(active.html) : ""}
-      initialHtml={active?.html ?? ""}
-      initialWidthMm={active?.id === "labels" ? 50 : 50}
-      initialHeightMm={active?.id === "labels" ? 30 : 40}
+      initialText={niimbotDocument ? htmlToPlainText(niimbotDocument.html) : ""}
+      initialHtml={niimbotDocument?.html ?? ""}
+      initialWidthMm={50}
+      initialHeightMm={niimbotDocument?.id === "labels" ? 30 : 40}
     />
     </>
   );

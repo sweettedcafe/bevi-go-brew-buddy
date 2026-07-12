@@ -33,6 +33,17 @@ export function getPairedDevice(): any {
   return pairedDevice;
 }
 
+export async function getOrRestorePairedDevice(): Promise<any> {
+  if (pairedDevice) return pairedDevice;
+  const nav = navigator as any;
+  if (!nav.bluetooth?.getDevices) return null;
+  const devices = await nav.bluetooth.getDevices();
+  const device = devices.find((d: any) => /niimbot|b1\b|b18|b21|b3s|d11|d110|d101/i.test(d.name ?? "")) ?? devices[0];
+  if (!device) return null;
+  pairedDevice = device;
+  return pairedDevice;
+}
+
 export async function findBluetoothPrinter(): Promise<BtPrinter | null> {
   const nav = navigator as any;
   if (!nav.bluetooth) {

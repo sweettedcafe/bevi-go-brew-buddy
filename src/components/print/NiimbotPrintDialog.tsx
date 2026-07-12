@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
-import { getPairedDevice, getPairedPrinter, htmlToPlainText } from "@/lib/bt-printer";
+import { getOrRestorePairedDevice, getPairedPrinter, htmlToPlainText } from "@/lib/bt-printer";
 import {
   bitmapToDataUrl,
   hasNiimbotLabelHtml,
@@ -38,7 +38,7 @@ export function NiimbotPrintDialog({
   initialWidthMm?: number;
   initialHeightMm?: number;
 }) {
-  const paired = getPairedPrinter();
+  const [pairedName, setPairedName] = useState(() => getPairedPrinter()?.name ?? "Niimbot");
   const [text, setText] = useState(() => toPlain(initialText));
   const [widthMm, setWidthMm] = useState(initialWidthMm);
   const [heightMm, setHeightMm] = useState(initialHeightMm);
@@ -55,6 +55,7 @@ export function NiimbotPrintDialog({
       setText(toPlain(initialText));
       setWidthMm(initialWidthMm);
       setHeightMm(initialHeightMm);
+      setPairedName(getPairedPrinter()?.name ?? "Niimbot");
     }
   }, [open, initialText, initialWidthMm, initialHeightMm]);
 
@@ -82,9 +83,9 @@ export function NiimbotPrintDialog({
   const dots = useMemo(() => ({ w: Math.round(widthMm * 8), h: Math.round(heightMm * 8) }), [widthMm, heightMm]);
 
   async function doPrint() {
-    const device = getPairedDevice();
+    const device = await getOrRestorePairedDevice();
     if (!device) {
-      toast.error("Pair a Niimbot printer first.");
+      toast.error("Pair a Niimbot printer first, then tap Print again.");
       return;
     }
     setSending(true);
@@ -92,7 +93,9 @@ export function NiimbotPrintDialog({
       const bitmaps = buildBitmaps();
       await printNiimbotBitmaps({ device, bitmaps, density, copies: quantity });
       const total = bitmaps.length * quantity;
-      toast.success(`Sent ${total} label${total > 1 ? "s" : ""} to ${paired?.name ?? "Niimbot"}`);
+      const printerName = device.name ?? pairedName;
+      setPairedName(printerName);
+      toast.success(`Sent ${total} label${total > 1 ? "s" : ""} to ${printerName}`);
       onOpenChange(false);
     } catch (e: any) {
       toast.error(e?.message ?? "Niimbot print failed");
@@ -108,7 +111,7 @@ export function NiimbotPrintDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Bluetooth className="h-5 w-5 text-primary" />
-            Niimbot label — {paired?.name ?? "not paired"}
+            Niimbot label — {pairedName}
           </DialogTitle>
           <DialogDescription>
             Adjust the label size and density, then tap Print to send the formatted label to the device.
@@ -181,7 +184,7 @@ export function NiimbotPrintDialog({
 
         <div className="flex items-center justify-end gap-2 p-4 border-t bg-background">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={doPrint} disabled={sending || !paired}>
+          <Button onClick={doPrint} disabled={sending}>
             <Printer className="h-4 w-4 mr-2" />
             {sending ? "Printing…" : `Print ${quantity > 1 ? `× ${quantity}` : ""}`}
           </Button>
