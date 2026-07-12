@@ -119,6 +119,11 @@ export function PrintPreviewDialog({
 
   function printActive() {
     if (!active || typeof window === "undefined") return;
+    const paired = getPairedPrinter();
+    if (active.id === "labels" && paired && isLikelyNiimbot(paired.name)) {
+      setNiimbotOpen(true);
+      return;
+    }
     const iframe = document.createElement("iframe");
     iframe.setAttribute("aria-hidden", "true");
     iframe.style.position = "fixed";
