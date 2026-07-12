@@ -335,16 +335,18 @@ function u16(n: number): [number, number] {
   return [(n >> 8) & 0xff, n & 0xff];
 }
 
-function countBlackPixels(row: Uint8Array): [number, number, number] {
-  let total = 0;
-  for (const value of row) {
-    let v = value;
-    while (v) {
-      total += v & 1;
-      v >>= 1;
+function countBlackPixelsThirds(row: Uint8Array, width: number): [number, number, number] {
+  // Niimbot 0x85 requires 3 single-byte counts, one per horizontal third of the row.
+  const third = Math.ceil(width / 3);
+  const counts = [0, 0, 0];
+  for (let x = 0; x < width; x++) {
+    const bit = row[x >> 3] & (0x80 >> (x & 7));
+    if (bit) {
+      const idx = Math.min(2, Math.floor(x / third));
+      counts[idx]++;
     }
   }
-  return [0, total & 0xff, (total >> 8) & 0xff];
+  return [Math.min(255, counts[0]), Math.min(255, counts[1]), Math.min(255, counts[2])];
 }
 
 async function printBitmapPage(ch: any, bmp: NiimbotBitmap, copies: number) {
