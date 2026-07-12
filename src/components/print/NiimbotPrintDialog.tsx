@@ -7,8 +7,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
-import { getPairedDevice, getPairedPrinter } from "@/lib/bt-printer";
+import { getPairedDevice, getPairedPrinter, htmlToPlainText } from "@/lib/bt-printer";
 import { printNiimbotLabel, renderLabelBitmap } from "@/lib/niimbot";
+
+function toPlain(s: string): string {
+  if (!s) return "";
+  // strip if it looks like HTML
+  return /<[a-z!/]/i.test(s) ? htmlToPlainText(s) : s;
+}
 
 export function NiimbotPrintDialog({
   open,
