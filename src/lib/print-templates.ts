@@ -1,4 +1,4 @@
-// HTML generators for thermal receipts (80mm) and drink labels (~58×40mm).
+// HTML generators for thermal receipts (80mm) and drink labels (50×30mm).
 // CSS targets @page so it prints correctly on most thermal printers.
 
 import type { PrintSettings } from "./print-settings";
@@ -113,20 +113,21 @@ export function labelsHTML(labels: DrinkLabel[], s: PrintSettings): string {
 
   return `
 <style>
-  @page { size: 58mm 40mm; margin: 2mm; }
+  @page { size: 50mm 30mm; margin: 0; }
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: "Inter", system-ui, sans-serif; color: #000; }
-  .label { width: 54mm; height: 36mm; padding: 2mm; display: flex; flex-direction: column; }
+  body { margin: 0; font-family: "Inter", system-ui, sans-serif; color: #000; width: 50mm; }
+  .label { width: 50mm; height: 30mm; padding: 1mm; display: flex; flex-direction: column; overflow: hidden; }
   .brk { page-break-after: always; }
-  .row { display: flex; justify-content: space-between; font-size: 9px; }
-  .top { margin-bottom: 2px; }
+  .row { display: flex; justify-content: space-between; gap: 2mm; font-size: 7px; line-height: 1.05; }
+  .top { margin-bottom: 1px; }
   .ord { font-weight: 700; }
-  .name { font-size: 14px; font-weight: 700; line-height: 1.1; margin-top: 2px; }
-  .cup  { font-size: 10px; color: #333; }
-  .cust { font-size: 12px; margin-top: 2px; font-weight: 600; }
-  .notes { font-size: 9px; font-style: italic; }
-  .quote { font-size: 8px; font-style: italic; color: #444; margin-top: auto; line-height: 1.15; }
-  .brand { font-size: 7px; color: #666; text-align: right; margin-top: 1px; }
+  .when { flex: 0 0 auto; }
+  .name { font-size: 12px; font-weight: 700; line-height: 1.05; margin-top: 1px; }
+  .cup  { font-size: 8px; color: #333; line-height: 1.05; }
+  .cust { font-size: 9px; margin-top: 1px; font-weight: 600; line-height: 1.05; }
+  .notes { font-size: 7px; font-style: italic; line-height: 1.08; }
+  .quote { font-size: 6.5px; font-style: italic; color: #444; margin-top: auto; line-height: 1.08; }
+  .brand { font-size: 6px; color: #666; text-align: right; margin-top: 0.5px; line-height: 1; }
 </style>
 ${each}
 `;

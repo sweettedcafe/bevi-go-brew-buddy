@@ -635,7 +635,7 @@ function POSPage() {
           title: `Labels #${args.orderNo}`,
           html: labelsHTML(labels, settings),
           filename: `labels-${String(args.orderNo).padStart(3, "0")}.pdf`,
-          widthMm: 58,
+          widthMm: 50,
         });
       }
     }

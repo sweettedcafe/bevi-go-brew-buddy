@@ -70,7 +70,10 @@ async function writeBytes(ch: any, data: Uint8Array) {
       } else {
         await ch.writeValue(data);
       }
-      await sleep(ch.properties?.writeWithoutResponse && !ch.properties?.write ? 24 : 16);
+      // B1 printers can acknowledge BLE writes faster than the print task can
+      // consume bitmap rows. A slightly slower cadence prevents the common
+      // failure where only the first/top band is printed and the rest is blank.
+      await sleep(ch.properties?.writeWithoutResponse && !ch.properties?.write ? 42 : 30);
       return;
     } catch (error) {
       if (tries === 29) throw error;
@@ -203,6 +206,11 @@ function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number,
   return lines;
 }
 
+function drawCenteredFallback(ctx: CanvasRenderingContext2D, text: string, y: number, width: number) {
+  const measured = ctx.measureText(text).width;
+  ctx.fillText(text, Math.max(0, (width - measured) / 2), y);
+}
+
 function drawWrappedText(
   ctx: CanvasRenderingContext2D,
   text: string,
@@ -259,10 +267,10 @@ export function renderFormattedLabelBitmap(
 ): NiimbotBitmap {
   if (typeof document === "undefined") throw new Error("Canvas not available");
   const { w, h } = labelDots(widthMm, heightMm);
-  // 50×30mm on a B1 is only 384×240 dots. Keep the layout compact so every
-  // field (drink, customer, notes, quote, shop) lands inside the printable area.
-  const scale = Math.max(0.68, Math.min(1, Math.min(widthMm / 50, heightMm / 30)));
-  const margin = Math.max(8, Math.round(10 * scale));
+  // 50×30mm on a B1 is only 384×240 dots. Keep everything in compact bands
+  // with small, even margins so the printed label shows more than the header.
+  const scale = Math.max(0.72, Math.min(1, Math.min(widthMm / 50, heightMm / 30)));
+  const margin = Math.max(6, Math.round(8 * scale));
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;
@@ -273,22 +281,22 @@ export function renderFormattedLabelBitmap(
   ctx.textBaseline = "top";
 
   const contentW = w - margin * 2;
-  const headerPx = Math.round(15 * scale);
-  const namePx = Math.round(24 * scale);
-  const cupPx = Math.round(15 * scale);
-  const customerPx = Math.round(18 * scale);
-  const notesPx = Math.round(14 * scale);
-  const quotePx = Math.round(13 * scale);
-  const brandPx = Math.round(11 * scale);
+  const headerPx = Math.round(12 * scale);
+  const namePx = Math.round(20 * scale);
+  const cupPx = Math.round(12 * scale);
+  const customerPx = Math.round(15 * scale);
+  const notesPx = Math.round(11 * scale);
+  const quotePx = Math.round(10 * scale);
+  const brandPx = Math.round(9 * scale);
 
   ctx.font = `${headerPx}px system-ui, sans-serif`;
   fitText(ctx, label.order, margin, margin, Math.round(contentW * 0.68));
   const whenW = Math.round(contentW * 0.3);
   fitText(ctx, label.when, w - margin - whenW, margin, whenW);
 
-  let y = margin + Math.round(headerPx * 1.25);
+  let y = margin + Math.round(headerPx * 1.3) + 2;
   ctx.font = `700 ${namePx}px system-ui, sans-serif`;
-  y = drawWrappedText(ctx, label.name, margin, y, contentW, Math.round(namePx * 1.12), 2);
+  y = drawWrappedText(ctx, label.name || "Order item", margin, y, contentW, Math.round(namePx * 1.08), 2);
 
   ctx.font = `${cupPx}px system-ui, sans-serif`;
   if (label.cup) {
@@ -302,11 +310,17 @@ export function renderFormattedLabelBitmap(
     y += Math.round(customerPx * 1.15);
   }
 
+  if (!label.name && !label.customer && !label.notes) {
+    ctx.font = `700 ${Math.round(16 * scale)}px system-ui, sans-serif`;
+    drawCenteredFallback(ctx, "Label details", Math.round(h * 0.45), w);
+  }
+
   const brandH = Math.round(brandPx * 1.25);
   const quoteLineH = Math.round(quotePx * 1.22);
+  ctx.font = `italic ${quotePx}px system-ui, sans-serif`;
   const quoteLines = wrapText(ctx, label.quote, contentW, 2);
   const quoteBlockH = quoteLines.length * quoteLineH;
-  const bottomReserved = brandH + quoteBlockH + Math.round(5 * scale);
+  const bottomReserved = brandH + quoteBlockH + Math.round(4 * scale);
   const notesBottom = h - margin - bottomReserved;
   ctx.font = `italic ${notesPx}px system-ui, sans-serif`;
   for (const line of wrapText(ctx, label.notes, contentW, 2)) {
@@ -385,6 +399,30 @@ function countBlackPixelsTotal(row: Uint8Array, width: number): [number, number,
   return [0x00, count & 0xff, (count >> 8) & 0xff];
 }
 
+function countBlackPixels(row: Uint8Array, width: number): number {
+  let count = 0;
+  for (let x = 0; x < width; x++) {
+    const bit = row[x >> 3] & (0x80 >> (x & 7));
+    if (bit) count++;
+  }
+  return count;
+}
+
+function rowEquals(a: Uint8Array, b: Uint8Array) {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+
+function blackPixelIndexes(row: Uint8Array, width: number): number[] {
+  const out: number[] = [];
+  for (let x = 0; x < width; x++) {
+    const bit = row[x >> 3] & (0x80 >> (x & 7));
+    if (bit) out.push(...u16(x));
+  }
+  return out;
+}
+
 function isBlankRow(row: Uint8Array) {
   for (let i = 0; i < row.length; i++) if (row[i] !== 0) return false;
   return true;
@@ -395,13 +433,27 @@ async function printBitmapPage(ch: any, bmp: NiimbotBitmap, copies: number) {
   await writePacket(ch, makePacket(0x03, [0x01])); // page start
   await writePacket(ch, makePacket(0x13, [...u16(bmp.height), ...u16(bmp.width), ...u16(copies)]));
 
-  for (let y = 0; y < bmp.rows.length; y++) {
+  let packetCount = 0;
+  for (let y = 0; y < bmp.rows.length;) {
     const row = bmp.rows[y];
-    if (isBlankRow(row)) continue;
-    // Keep repeat fixed at 1. The protocol requires this byte before the bitmap
-    // data, while avoiding grouped repeats prevents later content bands from
-    // being skipped by stricter B1 firmwares.
-    await writePacket(ch, makePacket(0x85, [...u16(y), ...countBlackPixelsTotal(row, bmp.width), 1, ...row]));
+    let repeat = 1;
+    while (y + repeat < bmp.rows.length && repeat < 255 && rowEquals(row, bmp.rows[y + repeat])) repeat++;
+
+    if (isBlankRow(row)) {
+      // Send explicit blank rows instead of skipping gaps. Several B1 units
+      // print only the first visible band when blank gaps are omitted.
+      await writePacket(ch, makePacket(0x84, [...u16(y), repeat]));
+    } else {
+      const black = countBlackPixels(row, bmp.width);
+      if (black > 0 && black <= 6) {
+        await writePacket(ch, makePacket(0x83, [...u16(y), 0x00, black & 0xff, (black >> 8) & 0xff, repeat, ...blackPixelIndexes(row, bmp.width)]));
+      } else {
+        await writePacket(ch, makePacket(0x85, [...u16(y), ...countBlackPixelsTotal(row, bmp.width), repeat, ...row]));
+      }
+    }
+    y += repeat;
+    packetCount++;
+    if (packetCount % 28 === 0) await sleep(80);
   }
 
   await writePacket(ch, makePacket(0xe3, [0x01])); // page end
