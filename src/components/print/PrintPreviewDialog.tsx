@@ -16,6 +16,8 @@ import {
   printTextToBluetooth,
   htmlToPlainText,
 } from "@/lib/bt-printer";
+import { isLikelyNiimbot } from "@/lib/niimbot";
+import { NiimbotPrintDialog } from "@/components/print/NiimbotPrintDialog";
 import { toast } from "sonner";
 
 export type PrintPreviewDocument = {
@@ -62,6 +64,7 @@ export function PrintPreviewDialog({
   const [paperId, setPaperId] = useState<string>("");
   const [customW, setCustomW] = useState<string>("80");
   const [customH, setCustomH] = useState<string>("");
+  const [niimbotOpen, setNiimbotOpen] = useState(false);
 
   useEffect(() => {
     if (open) setActiveId(firstId);
@@ -149,6 +152,12 @@ export function PrintPreviewDialog({
       if (!printer) return;
       if (!already) toast.success(`Bluetooth printer paired: ${printer.name}`);
       if (!active) return;
+      // Niimbot B-series uses a proprietary format — open the dedicated
+      // adjustment dialog instead of sending ESC/POS bytes.
+      if (isLikelyNiimbot(printer.name)) {
+        setNiimbotOpen(true);
+        return;
+      }
       const text = htmlToPlainText(active.html);
       toast.message(`Sending ${active.label.toLowerCase()} to ${printer.name}…`);
       await printTextToBluetooth(text);
@@ -161,6 +170,7 @@ export function PrintPreviewDialog({
   if (!active) return null;
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl h-[92vh] p-0 overflow-hidden grid grid-rows-[auto,auto,1fr,auto]">
         <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-6 pb-3 border-b">
@@ -261,6 +271,14 @@ export function PrintPreviewDialog({
         </div>
       </DialogContent>
     </Dialog>
+    <NiimbotPrintDialog
+      open={niimbotOpen}
+      onOpenChange={setNiimbotOpen}
+      initialText={active ? htmlToPlainText(active.html) : ""}
+      initialWidthMm={active?.id === "labels" ? 50 : 50}
+      initialHeightMm={active?.id === "labels" ? 30 : 40}
+    />
+    </>
   );
 }
 
