@@ -370,7 +370,6 @@ async function printBitmapPage(ch: any, bmp: NiimbotBitmap, copies: number) {
   // B1 is more reliable with the 6-byte page-size payload: rows, cols, copies.
   await writePacket(ch, makePacket(0x03, [0x01])); // page start
   await writePacket(ch, makePacket(0x13, [...u16(bmp.height), ...u16(bmp.width), ...u16(copies)]));
-  await writePacket(ch, makePacket(0x15, [...u16(copies)]));
 
   for (let y = 0; y < bmp.rows.length;) {
     const row = bmp.rows[y];
