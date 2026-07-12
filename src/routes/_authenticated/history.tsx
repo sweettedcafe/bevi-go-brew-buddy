@@ -118,37 +118,12 @@ function HistoryPage() {
   }
 
   async function reprintLabels(r: Row) {
-    const { data: items } = await db
-      .from("order_items")
-      .select("menu_item_id, name_snapshot, qty, notes, menu_items(category_id, categories(prints_label))")
-      .eq("order_id", r.id);
-    const labels: DrinkLabel[] = [];
-    for (const it of (items ?? []) as any[]) {
-      const isDrink = it.menu_items?.categories?.prints_label === true;
-      if (!isDrink) continue;
-      const total = Number(it.qty);
-      for (let i = 1; i <= total; i++) {
-        labels.push({
-          orderNo: r.order_no,
-          drinkName: it.name_snapshot,
-          cupIndex: i, cupTotal: total,
-          customerName: r.customer_name,
-          notes: it.notes,
-          createdAt: r.created_at,
-        });
-      }
-    }
-    if (labels.length === 0) { toast.message("No drinks to label in this order."); return; }
-    setPrintDocs([{
-      id: "labels",
-      label: "Labels",
-      title: `Labels #${r.order_no}`,
-      html: labelsHTML(labels, loadPrintSettings()),
-      filename: `labels-${String(r.order_no).padStart(3, "0")}.pdf`,
-      widthMm: 58,
-    }]);
+    const doc = await reprintLabelsById(r.id);
+    if (!doc) { toast.message("No drinks to label in this order."); return; }
+    setPrintDocs([doc]);
     setPrintOpen(true);
   }
+
 
   return (
     <div className="p-4 sm:p-6 max-w-5xl mx-auto">
