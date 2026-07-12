@@ -8,7 +8,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
 import { getPairedDevice, getPairedPrinter, htmlToPlainText } from "@/lib/bt-printer";
-import { printNiimbotLabel, renderLabelBitmap } from "@/lib/niimbot";
+import {
+  bitmapToDataUrl,
+  hasNiimbotLabelHtml,
+  printNiimbotBitmaps,
+  renderLabelBitmap,
+  renderLabelHtmlBitmaps,
+  type NiimbotBitmap,
+} from "@/lib/niimbot";
 
 function toPlain(s: string): string {
   if (!s) return "";
@@ -20,12 +27,14 @@ export function NiimbotPrintDialog({
   open,
   onOpenChange,
   initialText,
+  initialHtml = "",
   initialWidthMm = 50,
   initialHeightMm = 30,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   initialText: string;
+  initialHtml?: string;
   initialWidthMm?: number;
   initialHeightMm?: number;
 }) {
@@ -38,6 +47,8 @@ export function NiimbotPrintDialog({
   const [fontPx, setFontPx] = useState(22);
   const [sending, setSending] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string>("");
+  const [labelCount, setLabelCount] = useState(1);
+  const hasFormattedLabels = hasNiimbotLabelHtml(initialHtml);
 
   useEffect(() => {
     if (open) {
@@ -47,32 +58,26 @@ export function NiimbotPrintDialog({
     }
   }, [open, initialText, initialWidthMm, initialHeightMm]);
 
+  function buildBitmaps(): NiimbotBitmap[] {
+    if (hasNiimbotLabelHtml(initialHtml)) {
+      const bitmaps = renderLabelHtmlBitmaps(initialHtml, widthMm, heightMm);
+      if (bitmaps.length > 0) return bitmaps;
+    }
+    return [renderLabelBitmap(text, widthMm, heightMm, fontPx)];
+  }
+
   // Regenerate a canvas preview whenever inputs change.
   useEffect(() => {
     if (!open) return;
     try {
-      const bmp = renderLabelBitmap(text, widthMm, heightMm, fontPx);
-      const canvas = document.createElement("canvas");
-      canvas.width = bmp.width;
-      canvas.height = bmp.height;
-      const ctx = canvas.getContext("2d")!;
-      const img = ctx.createImageData(bmp.width, bmp.height);
-      const wBytes = Math.ceil(bmp.width / 8);
-      for (let y = 0; y < bmp.height; y++) {
-        const row = bmp.rows[y];
-        for (let x = 0; x < bmp.width; x++) {
-          const bit = row[Math.floor(x / 8) < wBytes ? Math.floor(x / 8) : 0] & (0x80 >> (x & 7));
-          const idx = (y * bmp.width + x) * 4;
-          const v = bit ? 0 : 255;
-          img.data[idx] = v; img.data[idx + 1] = v; img.data[idx + 2] = v; img.data[idx + 3] = 255;
-        }
-      }
-      ctx.putImageData(img, 0, 0);
-      setPreviewUrl(canvas.toDataURL("image/png"));
+      const bitmaps = buildBitmaps();
+      setLabelCount(bitmaps.length);
+      setPreviewUrl(bitmaps[0] ? bitmapToDataUrl(bitmaps[0]) : "");
     } catch {
       setPreviewUrl("");
+      setLabelCount(1);
     }
-  }, [open, text, widthMm, heightMm, fontPx]);
+  }, [open, text, initialHtml, widthMm, heightMm, fontPx]);
 
   const dots = useMemo(() => ({ w: Math.round(widthMm * 8), h: Math.round(heightMm * 8) }), [widthMm, heightMm]);
 
@@ -84,10 +89,10 @@ export function NiimbotPrintDialog({
     }
     setSending(true);
     try {
-      await printNiimbotLabel({
-        device, text, widthMm, heightMm, density, quantity, fontPx,
-      });
-      toast.success(`Sent ${quantity} label${quantity > 1 ? "s" : ""} to ${paired?.name ?? "Niimbot"}`);
+      const bitmaps = buildBitmaps();
+      await printNiimbotBitmaps({ device, bitmaps, density, copies: quantity });
+      const total = bitmaps.length * quantity;
+      toast.success(`Sent ${total} label${total > 1 ? "s" : ""} to ${paired?.name ?? "Niimbot"}`);
       onOpenChange(false);
     } catch (e: any) {
       toast.error(e?.message ?? "Niimbot print failed");
@@ -106,17 +111,23 @@ export function NiimbotPrintDialog({
             Niimbot label — {paired?.name ?? "not paired"}
           </DialogTitle>
           <DialogDescription>
-            This printer uses Niimbot's proprietary format. Adjust the label size,
-            density, and text below, then tap Print to send it to the device.
+            Adjust the label size and density, then tap Print to send the formatted label to the device.
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid md:grid-cols-2 gap-4">
           <div className="space-y-3">
-            <div>
-              <Label className="text-xs">Label text</Label>
-              <Textarea rows={6} value={text} onChange={(e) => setText(e.target.value)} />
-            </div>
+            {!hasFormattedLabels && (
+              <div>
+                <Label className="text-xs">Label text</Label>
+                <Textarea rows={6} value={text} onChange={(e) => setText(e.target.value)} />
+              </div>
+            )}
+            {hasFormattedLabels && (
+              <div className="rounded-md border bg-muted/30 p-3 text-sm">
+                Printing the formatted order label{labelCount > 1 ? `s (${labelCount})` : ""} with order number, drink, customer, notes, quote, and shop name.
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <Label className="text-xs">Width (mm)</Label>
@@ -134,7 +145,7 @@ export function NiimbotPrintDialog({
                   onChange={(e) => setFontPx(Math.max(10, Number(e.target.value) || 22))} />
               </div>
               <div>
-                <Label className="text-xs">Quantity</Label>
+                <Label className="text-xs">Copies per label</Label>
                 <Input type="number" min={1} max={50} value={quantity}
                   onChange={(e) => setQuantity(Math.max(1, Number(e.target.value) || 1))} />
               </div>
@@ -149,6 +160,7 @@ export function NiimbotPrintDialog({
             </div>
             <div className="text-xs text-muted-foreground">
               Bitmap size: {dots.w} × {dots.h} dots (8 dots/mm)
+              {labelCount > 1 ? ` • ${labelCount} labels` : ""}
             </div>
           </div>
 

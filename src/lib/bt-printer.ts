@@ -126,9 +126,26 @@ export async function printTextToBluetooth(text: string): Promise<void> {
 
 // Strip HTML tags and collapse whitespace for a printable text version.
 export function htmlToPlainText(html: string): string {
-  if (typeof document === "undefined") return html.replace(/<[^>]+>/g, " ");
+  if (typeof document === "undefined") {
+    return html
+      .replace(/<style[\s\S]*?<\/style>/gi, " ")
+      .replace(/<script[\s\S]*?<\/script>/gi, " ")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&nbsp;/g, " ")
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+  }
   const div = document.createElement("div");
   div.innerHTML = html;
+  div.querySelectorAll("style, script, template").forEach((el) => el.remove());
   const text = div.innerText || div.textContent || "";
-  return text.replace(/\n{3,}/g, "\n\n").trim();
+  return text
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
 }

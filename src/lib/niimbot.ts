@@ -19,6 +19,9 @@ const NIIMBOT_SERVICES = [
   "e7810a71-73ae-499d-8c15-faa9aef0c3f2",
 ];
 
+const NIIMBOT_WRITE_CHARACTERISTIC = "bef8d6c9-9c21-4c9e-b632-bd58c1009f9f";
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export function isLikelyNiimbot(name?: string | null) {
   if (!name) return false;
   return /niimbot|b1\b|b18|b21|b3s|d11|d110|d101/i.test(name);
@@ -37,6 +40,10 @@ async function getNiimbotWriteChar(device: any): Promise<any> {
   for (const uuid of NIIMBOT_SERVICES) {
     try {
       const svc = await server.getPrimaryService(uuid);
+      try {
+        const preferred = await svc.getCharacteristic(NIIMBOT_WRITE_CHARACTERISTIC);
+        if (preferred.properties?.write || preferred.properties?.writeWithoutResponse) return preferred;
+      } catch { /* fall back to any writable characteristic */ }
       const chars = await svc.getCharacteristics();
       for (const c of chars) {
         if (c.properties?.write || c.properties?.writeWithoutResponse) return c;
@@ -46,20 +53,29 @@ async function getNiimbotWriteChar(device: any): Promise<any> {
   throw new Error("Niimbot service not found on this device.");
 }
 
-async function writePacket(ch: any, pkt: Uint8Array) {
-  const CHUNK = 20;
-  for (let i = 0; i < pkt.length; i += CHUNK) {
-    const chunk = pkt.slice(i, i + CHUNK);
-    if (ch.properties?.writeWithoutResponse) {
-      await ch.writeValueWithoutResponse(chunk);
-    } else if (ch.writeValueWithResponse) {
-      await ch.writeValueWithResponse(chunk);
-    } else {
-      await ch.writeValue(chunk);
+async function writeBytes(ch: any, data: Uint8Array) {
+  // Niimbot expects each protocol frame as one BLE write. Splitting into 20-byte
+  // chunks can make the printer accept data but never start printing.
+  for (let tries = 0; tries < 30; tries++) {
+    try {
+      if (ch.properties?.writeWithoutResponse) {
+        await ch.writeValueWithoutResponse(data);
+      } else if (ch.writeValueWithResponse) {
+        await ch.writeValueWithResponse(data);
+      } else {
+        await ch.writeValue(data);
+      }
+      await sleep(10);
+      return;
+    } catch (error) {
+      if (tries === 29) throw error;
+      await sleep(8);
     }
-    // Small pacing gap — Niimbot dislikes back-to-back writes.
-    await new Promise((r) => setTimeout(r, 8));
   }
+}
+
+async function writePacket(ch: any, pkt: Uint8Array) {
+  await writeBytes(ch, pkt);
 }
 
 // Render a plain-text label to a monochrome bitmap. Width/height in mm,
@@ -72,7 +88,7 @@ export function renderLabelBitmap(
 ): { width: number; height: number; rows: Uint8Array[] } {
   if (typeof document === "undefined") throw new Error("Canvas not available");
   const DPM = 8; // dots per mm at 203dpi
-  const w = Math.round(widthMm * DPM);
+  const w = Math.ceil(Math.round(widthMm * DPM) / 8) * 8;
   const h = Math.round(heightMm * DPM);
   const wBytes = Math.ceil(w / 8);
 
@@ -127,6 +143,182 @@ export function renderLabelBitmap(
   return { width: w, height: h, rows };
 }
 
+type ParsedLabel = {
+  order: string;
+  when: string;
+  name: string;
+  cup: string;
+  customer: string;
+  notes: string;
+  quote: string;
+  brand: string;
+};
+
+function canvasToBitmap(canvas: HTMLCanvasElement): NiimbotBitmap {
+  const ctx = canvas.getContext("2d")!;
+  const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const wBytes = Math.ceil(canvas.width / 8);
+  const rows: Uint8Array[] = [];
+  for (let row = 0; row < canvas.height; row++) {
+    const bytes = new Uint8Array(wBytes);
+    for (let col = 0; col < canvas.width; col++) {
+      const idx = (row * canvas.width + col) * 4;
+      const r = img.data[idx], g = img.data[idx + 1], b = img.data[idx + 2], a = img.data[idx + 3];
+      if (a > 0 && (r + g + b) / 3 < 150) bytes[col >> 3] |= 0x80 >> (col & 7);
+    }
+    rows.push(bytes);
+  }
+  return { width: canvas.width, height: canvas.height, rows };
+}
+
+function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, maxLines = 3) {
+  const words = text.replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
+  const lines: string[] = [];
+  let line = "";
+  for (const word of words) {
+    const test = line ? `${line} ${word}` : word;
+    if (ctx.measureText(test).width > maxWidth && line) {
+      lines.push(line);
+      line = word;
+      if (lines.length >= maxLines) break;
+    } else {
+      line = test;
+    }
+  }
+  if (line && lines.length < maxLines) lines.push(line);
+  return lines;
+}
+
+function fitText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxWidth: number) {
+  if (ctx.measureText(text).width <= maxWidth) {
+    ctx.fillText(text, x, y);
+    return;
+  }
+  let out = text;
+  while (out.length > 1 && ctx.measureText(`${out}…`).width > maxWidth) out = out.slice(0, -1);
+  ctx.fillText(`${out}…`, x, y);
+}
+
+function parseLabelsFromHtml(html: string): ParsedLabel[] {
+  if (typeof document === "undefined" || !html) return [];
+  const root = document.createElement("div");
+  root.innerHTML = html;
+  root.querySelectorAll("style, script, template").forEach((el) => el.remove());
+  const sections = Array.from(root.querySelectorAll("section.label"));
+  return sections.map((section) => ({
+    order: section.querySelector(".ord")?.textContent?.trim() ?? "",
+    when: section.querySelector(".when")?.textContent?.trim() ?? "",
+    name: section.querySelector(".name")?.textContent?.trim() ?? "",
+    cup: section.querySelector(".cup")?.textContent?.trim() ?? "",
+    customer: section.querySelector(".cust")?.textContent?.trim() ?? "",
+    notes: section.querySelector(".notes")?.textContent?.trim() ?? "",
+    quote: section.querySelector(".quote")?.textContent?.trim() ?? "",
+    brand: section.querySelector(".brand")?.textContent?.trim() ?? "",
+  })).filter((label) => label.order || label.name || label.customer || label.quote);
+}
+
+export function hasNiimbotLabelHtml(html: string) {
+  return parseLabelsFromHtml(html).length > 0;
+}
+
+export function renderFormattedLabelBitmap(
+  label: ParsedLabel,
+  widthMm: number,
+  heightMm: number,
+): NiimbotBitmap {
+  if (typeof document === "undefined") throw new Error("Canvas not available");
+  const DPM = 8;
+  const w = Math.ceil(Math.round(widthMm * DPM) / 8) * 8;
+  const h = Math.round(heightMm * DPM);
+  const scale = Math.max(0.72, Math.min(1.18, Math.min(widthMm / 58, heightMm / 40)));
+  const margin = Math.max(10, Math.round(16 * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d")!;
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = "#000";
+  ctx.textBaseline = "top";
+
+  const contentW = w - margin * 2;
+  ctx.font = `${Math.round(18 * scale)}px system-ui, sans-serif`;
+  fitText(ctx, label.order, margin, margin, Math.round(contentW * 0.68));
+  const whenW = Math.round(contentW * 0.3);
+  fitText(ctx, label.when, w - margin - whenW, margin, whenW);
+
+  let y = margin + Math.round(24 * scale);
+  ctx.font = `700 ${Math.round(30 * scale)}px system-ui, sans-serif`;
+  const nameLines = wrapText(ctx, label.name, contentW, 2);
+  for (const line of nameLines) {
+    ctx.fillText(line, margin, y);
+    y += Math.round(34 * scale);
+  }
+
+  ctx.font = `${Math.round(20 * scale)}px system-ui, sans-serif`;
+  if (label.cup) {
+    fitText(ctx, label.cup, margin, y, contentW);
+    y += Math.round(23 * scale);
+  }
+
+  ctx.font = `700 ${Math.round(24 * scale)}px system-ui, sans-serif`;
+  if (label.customer) {
+    fitText(ctx, label.customer, margin, y, contentW);
+    y += Math.round(28 * scale);
+  }
+
+  ctx.font = `italic ${Math.round(18 * scale)}px system-ui, sans-serif`;
+  for (const line of wrapText(ctx, label.notes, contentW, 2)) {
+    ctx.fillText(line, margin, y);
+    y += Math.round(21 * scale);
+  }
+
+  const brandH = Math.round(18 * scale);
+  ctx.font = `italic ${Math.round(16 * scale)}px system-ui, sans-serif`;
+  const quoteLines = wrapText(ctx, label.quote, contentW, 2);
+  let quoteY = h - margin - brandH - quoteLines.length * Math.round(19 * scale);
+  quoteY = Math.max(y + Math.round(4 * scale), quoteY);
+  for (const line of quoteLines) {
+    if (quoteY > h - margin - brandH) break;
+    ctx.fillText(line, margin, quoteY);
+    quoteY += Math.round(19 * scale);
+  }
+
+  ctx.font = `${Math.round(14 * scale)}px system-ui, sans-serif`;
+  const brandWidth = ctx.measureText(label.brand).width;
+  ctx.fillText(label.brand, Math.max(margin, w - margin - brandWidth), h - margin - brandH);
+
+  return canvasToBitmap(canvas);
+}
+
+export function renderLabelHtmlBitmaps(
+  html: string,
+  widthMm: number,
+  heightMm: number,
+): NiimbotBitmap[] {
+  return parseLabelsFromHtml(html).map((label) => renderFormattedLabelBitmap(label, widthMm, heightMm));
+}
+
+export function bitmapToDataUrl(bmp: NiimbotBitmap): string {
+  if (typeof document === "undefined") return "";
+  const canvas = document.createElement("canvas");
+  canvas.width = bmp.width;
+  canvas.height = bmp.height;
+  const ctx = canvas.getContext("2d")!;
+  const img = ctx.createImageData(bmp.width, bmp.height);
+  for (let y = 0; y < bmp.height; y++) {
+    const row = bmp.rows[y];
+    for (let x = 0; x < bmp.width; x++) {
+      const bit = row[Math.floor(x / 8)] & (0x80 >> (x & 7));
+      const idx = (y * bmp.width + x) * 4;
+      const v = bit ? 0 : 255;
+      img.data[idx] = v; img.data[idx + 1] = v; img.data[idx + 2] = v; img.data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return canvas.toDataURL("image/png");
+}
+
 export type NiimbotOptions = {
   device: any; // BluetoothDevice
   text: string;
@@ -137,45 +329,83 @@ export type NiimbotOptions = {
   fontPx?: number;
 };
 
-export async function printNiimbotLabel(opts: NiimbotOptions) {
-  const { device, text, widthMm, heightMm, quantity, fontPx } = opts;
-  const density = Math.min(5, Math.max(1, Math.round(opts.density)));
-  const ch = await getNiimbotWriteChar(device);
-  const bmp = renderLabelBitmap(text, widthMm, heightMm, fontPx);
+export type NiimbotBitmap = { width: number; height: number; rows: Uint8Array[] };
 
-  // 1. density
-  await writePacket(ch, makePacket(0x21, [density]));
-  // 2. label type (1 = with gap)
-  await writePacket(ch, makePacket(0x23, [1]));
-  // 3. start print job
-  await writePacket(ch, makePacket(0x01, [0x01]));
-  // 4. start page
-  await writePacket(ch, makePacket(0x03, [0x01]));
-  // 5. dimensions (height_hi, height_lo, width_hi, width_lo)
-  await writePacket(
-    ch,
-    makePacket(0x13, [
-      (bmp.height >> 8) & 0xff, bmp.height & 0xff,
-      (bmp.width >> 8) & 0xff, bmp.width & 0xff,
-    ]),
-  );
-  // 6. quantity
-  await writePacket(ch, makePacket(0x15, [(quantity >> 8) & 0xff, quantity & 0xff]));
+function u16(n: number): [number, number] {
+  return [(n >> 8) & 0xff, n & 0xff];
+}
 
-  // 7. image rows (cmd 0x85) — skip pure-white rows with 0x84
+function countBlackPixels(row: Uint8Array): [number, number, number] {
+  let total = 0;
+  for (const value of row) {
+    let v = value;
+    while (v) {
+      total += v & 1;
+      v >>= 1;
+    }
+  }
+  return [0, total & 0xff, (total >> 8) & 0xff];
+}
+
+async function printBitmapPage(ch: any, bmp: NiimbotBitmap, copies: number) {
+  // B1 is more reliable with the 6-byte page-size payload: rows, cols, copies.
+  await writePacket(ch, makePacket(0x03, [0x01])); // page start
+  await writePacket(ch, makePacket(0x13, [...u16(bmp.height), ...u16(bmp.width), ...u16(copies)]));
+  await writePacket(ch, makePacket(0x15, [...u16(copies)]));
+
   for (let y = 0; y < bmp.rows.length; y++) {
     const row = bmp.rows[y];
     let any = false;
     for (let i = 0; i < row.length; i++) if (row[i]) { any = true; break; }
     if (!any) {
-      await writePacket(ch, makePacket(0x84, [(y >> 8) & 0xff, y & 0xff, 1]));
+      await writePacket(ch, makePacket(0x84, [...u16(y), 1]));
       continue;
     }
-    const header = [(y >> 8) & 0xff, y & 0xff, 0, 0, 1];
-    await writePacket(ch, makePacket(0x85, [...header, ...row]));
+    await writePacket(ch, makePacket(0x85, [...u16(y), ...countBlackPixels(row), 1, ...row]));
   }
 
-  // 8. end page + end print
-  await writePacket(ch, makePacket(0xe3, [1]));
-  await writePacket(ch, makePacket(0xf3, [1]));
+  await writePacket(ch, makePacket(0xe3, [0x01])); // page end
+  await sleep(120);
+}
+
+export async function printNiimbotBitmaps(opts: {
+  device: any;
+  bitmaps: NiimbotBitmap[];
+  density: number;
+  copies?: number;
+}) {
+  const density = Math.min(5, Math.max(1, Math.round(opts.density)));
+  const copies = Math.min(50, Math.max(1, Math.round(opts.copies ?? 1)));
+  const ch = await getNiimbotWriteChar(opts.device);
+  const sourceBitmaps = opts.bitmaps.filter((bmp) => bmp.width > 0 && bmp.height > 0 && bmp.rows.length > 0);
+  const bitmaps = Array.from({ length: copies }).flatMap(() => sourceBitmaps);
+  if (bitmaps.length === 0) throw new Error("No label content to print.");
+
+  // B1-compatible wake/handshake. The leading 0x03 packet mirrors Niimbot's
+  // browser driver and helps protocol-3 B1 units arm before print jobs.
+  await writeBytes(ch, new Uint8Array([0x03, ...makePacket(0xc1, [0x01])]));
+  await sleep(200);
+  await writePacket(ch, makePacket(0xa5, [0x01])); // status data
+  for (const sub of [0x08, 0x0b, 0x0d, 0x0a, 0x07, 0x03, 0x0c, 0x09]) {
+    await writePacket(ch, makePacket(0x40, [sub])); // printer info keepalive sequence
+  }
+  await writePacket(ch, makePacket(0xdc, [0x04])); // heartbeat
+
+  await writePacket(ch, makePacket(0x21, [density]));
+  await writePacket(ch, makePacket(0x23, [0x01])); // label with gap
+  await writePacket(ch, makePacket(0x01, [...u16(bitmaps.length), 0, 0, 0, 0, 0])); // B1 print start, total pages
+  await writePacket(ch, makePacket(0xa3, [0x01])); // status packet also absorbs B1's first-packet drop
+
+  for (const bmp of bitmaps) {
+    await printBitmapPage(ch, bmp, 1);
+  }
+
+  await writePacket(ch, makePacket(0xf3, [0x01])); // end print
+  await writePacket(ch, makePacket(0xdc, [0x01])); // harmless trailing packet for B1 firmwares that drop one after PrintEnd
+}
+
+export async function printNiimbotLabel(opts: NiimbotOptions) {
+  const { device, text, widthMm, heightMm, quantity, fontPx, density } = opts;
+  const bmp = renderLabelBitmap(text, widthMm, heightMm, fontPx);
+  await printNiimbotBitmaps({ device, bitmaps: [bmp], density, copies: quantity });
 }
