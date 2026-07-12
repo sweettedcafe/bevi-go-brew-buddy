@@ -16,6 +16,8 @@ import {
   printTextToBluetooth,
   htmlToPlainText,
 } from "@/lib/bt-printer";
+import { isLikelyNiimbot } from "@/lib/niimbot";
+import { NiimbotPrintDialog } from "@/components/print/NiimbotPrintDialog";
 import { toast } from "sonner";
 
 export type PrintPreviewDocument = {
