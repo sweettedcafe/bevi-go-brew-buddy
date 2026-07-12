@@ -12,7 +12,7 @@ export const Route = createFileRoute("/api/public/send-password-otp")({
           return json({ error: "invalid_email" }, 400);
         }
 
-        const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+        const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://ewwtxzoruibaxalffyli.supabase.co";
         const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY;
         if (!SUPABASE_URL || !SERVICE_ROLE) {
           return json({ error: "server_not_configured" }, 500);

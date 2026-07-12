@@ -41,6 +41,7 @@ import { Route as AuthenticatedAnalyticsRouteImport } from './routes/_authentica
 import { Route as AuthenticatedAccessControlRouteImport } from './routes/_authenticated/access-control'
 import { Route as ApiPublicSendWelcomeEmailRouteImport } from './routes/api/public/send-welcome-email'
 import { Route as ApiPublicSendPasswordOtpRouteImport } from './routes/api/public/send-password-otp'
+import { Route as ApiPublicResetPasswordByEmailRouteImport } from './routes/api/public/reset-password-by-email'
 import { Route as ApiPublicDevSetPasswordRouteImport } from './routes/api/public/dev-set-password'
 import { Route as ApiPublicDevListUsersRouteImport } from './routes/api/public/dev-list-users'
 
@@ -210,6 +211,12 @@ const ApiPublicSendPasswordOtpRoute =
     path: '/api/public/send-password-otp',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicResetPasswordByEmailRoute =
+  ApiPublicResetPasswordByEmailRouteImport.update({
+    id: '/api/public/reset-password-by-email',
+    path: '/api/public/reset-password-by-email',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicDevSetPasswordRoute = ApiPublicDevSetPasswordRouteImport.update({
   id: '/api/public/dev-set-password',
   path: '/api/public/dev-set-password',
@@ -253,6 +260,7 @@ export interface FileRoutesByFullPath {
   '/o/$token': typeof OTokenRoute
   '/api/public/dev-list-users': typeof ApiPublicDevListUsersRoute
   '/api/public/dev-set-password': typeof ApiPublicDevSetPasswordRoute
+  '/api/public/reset-password-by-email': typeof ApiPublicResetPasswordByEmailRoute
   '/api/public/send-password-otp': typeof ApiPublicSendPasswordOtpRoute
   '/api/public/send-welcome-email': typeof ApiPublicSendWelcomeEmailRoute
 }
@@ -288,6 +296,7 @@ export interface FileRoutesByTo {
   '/o/$token': typeof OTokenRoute
   '/api/public/dev-list-users': typeof ApiPublicDevListUsersRoute
   '/api/public/dev-set-password': typeof ApiPublicDevSetPasswordRoute
+  '/api/public/reset-password-by-email': typeof ApiPublicResetPasswordByEmailRoute
   '/api/public/send-password-otp': typeof ApiPublicSendPasswordOtpRoute
   '/api/public/send-welcome-email': typeof ApiPublicSendWelcomeEmailRoute
 }
@@ -325,6 +334,7 @@ export interface FileRoutesById {
   '/o/$token': typeof OTokenRoute
   '/api/public/dev-list-users': typeof ApiPublicDevListUsersRoute
   '/api/public/dev-set-password': typeof ApiPublicDevSetPasswordRoute
+  '/api/public/reset-password-by-email': typeof ApiPublicResetPasswordByEmailRoute
   '/api/public/send-password-otp': typeof ApiPublicSendPasswordOtpRoute
   '/api/public/send-welcome-email': typeof ApiPublicSendWelcomeEmailRoute
 }
@@ -362,6 +372,7 @@ export interface FileRouteTypes {
     | '/o/$token'
     | '/api/public/dev-list-users'
     | '/api/public/dev-set-password'
+    | '/api/public/reset-password-by-email'
     | '/api/public/send-password-otp'
     | '/api/public/send-welcome-email'
   fileRoutesByTo: FileRoutesByTo
@@ -397,6 +408,7 @@ export interface FileRouteTypes {
     | '/o/$token'
     | '/api/public/dev-list-users'
     | '/api/public/dev-set-password'
+    | '/api/public/reset-password-by-email'
     | '/api/public/send-password-otp'
     | '/api/public/send-welcome-email'
   id:
@@ -433,6 +445,7 @@ export interface FileRouteTypes {
     | '/o/$token'
     | '/api/public/dev-list-users'
     | '/api/public/dev-set-password'
+    | '/api/public/reset-password-by-email'
     | '/api/public/send-password-otp'
     | '/api/public/send-welcome-email'
   fileRoutesById: FileRoutesById
@@ -446,6 +459,7 @@ export interface RootRouteChildren {
   OTokenRoute: typeof OTokenRoute
   ApiPublicDevListUsersRoute: typeof ApiPublicDevListUsersRoute
   ApiPublicDevSetPasswordRoute: typeof ApiPublicDevSetPasswordRoute
+  ApiPublicResetPasswordByEmailRoute: typeof ApiPublicResetPasswordByEmailRoute
   ApiPublicSendPasswordOtpRoute: typeof ApiPublicSendPasswordOtpRoute
   ApiPublicSendWelcomeEmailRoute: typeof ApiPublicSendWelcomeEmailRoute
 }
@@ -676,6 +690,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicSendPasswordOtpRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/reset-password-by-email': {
+      id: '/api/public/reset-password-by-email'
+      path: '/api/public/reset-password-by-email'
+      fullPath: '/api/public/reset-password-by-email'
+      preLoaderRoute: typeof ApiPublicResetPasswordByEmailRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/dev-set-password': {
       id: '/api/public/dev-set-password'
       path: '/api/public/dev-set-password'
@@ -760,6 +781,7 @@ const rootRouteChildren: RootRouteChildren = {
   OTokenRoute: OTokenRoute,
   ApiPublicDevListUsersRoute: ApiPublicDevListUsersRoute,
   ApiPublicDevSetPasswordRoute: ApiPublicDevSetPasswordRoute,
+  ApiPublicResetPasswordByEmailRoute: ApiPublicResetPasswordByEmailRoute,
   ApiPublicSendPasswordOtpRoute: ApiPublicSendPasswordOtpRoute,
   ApiPublicSendWelcomeEmailRoute: ApiPublicSendWelcomeEmailRoute,
 }

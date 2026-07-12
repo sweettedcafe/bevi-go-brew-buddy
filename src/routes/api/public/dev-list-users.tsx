@@ -8,7 +8,7 @@ export const Route = createFileRoute("/api/public/dev-list-users")({
         const token = authHeader.replace(/^Bearer\s+/i, "").trim();
         if (!token) return json({ error: "missing_bearer" }, 401);
 
-        const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+        const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://ewwtxzoruibaxalffyli.supabase.co";
         const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY;
         if (!SUPABASE_URL || !SERVICE_ROLE) return json({ error: "server_not_configured" }, 500);
 
