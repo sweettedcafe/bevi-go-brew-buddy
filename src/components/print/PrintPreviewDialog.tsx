@@ -44,6 +44,7 @@ const RECEIPT_PRESETS: PaperPreset[] = [
 ];
 
 const LABEL_PRESETS: PaperPreset[] = [
+  { id: "50x30", label: "50×30mm label", paper: { kind: "fixed", widthMm: 50, heightMm: 30 } },
   { id: "58x40", label: "58×40mm label", paper: { kind: "fixed", widthMm: 58, heightMm: 40 } },
   { id: "40x30", label: "40×30mm label", paper: { kind: "fixed", widthMm: 40, heightMm: 30 } },
   { id: "80mm", label: "80mm thermal (roll)", paper: { kind: "roll", widthMm: 80 } },
