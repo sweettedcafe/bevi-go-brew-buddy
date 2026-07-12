@@ -140,6 +140,8 @@ function AccessControlPage() {
           )}
         </CardContent>
       </Card>
+
+      {canManage && <PasswordResetCard />}
     </div>
   );
 }
