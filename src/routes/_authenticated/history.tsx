@@ -12,6 +12,7 @@ import { receiptHTML, labelsHTML, type ReceiptData, type DrinkLabel } from "@/li
 import { useAuth } from "@/lib/auth-context";
 import { OrderDetailSheet } from "@/components/orders/OrderDetailSheet";
 import { PrintPreviewDialog, type PrintPreviewDocument } from "@/components/print/PrintPreviewDialog";
+import { reprintLabelsById } from "@/lib/reprint";
 
 export const Route = createFileRoute("/_authenticated/history")({
   component: HistoryPage,
