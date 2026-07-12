@@ -31,14 +31,15 @@ export const Route = createFileRoute("/api/public/dev-set-password")({
         const callerId = me?.id;
         if (!callerId) return json({ error: "invalid_session" }, 401);
 
-        // Check caller is a developer via service role read of user_roles.
+        // Check caller is a developer or admin via service role read of user_roles.
         const roleRes = await fetch(
-          `${SUPABASE_URL}/rest/v1/user_roles?user_id=eq.${callerId}&role=eq.developer&select=role`,
+          `${SUPABASE_URL}/rest/v1/user_roles?user_id=eq.${callerId}&select=role`,
           { headers: { apikey: SERVICE_ROLE, Authorization: `Bearer ${SERVICE_ROLE}` } },
         );
         if (!roleRes.ok) return json({ error: "role_check_failed" }, 500);
-        const roles = await roleRes.json();
-        if (!Array.isArray(roles) || roles.length === 0) {
+        const roles = (await roleRes.json()) as Array<{ role: string }>;
+        const roleSet = new Set(roles.map((r) => r.role));
+        if (!roleSet.has("developer") && !roleSet.has("admin")) {
           return json({ error: "forbidden" }, 403);
         }
 
