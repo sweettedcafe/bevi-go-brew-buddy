@@ -398,10 +398,10 @@ async function printBitmapPage(ch: any, bmp: NiimbotBitmap, copies: number) {
   for (let y = 0; y < bmp.rows.length; y++) {
     const row = bmp.rows[y];
     if (isBlankRow(row)) continue;
-    // Indexed bitmap rows already carry their row number; skip blank rows and
-    // do not use repeat/RLE bytes here. Some B1 firmwares treat the extra repeat
-    // byte as bitmap data and stop after the first text band.
-    await writePacket(ch, makePacket(0x85, [...u16(y), ...countBlackPixelsTotal(row, bmp.width), ...row]));
+    // Keep repeat fixed at 1. The protocol requires this byte before the bitmap
+    // data, while avoiding grouped repeats prevents later content bands from
+    // being skipped by stricter B1 firmwares.
+    await writePacket(ch, makePacket(0x85, [...u16(y), ...countBlackPixelsTotal(row, bmp.width), 1, ...row]));
   }
 
   await writePacket(ch, makePacket(0xe3, [0x01])); // page end
