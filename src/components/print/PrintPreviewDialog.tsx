@@ -276,8 +276,8 @@ export function PrintPreviewDialog({
       onOpenChange={setNiimbotOpen}
       initialText={active ? htmlToPlainText(active.html) : ""}
       initialHtml={active?.html ?? ""}
-      initialWidthMm={active?.id === "labels" ? Math.min(selectedPaper.widthMm, 48) : 48}
-      initialHeightMm={active?.id === "labels" && selectedPaper.kind === "fixed" ? selectedPaper.heightMm : 40}
+      initialWidthMm={active?.id === "labels" ? 50 : 50}
+      initialHeightMm={active?.id === "labels" ? 30 : 40}
     />
     </>
   );
