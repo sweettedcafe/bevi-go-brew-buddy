@@ -165,8 +165,9 @@ export function NiimbotPrintDialog({
             )}
           </div>
         </div>
+        </div>
 
-        <div className="flex items-center justify-end gap-2 pt-2 border-t">
+        <div className="flex items-center justify-end gap-2 p-4 border-t bg-background">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={doPrint} disabled={sending || !paired}>
             <Printer className="h-4 w-4 mr-2" />
