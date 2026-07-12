@@ -113,6 +113,13 @@ function LoginPage() {
               </>
             )}
           </div>
+          {mode === "signin" && (
+            <div className="mt-3 text-center">
+              <Link to="/forgot-password" className="text-xs text-primary hover:underline font-medium">
+                Forgot password?
+              </Link>
+            </div>
+          )}
           <div className="mt-4 text-center">
             <Link to="/" className="text-xs text-muted-foreground hover:text-foreground">
               ← Back to home
