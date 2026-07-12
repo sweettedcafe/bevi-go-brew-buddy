@@ -17,7 +17,7 @@ export const Route = createFileRoute("/api/public/reset-password-by-email")({
 
           const SUPABASE_URL =
             process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || SUPABASE_URL_FALLBACK;
-          const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY;
+          const SERVICE_ROLE = (process.env.APP_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY);
           if (!SERVICE_ROLE) return json({ error: "server_not_configured" }, 500);
 
           // Look up user by email via admin list (filter by email).
