@@ -285,6 +285,7 @@ function SelfOrderPage() {
 
   async function place() {
     if (cart.length === 0) return;
+    unlockAudio(); // iOS: unlock Web Audio inside this user gesture
     setPlacing(true);
     const { data, error } = await db.rpc("customer_self_order", {
       p_token: token,
