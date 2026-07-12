@@ -13,6 +13,7 @@ import {
   findBluetoothPrinter,
   isBluetoothSupported,
   getPairedPrinter,
+  getOrRestorePairedDevice,
   printTextToBluetooth,
   htmlToPlainText,
 } from "@/lib/bt-printer";
@@ -117,9 +118,9 @@ export function PrintPreviewDialog({
     }
   }
 
-  function printActive() {
+  async function printActive() {
     if (!active || typeof window === "undefined") return;
-    const paired = getPairedPrinter();
+    const paired = getPairedPrinter() ?? (await getOrRestorePairedDevice());
     if (active.id === "labels" && paired && isLikelyNiimbot(paired.name)) {
       setNiimbotOpen(true);
       return;
