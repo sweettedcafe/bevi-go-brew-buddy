@@ -7,8 +7,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
-import { getPairedDevice, getPairedPrinter } from "@/lib/bt-printer";
+import { getPairedDevice, getPairedPrinter, htmlToPlainText } from "@/lib/bt-printer";
 import { printNiimbotLabel, renderLabelBitmap } from "@/lib/niimbot";
+
+function toPlain(s: string): string {
+  if (!s) return "";
+  // strip if it looks like HTML
+  return /<[a-z!/]/i.test(s) ? htmlToPlainText(s) : s;
+}
 
 export function NiimbotPrintDialog({
   open,
@@ -24,7 +30,7 @@ export function NiimbotPrintDialog({
   initialHeightMm?: number;
 }) {
   const paired = getPairedPrinter();
-  const [text, setText] = useState(initialText);
+  const [text, setText] = useState(() => toPlain(initialText));
   const [widthMm, setWidthMm] = useState(initialWidthMm);
   const [heightMm, setHeightMm] = useState(initialHeightMm);
   const [density, setDensity] = useState(3);
@@ -35,7 +41,7 @@ export function NiimbotPrintDialog({
 
   useEffect(() => {
     if (open) {
-      setText(initialText);
+      setText(toPlain(initialText));
       setWidthMm(initialWidthMm);
       setHeightMm(initialHeightMm);
     }
@@ -92,7 +98,8 @@ export function NiimbotPrintDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-0">
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Bluetooth className="h-5 w-5 text-primary" />
@@ -158,8 +165,9 @@ export function NiimbotPrintDialog({
             )}
           </div>
         </div>
+        </div>
 
-        <div className="flex items-center justify-end gap-2 pt-2 border-t">
+        <div className="flex items-center justify-end gap-2 p-4 border-t bg-background">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={doPrint} disabled={sending || !paired}>
             <Printer className="h-4 w-4 mr-2" />
