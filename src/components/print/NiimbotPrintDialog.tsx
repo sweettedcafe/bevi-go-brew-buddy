@@ -41,7 +41,7 @@ export function NiimbotPrintDialog({
 
   useEffect(() => {
     if (open) {
-      setText(initialText);
+      setText(toPlain(initialText));
       setWidthMm(initialWidthMm);
       setHeightMm(initialHeightMm);
     }
