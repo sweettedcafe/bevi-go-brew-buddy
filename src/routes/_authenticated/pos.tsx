@@ -610,9 +610,12 @@ function POSPage() {
 
     if (settings.autoPrintLabels) {
       const labels: DrinkLabel[] = [];
+      // If no category is explicitly flagged for labels, print a label for every cart line
+      // (this covers coffee shops that haven't toggled prints_label per category yet).
+      const anyFlagged = labelCatIds.size > 0;
       for (const line of cart) {
         const item = items.find((x) => x.id === line.menu_item_id);
-        if (!item || !item.category_id || !labelCatIds.has(item.category_id)) continue;
+        if (anyFlagged && (!item || !item.category_id || !labelCatIds.has(item.category_id))) continue;
         for (let i = 1; i <= line.qty; i++) {
           labels.push({
             orderNo: args.orderNo,
