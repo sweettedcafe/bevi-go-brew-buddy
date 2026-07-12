@@ -9,7 +9,13 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { savePdfFromHTML, type PaperSize } from "@/lib/print-pdf";
-import { findBluetoothPrinter, isBluetoothSupported } from "@/lib/bt-printer";
+import {
+  findBluetoothPrinter,
+  isBluetoothSupported,
+  getPairedPrinter,
+  printTextToBluetooth,
+  htmlToPlainText,
+} from "@/lib/bt-printer";
 import { toast } from "sonner";
 
 export type PrintPreviewDocument = {
@@ -138,10 +144,17 @@ export function PrintPreviewDialog({
 
   async function findBluetooth() {
     try {
-      const printer = await findBluetoothPrinter();
-      if (printer) toast.success(`Bluetooth printer found: ${printer.name}`);
+      const already = getPairedPrinter();
+      const printer = already ?? (await findBluetoothPrinter());
+      if (!printer) return;
+      if (!already) toast.success(`Bluetooth printer paired: ${printer.name}`);
+      if (!active) return;
+      const text = htmlToPlainText(active.html);
+      toast.message(`Sending ${active.label.toLowerCase()} to ${printer.name}…`);
+      await printTextToBluetooth(text);
+      toast.success(`Sent to ${printer.name}`);
     } catch (error: any) {
-      toast.error(error?.message ?? "Bluetooth search failed");
+      toast.error(error?.message ?? "Bluetooth print failed");
     }
   }
 
