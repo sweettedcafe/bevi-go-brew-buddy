@@ -40,7 +40,9 @@ import { Route as AuthenticatedAuditLogRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedAnalyticsRouteImport } from './routes/_authenticated/analytics'
 import { Route as AuthenticatedAccessControlRouteImport } from './routes/_authenticated/access-control'
 import { Route as ApiPublicSendWelcomeEmailRouteImport } from './routes/api/public/send-welcome-email'
+import { Route as ApiPublicSendPasswordOtpRouteImport } from './routes/api/public/send-password-otp'
 import { Route as ApiPublicDevSetPasswordRouteImport } from './routes/api/public/dev-set-password'
+import { Route as ApiPublicDevListUsersRouteImport } from './routes/api/public/dev-list-users'
 
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
@@ -202,9 +204,20 @@ const ApiPublicSendWelcomeEmailRoute =
     path: '/api/public/send-welcome-email',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicSendPasswordOtpRoute =
+  ApiPublicSendPasswordOtpRouteImport.update({
+    id: '/api/public/send-password-otp',
+    path: '/api/public/send-password-otp',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicDevSetPasswordRoute = ApiPublicDevSetPasswordRouteImport.update({
   id: '/api/public/dev-set-password',
   path: '/api/public/dev-set-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicDevListUsersRoute = ApiPublicDevListUsersRouteImport.update({
+  id: '/api/public/dev-list-users',
+  path: '/api/public/dev-list-users',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -238,7 +251,9 @@ export interface FileRoutesByFullPath {
   '/timeclock': typeof AuthenticatedTimeclockRoute
   '/timeclock-report': typeof AuthenticatedTimeclockReportRoute
   '/o/$token': typeof OTokenRoute
+  '/api/public/dev-list-users': typeof ApiPublicDevListUsersRoute
   '/api/public/dev-set-password': typeof ApiPublicDevSetPasswordRoute
+  '/api/public/send-password-otp': typeof ApiPublicSendPasswordOtpRoute
   '/api/public/send-welcome-email': typeof ApiPublicSendWelcomeEmailRoute
 }
 export interface FileRoutesByTo {
@@ -271,7 +286,9 @@ export interface FileRoutesByTo {
   '/timeclock': typeof AuthenticatedTimeclockRoute
   '/timeclock-report': typeof AuthenticatedTimeclockReportRoute
   '/o/$token': typeof OTokenRoute
+  '/api/public/dev-list-users': typeof ApiPublicDevListUsersRoute
   '/api/public/dev-set-password': typeof ApiPublicDevSetPasswordRoute
+  '/api/public/send-password-otp': typeof ApiPublicSendPasswordOtpRoute
   '/api/public/send-welcome-email': typeof ApiPublicSendWelcomeEmailRoute
 }
 export interface FileRoutesById {
@@ -306,7 +323,9 @@ export interface FileRoutesById {
   '/_authenticated/timeclock': typeof AuthenticatedTimeclockRoute
   '/_authenticated/timeclock-report': typeof AuthenticatedTimeclockReportRoute
   '/o/$token': typeof OTokenRoute
+  '/api/public/dev-list-users': typeof ApiPublicDevListUsersRoute
   '/api/public/dev-set-password': typeof ApiPublicDevSetPasswordRoute
+  '/api/public/send-password-otp': typeof ApiPublicSendPasswordOtpRoute
   '/api/public/send-welcome-email': typeof ApiPublicSendWelcomeEmailRoute
 }
 export interface FileRouteTypes {
@@ -341,7 +360,9 @@ export interface FileRouteTypes {
     | '/timeclock'
     | '/timeclock-report'
     | '/o/$token'
+    | '/api/public/dev-list-users'
     | '/api/public/dev-set-password'
+    | '/api/public/send-password-otp'
     | '/api/public/send-welcome-email'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -374,7 +395,9 @@ export interface FileRouteTypes {
     | '/timeclock'
     | '/timeclock-report'
     | '/o/$token'
+    | '/api/public/dev-list-users'
     | '/api/public/dev-set-password'
+    | '/api/public/send-password-otp'
     | '/api/public/send-welcome-email'
   id:
     | '__root__'
@@ -408,7 +431,9 @@ export interface FileRouteTypes {
     | '/_authenticated/timeclock'
     | '/_authenticated/timeclock-report'
     | '/o/$token'
+    | '/api/public/dev-list-users'
     | '/api/public/dev-set-password'
+    | '/api/public/send-password-otp'
     | '/api/public/send-welcome-email'
   fileRoutesById: FileRoutesById
 }
@@ -419,7 +444,9 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   RegisterRoute: typeof RegisterRoute
   OTokenRoute: typeof OTokenRoute
+  ApiPublicDevListUsersRoute: typeof ApiPublicDevListUsersRoute
   ApiPublicDevSetPasswordRoute: typeof ApiPublicDevSetPasswordRoute
+  ApiPublicSendPasswordOtpRoute: typeof ApiPublicSendPasswordOtpRoute
   ApiPublicSendWelcomeEmailRoute: typeof ApiPublicSendWelcomeEmailRoute
 }
 
@@ -642,11 +669,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicSendWelcomeEmailRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/send-password-otp': {
+      id: '/api/public/send-password-otp'
+      path: '/api/public/send-password-otp'
+      fullPath: '/api/public/send-password-otp'
+      preLoaderRoute: typeof ApiPublicSendPasswordOtpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/dev-set-password': {
       id: '/api/public/dev-set-password'
       path: '/api/public/dev-set-password'
       fullPath: '/api/public/dev-set-password'
       preLoaderRoute: typeof ApiPublicDevSetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/dev-list-users': {
+      id: '/api/public/dev-list-users'
+      path: '/api/public/dev-list-users'
+      fullPath: '/api/public/dev-list-users'
+      preLoaderRoute: typeof ApiPublicDevListUsersRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -717,7 +758,9 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   RegisterRoute: RegisterRoute,
   OTokenRoute: OTokenRoute,
+  ApiPublicDevListUsersRoute: ApiPublicDevListUsersRoute,
   ApiPublicDevSetPasswordRoute: ApiPublicDevSetPasswordRoute,
+  ApiPublicSendPasswordOtpRoute: ApiPublicSendPasswordOtpRoute,
   ApiPublicSendWelcomeEmailRoute: ApiPublicSendWelcomeEmailRoute,
 }
 export const routeTree = rootRouteImport

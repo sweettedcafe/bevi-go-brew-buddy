@@ -27,12 +27,13 @@ function ForgotPasswordPage() {
     if (!email) return;
     setBusy(true);
     try {
-      // shouldCreateUser: false — only send OTP to existing accounts
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: { shouldCreateUser: false },
+      const res = await fetch("/api/public/send-password-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
       });
-      if (error) throw error;
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.error ?? "Failed to send code");
       toast.success("Verification code sent. Check your email.");
       setStep("code");
     } catch (err) {
@@ -50,7 +51,7 @@ function ForgotPasswordPage() {
       const { error } = await supabase.auth.verifyOtp({
         email,
         token: code.trim(),
-        type: "email",
+        type: "recovery",
       });
       if (error) throw error;
       setStep("password");
