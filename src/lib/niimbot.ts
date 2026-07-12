@@ -14,9 +14,11 @@
 // and try again.
 
 const NIIMBOT_SERVICES = [
+  // Prefer the well-known B1/B-series protocol service first. Some devices also
+  // expose FF00/FEE7 writable characteristics that accept bytes but do not print.
+  "e7810a71-73ae-499d-8c15-faa9aef0c3f2",
   "0000ff00-0000-1000-8000-00805f9b34fb",
   "0000fee7-0000-1000-8000-00805f9b34fb",
-  "e7810a71-73ae-499d-8c15-faa9aef0c3f2",
 ];
 
 const NIIMBOT_WRITE_CHARACTERISTIC = "bef8d6c9-9c21-4c9e-b632-bd58c1009f9f";
@@ -353,25 +355,41 @@ function countBlackPixelsTotal(row: Uint8Array, width: number): [number, number,
   return [0x00, count & 0xff, (count >> 8) & 0xff];
 }
 
+function isBlankRow(row: Uint8Array) {
+  for (let i = 0; i < row.length; i++) if (row[i] !== 0) return false;
+  return true;
+}
+
+function sameRow(a: Uint8Array, b: Uint8Array) {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+
 async function printBitmapPage(ch: any, bmp: NiimbotBitmap, copies: number) {
   // B1 is more reliable with the 6-byte page-size payload: rows, cols, copies.
   await writePacket(ch, makePacket(0x03, [0x01])); // page start
   await writePacket(ch, makePacket(0x13, [...u16(bmp.height), ...u16(bmp.width), ...u16(copies)]));
   await writePacket(ch, makePacket(0x15, [...u16(copies)]));
 
-  for (let y = 0; y < bmp.rows.length; y++) {
+  for (let y = 0; y < bmp.rows.length;) {
     const row = bmp.rows[y];
-    let any = false;
-    for (let i = 0; i < row.length; i++) if (row[i]) { any = true; break; }
-    if (!any) {
-      await writePacket(ch, makePacket(0x84, [...u16(y), 1]));
+    let repeat = 1;
+    while (y + repeat < bmp.rows.length && repeat < 255 && sameRow(row, bmp.rows[y + repeat])) repeat++;
+    if (isBlankRow(row)) {
+      await writePacket(ch, makePacket(0x84, [...u16(y), repeat]));
+      y += repeat;
       continue;
     }
-    await writePacket(ch, makePacket(0x85, [...u16(y), ...countBlackPixelsTotal(row, bmp.width), 1, ...row]));
+    await writePacket(ch, makePacket(0x85, [...u16(y), ...countBlackPixelsTotal(row, bmp.width), repeat, ...row]));
+    y += repeat;
   }
 
   await writePacket(ch, makePacket(0xe3, [0x01])); // page end
-  await sleep(120);
+  for (let i = 0; i < 6; i++) {
+    await sleep(90);
+    await writePacket(ch, makePacket(0xa3, [0x01])); // print status/keepalive for B1
+  }
 }
 
 export async function printNiimbotBitmaps(opts: {
