@@ -76,6 +76,11 @@ export function PrintPreviewDialog({
     () => documents.find((doc) => doc.id === activeId) ?? documents[0] ?? null,
     [activeId, documents],
   );
+  const labelDocument = useMemo(
+    () => documents.find((doc) => doc.id === "labels") ?? null,
+    [documents],
+  );
+  const niimbotDocument = labelDocument ?? active;
 
   const presets = active?.id === "labels" ? LABEL_PRESETS : RECEIPT_PRESETS;
 
@@ -162,6 +167,7 @@ export function PrintPreviewDialog({
       // Niimbot B-series uses a proprietary format — open the dedicated
       // adjustment dialog instead of sending ESC/POS bytes.
       if (isLikelyNiimbot(printer.name)) {
+        if (labelDocument) setActiveId("labels");
         setNiimbotOpen(true);
         return;
       }
@@ -281,10 +287,10 @@ export function PrintPreviewDialog({
     <NiimbotPrintDialog
       open={niimbotOpen}
       onOpenChange={setNiimbotOpen}
-      initialText={active ? htmlToPlainText(active.html) : ""}
-      initialHtml={active?.html ?? ""}
-      initialWidthMm={active?.id === "labels" ? 50 : 50}
-      initialHeightMm={active?.id === "labels" ? 30 : 40}
+      initialText={niimbotDocument ? htmlToPlainText(niimbotDocument.html) : ""}
+      initialHtml={niimbotDocument?.html ?? ""}
+      initialWidthMm={50}
+      initialHeightMm={niimbotDocument?.id === "labels" ? 30 : 40}
     />
     </>
   );
