@@ -43,6 +43,7 @@ import { Route as ApiPublicSendWelcomeEmailRouteImport } from './routes/api/publ
 import { Route as ApiPublicSendPasswordOtpRouteImport } from './routes/api/public/send-password-otp'
 import { Route as ApiPublicDevSetPasswordRouteImport } from './routes/api/public/dev-set-password'
 import { Route as ApiPublicDevListUsersRouteImport } from './routes/api/public/dev-list-users'
+import { Route as ApiPublicEnvProbeRouteImport } from './routes/api/public/_env-probe'
 
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
@@ -220,6 +221,11 @@ const ApiPublicDevListUsersRoute = ApiPublicDevListUsersRouteImport.update({
   path: '/api/public/dev-list-users',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicEnvProbeRoute = ApiPublicEnvProbeRouteImport.update({
+  id: '/api/public/_env-probe',
+  path: '/api/public',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -251,6 +257,7 @@ export interface FileRoutesByFullPath {
   '/timeclock': typeof AuthenticatedTimeclockRoute
   '/timeclock-report': typeof AuthenticatedTimeclockReportRoute
   '/o/$token': typeof OTokenRoute
+  '/api/public': typeof ApiPublicEnvProbeRoute
   '/api/public/dev-list-users': typeof ApiPublicDevListUsersRoute
   '/api/public/dev-set-password': typeof ApiPublicDevSetPasswordRoute
   '/api/public/send-password-otp': typeof ApiPublicSendPasswordOtpRoute
@@ -286,6 +293,7 @@ export interface FileRoutesByTo {
   '/timeclock': typeof AuthenticatedTimeclockRoute
   '/timeclock-report': typeof AuthenticatedTimeclockReportRoute
   '/o/$token': typeof OTokenRoute
+  '/api/public': typeof ApiPublicEnvProbeRoute
   '/api/public/dev-list-users': typeof ApiPublicDevListUsersRoute
   '/api/public/dev-set-password': typeof ApiPublicDevSetPasswordRoute
   '/api/public/send-password-otp': typeof ApiPublicSendPasswordOtpRoute
@@ -323,6 +331,7 @@ export interface FileRoutesById {
   '/_authenticated/timeclock': typeof AuthenticatedTimeclockRoute
   '/_authenticated/timeclock-report': typeof AuthenticatedTimeclockReportRoute
   '/o/$token': typeof OTokenRoute
+  '/api/public/_env-probe': typeof ApiPublicEnvProbeRoute
   '/api/public/dev-list-users': typeof ApiPublicDevListUsersRoute
   '/api/public/dev-set-password': typeof ApiPublicDevSetPasswordRoute
   '/api/public/send-password-otp': typeof ApiPublicSendPasswordOtpRoute
@@ -360,6 +369,7 @@ export interface FileRouteTypes {
     | '/timeclock'
     | '/timeclock-report'
     | '/o/$token'
+    | '/api/public'
     | '/api/public/dev-list-users'
     | '/api/public/dev-set-password'
     | '/api/public/send-password-otp'
@@ -395,6 +405,7 @@ export interface FileRouteTypes {
     | '/timeclock'
     | '/timeclock-report'
     | '/o/$token'
+    | '/api/public'
     | '/api/public/dev-list-users'
     | '/api/public/dev-set-password'
     | '/api/public/send-password-otp'
@@ -431,6 +442,7 @@ export interface FileRouteTypes {
     | '/_authenticated/timeclock'
     | '/_authenticated/timeclock-report'
     | '/o/$token'
+    | '/api/public/_env-probe'
     | '/api/public/dev-list-users'
     | '/api/public/dev-set-password'
     | '/api/public/send-password-otp'
@@ -444,6 +456,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   RegisterRoute: typeof RegisterRoute
   OTokenRoute: typeof OTokenRoute
+  ApiPublicEnvProbeRoute: typeof ApiPublicEnvProbeRoute
   ApiPublicDevListUsersRoute: typeof ApiPublicDevListUsersRoute
   ApiPublicDevSetPasswordRoute: typeof ApiPublicDevSetPasswordRoute
   ApiPublicSendPasswordOtpRoute: typeof ApiPublicSendPasswordOtpRoute
@@ -690,6 +703,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicDevListUsersRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/_env-probe': {
+      id: '/api/public/_env-probe'
+      path: '/api/public'
+      fullPath: '/api/public'
+      preLoaderRoute: typeof ApiPublicEnvProbeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -758,6 +778,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   RegisterRoute: RegisterRoute,
   OTokenRoute: OTokenRoute,
+  ApiPublicEnvProbeRoute: ApiPublicEnvProbeRoute,
   ApiPublicDevListUsersRoute: ApiPublicDevListUsersRoute,
   ApiPublicDevSetPasswordRoute: ApiPublicDevSetPasswordRoute,
   ApiPublicSendPasswordOtpRoute: ApiPublicSendPasswordOtpRoute,
@@ -766,3 +787,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
