@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Printer, Receipt as ReceiptIcon, Tag, RefreshCw, Search } from "lucide-react";
 import { toast } from "sonner";
 import { loadPrintSettings } from "@/lib/print-settings";
-import { receiptHTML, labelsHTML, type ReceiptData, type DrinkLabel } from "@/lib/print-templates";
+import { receiptHTML, type ReceiptData } from "@/lib/print-templates";
 import { useAuth } from "@/lib/auth-context";
 import { OrderDetailSheet } from "@/components/orders/OrderDetailSheet";
 import { PrintPreviewDialog, type PrintPreviewDocument } from "@/components/print/PrintPreviewDialog";
