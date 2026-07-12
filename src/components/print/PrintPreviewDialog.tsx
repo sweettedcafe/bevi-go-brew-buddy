@@ -17,7 +17,7 @@ import {
   printTextToBluetooth,
   htmlToPlainText,
 } from "@/lib/bt-printer";
-import { isLikelyNiimbot } from "@/lib/niimbot";
+import { isLikelyNiimbot, printNiimbotLabelHtml } from "@/lib/niimbot";
 import { NiimbotPrintDialog } from "@/components/print/NiimbotPrintDialog";
 import { toast } from "sonner";
 
@@ -67,6 +67,7 @@ export function PrintPreviewDialog({
   const [customW, setCustomW] = useState<string>("80");
   const [customH, setCustomH] = useState<string>("");
   const [niimbotOpen, setNiimbotOpen] = useState(false);
+  const [sendingNiimbot, setSendingNiimbot] = useState(false);
 
   useEffect(() => {
     if (open) setActiveId(firstId);
@@ -123,11 +124,30 @@ export function PrintPreviewDialog({
     }
   }
 
+  async function sendNiimbotLabel(device: any, doc: PrintPreviewDocument) {
+    setSendingNiimbot(true);
+    try {
+      toast.message(`Sending label to ${device.name ?? "Niimbot"}…`);
+      await printNiimbotLabelHtml({
+        device,
+        html: doc.html,
+        text: htmlToPlainText(doc.html),
+        widthMm: 50,
+        heightMm: 30,
+      });
+      toast.success(`Label sent to ${device.name ?? "Niimbot"}`);
+    } catch (error: any) {
+      toast.error(error?.message ?? "Niimbot print failed");
+    } finally {
+      setSendingNiimbot(false);
+    }
+  }
+
   async function printActive() {
     if (!active || typeof window === "undefined") return;
-    const paired = getPairedPrinter() ?? (await getOrRestorePairedDevice());
-    if (active.id === "labels" && paired && isLikelyNiimbot(paired.name)) {
-      setNiimbotOpen(true);
+    const pairedDevice = await getOrRestorePairedDevice();
+    if (active.id === "labels" && pairedDevice && isLikelyNiimbot(pairedDevice.name)) {
+      await sendNiimbotLabel(pairedDevice, active);
       return;
     }
     const iframe = document.createElement("iframe");
@@ -165,10 +185,13 @@ export function PrintPreviewDialog({
       if (!already) toast.success(`Bluetooth printer paired: ${printer.name}`);
       if (!active) return;
       // Niimbot B-series uses a proprietary format — open the dedicated
-      // adjustment dialog instead of sending ESC/POS bytes.
+      // direct print path instead of sending ESC/POS bytes.
       if (isLikelyNiimbot(printer.name)) {
+        const device = await getOrRestorePairedDevice();
+        const labelDoc = labelDocument ?? active;
         if (labelDocument) setActiveId("labels");
-        setNiimbotOpen(true);
+        if (device) await sendNiimbotLabel(device, labelDoc);
+        else setNiimbotOpen(true);
         return;
       }
       const text = htmlToPlainText(active.html);
@@ -258,7 +281,7 @@ export function PrintPreviewDialog({
         </Tabs>
 
         <div className="border-t px-4 sm:px-6 py-3 flex flex-wrap items-center gap-2">
-          <Button onClick={printActive}>
+          <Button onClick={printActive} disabled={sendingNiimbot}>
             <Printer className="h-4 w-4 mr-2" /> Print
           </Button>
           <Button variant="outline" onClick={savePdf}>
