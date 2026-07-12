@@ -60,18 +60,21 @@ async function writeBytes(ch: any, data: Uint8Array) {
   // chunks can make the printer accept data but never start printing.
   for (let tries = 0; tries < 30; tries++) {
     try {
-      if (ch.properties?.writeWithoutResponse) {
-        await ch.writeValueWithoutResponse(data);
-      } else if (ch.writeValueWithResponse) {
+      // Prefer acknowledged writes when available. B1 units can beep/feed after
+      // accepting the first frames, then silently drop later bitmap rows if the
+      // browser floods writeWithoutResponse too quickly.
+      if (ch.properties?.write && ch.writeValueWithResponse) {
         await ch.writeValueWithResponse(data);
+      } else if (ch.properties?.writeWithoutResponse) {
+        await ch.writeValueWithoutResponse(data);
       } else {
         await ch.writeValue(data);
       }
-      await sleep(10);
+      await sleep(ch.properties?.writeWithoutResponse && !ch.properties?.write ? 24 : 16);
       return;
     } catch (error) {
       if (tries === 29) throw error;
-      await sleep(8);
+      await sleep(14);
     }
   }
 }
@@ -200,6 +203,23 @@ function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number,
   return lines;
 }
 
+function drawWrappedText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  maxWidth: number,
+  lineHeight: number,
+  maxLines: number,
+) {
+  const lines = wrapText(ctx, text, maxWidth, maxLines);
+  for (const line of lines) {
+    ctx.fillText(line, x, y);
+    y += lineHeight;
+  }
+  return y;
+}
+
 function fitText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxWidth: number) {
   if (ctx.measureText(text).width <= maxWidth) {
     ctx.fillText(text, x, y);
@@ -239,8 +259,10 @@ export function renderFormattedLabelBitmap(
 ): NiimbotBitmap {
   if (typeof document === "undefined") throw new Error("Canvas not available");
   const { w, h } = labelDots(widthMm, heightMm);
-  const scale = Math.max(0.72, Math.min(1.18, Math.min(widthMm / 58, heightMm / 40)));
-  const margin = Math.max(10, Math.round(16 * scale));
+  // 50×30mm on a B1 is only 384×240 dots. Keep the layout compact so every
+  // field (drink, customer, notes, quote, shop) lands inside the printable area.
+  const scale = Math.max(0.68, Math.min(1, Math.min(widthMm / 50, heightMm / 30)));
+  const margin = Math.max(8, Math.round(10 * scale));
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;
@@ -251,49 +273,57 @@ export function renderFormattedLabelBitmap(
   ctx.textBaseline = "top";
 
   const contentW = w - margin * 2;
-  ctx.font = `${Math.round(18 * scale)}px system-ui, sans-serif`;
+  const headerPx = Math.round(15 * scale);
+  const namePx = Math.round(24 * scale);
+  const cupPx = Math.round(15 * scale);
+  const customerPx = Math.round(18 * scale);
+  const notesPx = Math.round(14 * scale);
+  const quotePx = Math.round(13 * scale);
+  const brandPx = Math.round(11 * scale);
+
+  ctx.font = `${headerPx}px system-ui, sans-serif`;
   fitText(ctx, label.order, margin, margin, Math.round(contentW * 0.68));
   const whenW = Math.round(contentW * 0.3);
   fitText(ctx, label.when, w - margin - whenW, margin, whenW);
 
-  let y = margin + Math.round(24 * scale);
-  ctx.font = `700 ${Math.round(30 * scale)}px system-ui, sans-serif`;
-  const nameLines = wrapText(ctx, label.name, contentW, 2);
-  for (const line of nameLines) {
-    ctx.fillText(line, margin, y);
-    y += Math.round(34 * scale);
-  }
+  let y = margin + Math.round(headerPx * 1.25);
+  ctx.font = `700 ${namePx}px system-ui, sans-serif`;
+  y = drawWrappedText(ctx, label.name, margin, y, contentW, Math.round(namePx * 1.12), 2);
 
-  ctx.font = `${Math.round(20 * scale)}px system-ui, sans-serif`;
+  ctx.font = `${cupPx}px system-ui, sans-serif`;
   if (label.cup) {
     fitText(ctx, label.cup, margin, y, contentW);
-    y += Math.round(23 * scale);
+    y += Math.round(cupPx * 1.18);
   }
 
-  ctx.font = `700 ${Math.round(24 * scale)}px system-ui, sans-serif`;
+  ctx.font = `700 ${customerPx}px system-ui, sans-serif`;
   if (label.customer) {
     fitText(ctx, label.customer, margin, y, contentW);
-    y += Math.round(28 * scale);
+    y += Math.round(customerPx * 1.15);
   }
 
-  ctx.font = `italic ${Math.round(18 * scale)}px system-ui, sans-serif`;
-  for (const line of wrapText(ctx, label.notes, contentW, 2)) {
-    ctx.fillText(line, margin, y);
-    y += Math.round(21 * scale);
-  }
-
-  const brandH = Math.round(18 * scale);
-  ctx.font = `italic ${Math.round(16 * scale)}px system-ui, sans-serif`;
+  const brandH = Math.round(brandPx * 1.25);
+  const quoteLineH = Math.round(quotePx * 1.22);
   const quoteLines = wrapText(ctx, label.quote, contentW, 2);
-  let quoteY = h - margin - brandH - quoteLines.length * Math.round(19 * scale);
-  quoteY = Math.max(y + Math.round(4 * scale), quoteY);
+  const quoteBlockH = quoteLines.length * quoteLineH;
+  const bottomReserved = brandH + quoteBlockH + Math.round(5 * scale);
+  const notesBottom = h - margin - bottomReserved;
+  ctx.font = `italic ${notesPx}px system-ui, sans-serif`;
+  for (const line of wrapText(ctx, label.notes, contentW, 2)) {
+    if (y + notesPx > notesBottom) break;
+    ctx.fillText(line, margin, y);
+    y += Math.round(notesPx * 1.18);
+  }
+
+  ctx.font = `italic ${quotePx}px system-ui, sans-serif`;
+  let quoteY = Math.max(y + Math.round(3 * scale), h - margin - brandH - quoteBlockH);
   for (const line of quoteLines) {
     if (quoteY > h - margin - brandH) break;
     ctx.fillText(line, margin, quoteY);
-    quoteY += Math.round(19 * scale);
+    quoteY += quoteLineH;
   }
 
-  ctx.font = `${Math.round(14 * scale)}px system-ui, sans-serif`;
+  ctx.font = `${brandPx}px system-ui, sans-serif`;
   const brandWidth = ctx.measureText(label.brand).width;
   ctx.fillText(label.brand, Math.max(margin, w - margin - brandWidth), h - margin - brandH);
 
@@ -360,28 +390,18 @@ function isBlankRow(row: Uint8Array) {
   return true;
 }
 
-function sameRow(a: Uint8Array, b: Uint8Array) {
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
-  return true;
-}
-
 async function printBitmapPage(ch: any, bmp: NiimbotBitmap, copies: number) {
   // B1 is more reliable with the 6-byte page-size payload: rows, cols, copies.
   await writePacket(ch, makePacket(0x03, [0x01])); // page start
   await writePacket(ch, makePacket(0x13, [...u16(bmp.height), ...u16(bmp.width), ...u16(copies)]));
 
-  for (let y = 0; y < bmp.rows.length;) {
+  for (let y = 0; y < bmp.rows.length; y++) {
     const row = bmp.rows[y];
-    let repeat = 1;
-    while (y + repeat < bmp.rows.length && repeat < 255 && sameRow(row, bmp.rows[y + repeat])) repeat++;
-    if (isBlankRow(row)) {
-      await writePacket(ch, makePacket(0x84, [...u16(y), repeat]));
-      y += repeat;
-      continue;
-    }
-    await writePacket(ch, makePacket(0x85, [...u16(y), ...countBlackPixelsTotal(row, bmp.width), repeat, ...row]));
-    y += repeat;
+    if (isBlankRow(row)) continue;
+    // Keep repeat fixed at 1. The protocol requires this byte before the bitmap
+    // data, while avoiding grouped repeats prevents later content bands from
+    // being skipped by stricter B1 firmwares.
+    await writePacket(ch, makePacket(0x85, [...u16(y), ...countBlackPixelsTotal(row, bmp.width), 1, ...row]));
   }
 
   await writePacket(ch, makePacket(0xe3, [0x01])); // page end

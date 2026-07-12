@@ -80,7 +80,7 @@ export function NiimbotPrintDialog({
     }
   }, [open, text, initialHtml, widthMm, heightMm, fontPx]);
 
-  const dots = useMemo(() => ({ w: Math.round(widthMm * 8), h: Math.round(heightMm * 8) }), [widthMm, heightMm]);
+  const dots = useMemo(() => ({ w: Math.min(384, Math.ceil(Math.round(widthMm * 8) / 8) * 8), h: Math.round(heightMm * 8) }), [widthMm, heightMm]);
 
   async function doPrint() {
     const device = await getOrRestorePairedDevice();
