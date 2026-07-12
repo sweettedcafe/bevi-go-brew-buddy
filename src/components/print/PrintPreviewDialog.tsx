@@ -152,6 +152,12 @@ export function PrintPreviewDialog({
       if (!printer) return;
       if (!already) toast.success(`Bluetooth printer paired: ${printer.name}`);
       if (!active) return;
+      // Niimbot B-series uses a proprietary format — open the dedicated
+      // adjustment dialog instead of sending ESC/POS bytes.
+      if (isLikelyNiimbot(printer.name)) {
+        setNiimbotOpen(true);
+        return;
+      }
       const text = htmlToPlainText(active.html);
       toast.message(`Sending ${active.label.toLowerCase()} to ${printer.name}…`);
       await printTextToBluetooth(text);
