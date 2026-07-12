@@ -41,9 +41,9 @@ import { Route as AuthenticatedAnalyticsRouteImport } from './routes/_authentica
 import { Route as AuthenticatedAccessControlRouteImport } from './routes/_authenticated/access-control'
 import { Route as ApiPublicSendWelcomeEmailRouteImport } from './routes/api/public/send-welcome-email'
 import { Route as ApiPublicSendPasswordOtpRouteImport } from './routes/api/public/send-password-otp'
+import { Route as ApiPublicEnvprobeRouteImport } from './routes/api/public/envprobe'
 import { Route as ApiPublicDevSetPasswordRouteImport } from './routes/api/public/dev-set-password'
 import { Route as ApiPublicDevListUsersRouteImport } from './routes/api/public/dev-list-users'
-import { Route as ApiPublicEnvProbeRouteImport } from './routes/api/public/_env-probe'
 
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
@@ -211,6 +211,11 @@ const ApiPublicSendPasswordOtpRoute =
     path: '/api/public/send-password-otp',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicEnvprobeRoute = ApiPublicEnvprobeRouteImport.update({
+  id: '/api/public/envprobe',
+  path: '/api/public/envprobe',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicDevSetPasswordRoute = ApiPublicDevSetPasswordRouteImport.update({
   id: '/api/public/dev-set-password',
   path: '/api/public/dev-set-password',
@@ -219,11 +224,6 @@ const ApiPublicDevSetPasswordRoute = ApiPublicDevSetPasswordRouteImport.update({
 const ApiPublicDevListUsersRoute = ApiPublicDevListUsersRouteImport.update({
   id: '/api/public/dev-list-users',
   path: '/api/public/dev-list-users',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiPublicEnvProbeRoute = ApiPublicEnvProbeRouteImport.update({
-  id: '/api/public/_env-probe',
-  path: '/api/public',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -257,9 +257,9 @@ export interface FileRoutesByFullPath {
   '/timeclock': typeof AuthenticatedTimeclockRoute
   '/timeclock-report': typeof AuthenticatedTimeclockReportRoute
   '/o/$token': typeof OTokenRoute
-  '/api/public': typeof ApiPublicEnvProbeRoute
   '/api/public/dev-list-users': typeof ApiPublicDevListUsersRoute
   '/api/public/dev-set-password': typeof ApiPublicDevSetPasswordRoute
+  '/api/public/envprobe': typeof ApiPublicEnvprobeRoute
   '/api/public/send-password-otp': typeof ApiPublicSendPasswordOtpRoute
   '/api/public/send-welcome-email': typeof ApiPublicSendWelcomeEmailRoute
 }
@@ -293,9 +293,9 @@ export interface FileRoutesByTo {
   '/timeclock': typeof AuthenticatedTimeclockRoute
   '/timeclock-report': typeof AuthenticatedTimeclockReportRoute
   '/o/$token': typeof OTokenRoute
-  '/api/public': typeof ApiPublicEnvProbeRoute
   '/api/public/dev-list-users': typeof ApiPublicDevListUsersRoute
   '/api/public/dev-set-password': typeof ApiPublicDevSetPasswordRoute
+  '/api/public/envprobe': typeof ApiPublicEnvprobeRoute
   '/api/public/send-password-otp': typeof ApiPublicSendPasswordOtpRoute
   '/api/public/send-welcome-email': typeof ApiPublicSendWelcomeEmailRoute
 }
@@ -331,9 +331,9 @@ export interface FileRoutesById {
   '/_authenticated/timeclock': typeof AuthenticatedTimeclockRoute
   '/_authenticated/timeclock-report': typeof AuthenticatedTimeclockReportRoute
   '/o/$token': typeof OTokenRoute
-  '/api/public/_env-probe': typeof ApiPublicEnvProbeRoute
   '/api/public/dev-list-users': typeof ApiPublicDevListUsersRoute
   '/api/public/dev-set-password': typeof ApiPublicDevSetPasswordRoute
+  '/api/public/envprobe': typeof ApiPublicEnvprobeRoute
   '/api/public/send-password-otp': typeof ApiPublicSendPasswordOtpRoute
   '/api/public/send-welcome-email': typeof ApiPublicSendWelcomeEmailRoute
 }
@@ -369,9 +369,9 @@ export interface FileRouteTypes {
     | '/timeclock'
     | '/timeclock-report'
     | '/o/$token'
-    | '/api/public'
     | '/api/public/dev-list-users'
     | '/api/public/dev-set-password'
+    | '/api/public/envprobe'
     | '/api/public/send-password-otp'
     | '/api/public/send-welcome-email'
   fileRoutesByTo: FileRoutesByTo
@@ -405,9 +405,9 @@ export interface FileRouteTypes {
     | '/timeclock'
     | '/timeclock-report'
     | '/o/$token'
-    | '/api/public'
     | '/api/public/dev-list-users'
     | '/api/public/dev-set-password'
+    | '/api/public/envprobe'
     | '/api/public/send-password-otp'
     | '/api/public/send-welcome-email'
   id:
@@ -442,9 +442,9 @@ export interface FileRouteTypes {
     | '/_authenticated/timeclock'
     | '/_authenticated/timeclock-report'
     | '/o/$token'
-    | '/api/public/_env-probe'
     | '/api/public/dev-list-users'
     | '/api/public/dev-set-password'
+    | '/api/public/envprobe'
     | '/api/public/send-password-otp'
     | '/api/public/send-welcome-email'
   fileRoutesById: FileRoutesById
@@ -456,9 +456,9 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   RegisterRoute: typeof RegisterRoute
   OTokenRoute: typeof OTokenRoute
-  ApiPublicEnvProbeRoute: typeof ApiPublicEnvProbeRoute
   ApiPublicDevListUsersRoute: typeof ApiPublicDevListUsersRoute
   ApiPublicDevSetPasswordRoute: typeof ApiPublicDevSetPasswordRoute
+  ApiPublicEnvprobeRoute: typeof ApiPublicEnvprobeRoute
   ApiPublicSendPasswordOtpRoute: typeof ApiPublicSendPasswordOtpRoute
   ApiPublicSendWelcomeEmailRoute: typeof ApiPublicSendWelcomeEmailRoute
 }
@@ -689,6 +689,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicSendPasswordOtpRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/envprobe': {
+      id: '/api/public/envprobe'
+      path: '/api/public/envprobe'
+      fullPath: '/api/public/envprobe'
+      preLoaderRoute: typeof ApiPublicEnvprobeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/dev-set-password': {
       id: '/api/public/dev-set-password'
       path: '/api/public/dev-set-password'
@@ -701,13 +708,6 @@ declare module '@tanstack/react-router' {
       path: '/api/public/dev-list-users'
       fullPath: '/api/public/dev-list-users'
       preLoaderRoute: typeof ApiPublicDevListUsersRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/_env-probe': {
-      id: '/api/public/_env-probe'
-      path: '/api/public'
-      fullPath: '/api/public'
-      preLoaderRoute: typeof ApiPublicEnvProbeRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -778,9 +778,9 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   RegisterRoute: RegisterRoute,
   OTokenRoute: OTokenRoute,
-  ApiPublicEnvProbeRoute: ApiPublicEnvProbeRoute,
   ApiPublicDevListUsersRoute: ApiPublicDevListUsersRoute,
   ApiPublicDevSetPasswordRoute: ApiPublicDevSetPasswordRoute,
+  ApiPublicEnvprobeRoute: ApiPublicEnvprobeRoute,
   ApiPublicSendPasswordOtpRoute: ApiPublicSendPasswordOtpRoute,
   ApiPublicSendWelcomeEmailRoute: ApiPublicSendWelcomeEmailRoute,
 }
