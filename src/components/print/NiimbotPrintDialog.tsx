@@ -98,7 +98,8 @@ export function NiimbotPrintDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-0">
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Bluetooth className="h-5 w-5 text-primary" />
