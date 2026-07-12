@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as OTokenRouteImport } from './routes/o.$token'
@@ -39,6 +40,7 @@ import { Route as AuthenticatedAuditLogRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedAnalyticsRouteImport } from './routes/_authenticated/analytics'
 import { Route as AuthenticatedAccessControlRouteImport } from './routes/_authenticated/access-control'
 import { Route as ApiPublicSendWelcomeEmailRouteImport } from './routes/api/public/send-welcome-email'
+import { Route as ApiPublicDevSetPasswordRouteImport } from './routes/api/public/dev-set-password'
 
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
@@ -48,6 +50,11 @@ const RegisterRoute = RegisterRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
@@ -195,9 +202,15 @@ const ApiPublicSendWelcomeEmailRoute =
     path: '/api/public/send-welcome-email',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicDevSetPasswordRoute = ApiPublicDevSetPasswordRouteImport.update({
+  id: '/api/public/dev-set-password',
+  path: '/api/public/dev-set-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/access-control': typeof AuthenticatedAccessControlRoute
@@ -225,10 +238,12 @@ export interface FileRoutesByFullPath {
   '/timeclock': typeof AuthenticatedTimeclockRoute
   '/timeclock-report': typeof AuthenticatedTimeclockReportRoute
   '/o/$token': typeof OTokenRoute
+  '/api/public/dev-set-password': typeof ApiPublicDevSetPasswordRoute
   '/api/public/send-welcome-email': typeof ApiPublicSendWelcomeEmailRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/access-control': typeof AuthenticatedAccessControlRoute
@@ -256,12 +271,14 @@ export interface FileRoutesByTo {
   '/timeclock': typeof AuthenticatedTimeclockRoute
   '/timeclock-report': typeof AuthenticatedTimeclockReportRoute
   '/o/$token': typeof OTokenRoute
+  '/api/public/dev-set-password': typeof ApiPublicDevSetPasswordRoute
   '/api/public/send-welcome-email': typeof ApiPublicSendWelcomeEmailRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
+  '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/_authenticated/access-control': typeof AuthenticatedAccessControlRoute
@@ -289,12 +306,14 @@ export interface FileRoutesById {
   '/_authenticated/timeclock': typeof AuthenticatedTimeclockRoute
   '/_authenticated/timeclock-report': typeof AuthenticatedTimeclockReportRoute
   '/o/$token': typeof OTokenRoute
+  '/api/public/dev-set-password': typeof ApiPublicDevSetPasswordRoute
   '/api/public/send-welcome-email': typeof ApiPublicSendWelcomeEmailRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/forgot-password'
     | '/login'
     | '/register'
     | '/access-control'
@@ -322,10 +341,12 @@ export interface FileRouteTypes {
     | '/timeclock'
     | '/timeclock-report'
     | '/o/$token'
+    | '/api/public/dev-set-password'
     | '/api/public/send-welcome-email'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/forgot-password'
     | '/login'
     | '/register'
     | '/access-control'
@@ -353,11 +374,13 @@ export interface FileRouteTypes {
     | '/timeclock'
     | '/timeclock-report'
     | '/o/$token'
+    | '/api/public/dev-set-password'
     | '/api/public/send-welcome-email'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
+    | '/forgot-password'
     | '/login'
     | '/register'
     | '/_authenticated/access-control'
@@ -385,15 +408,18 @@ export interface FileRouteTypes {
     | '/_authenticated/timeclock'
     | '/_authenticated/timeclock-report'
     | '/o/$token'
+    | '/api/public/dev-set-password'
     | '/api/public/send-welcome-email'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
+  ForgotPasswordRoute: typeof ForgotPasswordRoute
   LoginRoute: typeof LoginRoute
   RegisterRoute: typeof RegisterRoute
   OTokenRoute: typeof OTokenRoute
+  ApiPublicDevSetPasswordRoute: typeof ApiPublicDevSetPasswordRoute
   ApiPublicSendWelcomeEmailRoute: typeof ApiPublicSendWelcomeEmailRoute
 }
 
@@ -411,6 +437,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/forgot-password': {
+      id: '/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof ForgotPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated': {
@@ -609,6 +642,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicSendWelcomeEmailRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/dev-set-password': {
+      id: '/api/public/dev-set-password'
+      path: '/api/public/dev-set-password'
+      fullPath: '/api/public/dev-set-password'
+      preLoaderRoute: typeof ApiPublicDevSetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -673,21 +713,13 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
+  ForgotPasswordRoute: ForgotPasswordRoute,
   LoginRoute: LoginRoute,
   RegisterRoute: RegisterRoute,
   OTokenRoute: OTokenRoute,
+  ApiPublicDevSetPasswordRoute: ApiPublicDevSetPasswordRoute,
   ApiPublicSendWelcomeEmailRoute: ApiPublicSendWelcomeEmailRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
