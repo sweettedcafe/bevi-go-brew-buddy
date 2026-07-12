@@ -315,12 +315,13 @@ export function renderFormattedLabelBitmap(
     drawCenteredFallback(ctx, "Label details", Math.round(h * 0.45), w);
   }
 
-  const brandH = Math.round(brandPx * 1.25);
-  const quoteLineH = Math.round(quotePx * 1.22);
+  const brandH = Math.round(brandPx * 1.1);
+  const brandY = h - brandH - Math.round(2 * scale);
+  const quoteLineH = Math.round(quotePx * 1.15);
   ctx.font = `italic ${quotePx}px system-ui, sans-serif`;
   const quoteLines = wrapText(ctx, label.quote, contentW, 2);
   const quoteBlockH = quoteLines.length * quoteLineH;
-  const bottomReserved = brandH + quoteBlockH + Math.round(4 * scale);
+  const bottomReserved = brandH + quoteBlockH + Math.round(1 * scale);
   const notesBottom = h - margin - bottomReserved;
   ctx.font = `italic ${notesPx}px system-ui, sans-serif`;
   for (const line of wrapText(ctx, label.notes, contentW, 2)) {
@@ -330,8 +331,8 @@ export function renderFormattedLabelBitmap(
   }
 
   ctx.font = `italic ${quotePx}px system-ui, sans-serif`;
-  let quoteY = y + Math.round(2 * scale);
-  const quoteMaxY = h - margin - brandH;
+  let quoteY = y + Math.round(1 * scale);
+  const quoteMaxY = brandY - Math.round(1 * scale);
   for (const line of quoteLines) {
     if (quoteY + quotePx > quoteMaxY) break;
     ctx.fillText(line, margin, quoteY);
@@ -340,7 +341,7 @@ export function renderFormattedLabelBitmap(
 
   ctx.font = `${brandPx}px system-ui, sans-serif`;
   const brandWidth = ctx.measureText(label.brand).width;
-  ctx.fillText(label.brand, Math.max(margin, w - margin - brandWidth), h - margin - brandH);
+  ctx.fillText(label.brand, Math.max(margin, w - margin - brandWidth), brandY);
 
   return canvasToBitmap(canvas);
 }
