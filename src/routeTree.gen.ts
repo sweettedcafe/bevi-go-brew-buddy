@@ -40,6 +40,7 @@ import { Route as AuthenticatedAuditLogRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedAnalyticsRouteImport } from './routes/_authenticated/analytics'
 import { Route as AuthenticatedAccessControlRouteImport } from './routes/_authenticated/access-control'
 import { Route as ApiPublicSendWelcomeEmailRouteImport } from './routes/api/public/send-welcome-email'
+import { Route as ApiPublicSendPasswordOtpRouteImport } from './routes/api/public/send-password-otp'
 import { Route as ApiPublicDevSetPasswordRouteImport } from './routes/api/public/dev-set-password'
 
 const RegisterRoute = RegisterRouteImport.update({
@@ -202,6 +203,12 @@ const ApiPublicSendWelcomeEmailRoute =
     path: '/api/public/send-welcome-email',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicSendPasswordOtpRoute =
+  ApiPublicSendPasswordOtpRouteImport.update({
+    id: '/api/public/send-password-otp',
+    path: '/api/public/send-password-otp',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicDevSetPasswordRoute = ApiPublicDevSetPasswordRouteImport.update({
   id: '/api/public/dev-set-password',
   path: '/api/public/dev-set-password',
@@ -239,6 +246,7 @@ export interface FileRoutesByFullPath {
   '/timeclock-report': typeof AuthenticatedTimeclockReportRoute
   '/o/$token': typeof OTokenRoute
   '/api/public/dev-set-password': typeof ApiPublicDevSetPasswordRoute
+  '/api/public/send-password-otp': typeof ApiPublicSendPasswordOtpRoute
   '/api/public/send-welcome-email': typeof ApiPublicSendWelcomeEmailRoute
 }
 export interface FileRoutesByTo {
@@ -272,6 +280,7 @@ export interface FileRoutesByTo {
   '/timeclock-report': typeof AuthenticatedTimeclockReportRoute
   '/o/$token': typeof OTokenRoute
   '/api/public/dev-set-password': typeof ApiPublicDevSetPasswordRoute
+  '/api/public/send-password-otp': typeof ApiPublicSendPasswordOtpRoute
   '/api/public/send-welcome-email': typeof ApiPublicSendWelcomeEmailRoute
 }
 export interface FileRoutesById {
@@ -307,6 +316,7 @@ export interface FileRoutesById {
   '/_authenticated/timeclock-report': typeof AuthenticatedTimeclockReportRoute
   '/o/$token': typeof OTokenRoute
   '/api/public/dev-set-password': typeof ApiPublicDevSetPasswordRoute
+  '/api/public/send-password-otp': typeof ApiPublicSendPasswordOtpRoute
   '/api/public/send-welcome-email': typeof ApiPublicSendWelcomeEmailRoute
 }
 export interface FileRouteTypes {
@@ -342,6 +352,7 @@ export interface FileRouteTypes {
     | '/timeclock-report'
     | '/o/$token'
     | '/api/public/dev-set-password'
+    | '/api/public/send-password-otp'
     | '/api/public/send-welcome-email'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -375,6 +386,7 @@ export interface FileRouteTypes {
     | '/timeclock-report'
     | '/o/$token'
     | '/api/public/dev-set-password'
+    | '/api/public/send-password-otp'
     | '/api/public/send-welcome-email'
   id:
     | '__root__'
@@ -409,6 +421,7 @@ export interface FileRouteTypes {
     | '/_authenticated/timeclock-report'
     | '/o/$token'
     | '/api/public/dev-set-password'
+    | '/api/public/send-password-otp'
     | '/api/public/send-welcome-email'
   fileRoutesById: FileRoutesById
 }
@@ -420,6 +433,7 @@ export interface RootRouteChildren {
   RegisterRoute: typeof RegisterRoute
   OTokenRoute: typeof OTokenRoute
   ApiPublicDevSetPasswordRoute: typeof ApiPublicDevSetPasswordRoute
+  ApiPublicSendPasswordOtpRoute: typeof ApiPublicSendPasswordOtpRoute
   ApiPublicSendWelcomeEmailRoute: typeof ApiPublicSendWelcomeEmailRoute
 }
 
@@ -642,6 +656,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicSendWelcomeEmailRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/send-password-otp': {
+      id: '/api/public/send-password-otp'
+      path: '/api/public/send-password-otp'
+      fullPath: '/api/public/send-password-otp'
+      preLoaderRoute: typeof ApiPublicSendPasswordOtpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/dev-set-password': {
       id: '/api/public/dev-set-password'
       path: '/api/public/dev-set-password'
@@ -718,6 +739,7 @@ const rootRouteChildren: RootRouteChildren = {
   RegisterRoute: RegisterRoute,
   OTokenRoute: OTokenRoute,
   ApiPublicDevSetPasswordRoute: ApiPublicDevSetPasswordRoute,
+  ApiPublicSendPasswordOtpRoute: ApiPublicSendPasswordOtpRoute,
   ApiPublicSendWelcomeEmailRoute: ApiPublicSendWelcomeEmailRoute,
 }
 export const routeTree = rootRouteImport
