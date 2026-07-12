@@ -64,6 +64,7 @@ export function PrintPreviewDialog({
   const [paperId, setPaperId] = useState<string>("");
   const [customW, setCustomW] = useState<string>("80");
   const [customH, setCustomH] = useState<string>("");
+  const [niimbotOpen, setNiimbotOpen] = useState(false);
 
   useEffect(() => {
     if (open) setActiveId(firstId);
