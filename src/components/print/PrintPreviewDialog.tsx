@@ -271,6 +271,14 @@ export function PrintPreviewDialog({
         </div>
       </DialogContent>
     </Dialog>
+    <NiimbotPrintDialog
+      open={niimbotOpen}
+      onOpenChange={setNiimbotOpen}
+      initialText={active ? htmlToPlainText(active.html) : ""}
+      initialWidthMm={active?.id === "labels" ? 50 : 50}
+      initialHeightMm={active?.id === "labels" ? 30 : 40}
+    />
+    </>
   );
 }
 
