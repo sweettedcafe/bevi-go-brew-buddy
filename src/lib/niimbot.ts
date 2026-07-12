@@ -19,6 +19,9 @@ const NIIMBOT_SERVICES = [
   "e7810a71-73ae-499d-8c15-faa9aef0c3f2",
 ];
 
+const NIIMBOT_WRITE_CHARACTERISTIC = "bef8d6c9-9c21-4c9e-b632-bd58c1009f9f";
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export function isLikelyNiimbot(name?: string | null) {
   if (!name) return false;
   return /niimbot|b1\b|b18|b21|b3s|d11|d110|d101/i.test(name);
@@ -37,6 +40,10 @@ async function getNiimbotWriteChar(device: any): Promise<any> {
   for (const uuid of NIIMBOT_SERVICES) {
     try {
       const svc = await server.getPrimaryService(uuid);
+      try {
+        const preferred = await svc.getCharacteristic(NIIMBOT_WRITE_CHARACTERISTIC);
+        if (preferred.properties?.write || preferred.properties?.writeWithoutResponse) return preferred;
+      } catch { /* fall back to any writable characteristic */ }
       const chars = await svc.getCharacteristics();
       for (const c of chars) {
         if (c.properties?.write || c.properties?.writeWithoutResponse) return c;
@@ -46,20 +53,29 @@ async function getNiimbotWriteChar(device: any): Promise<any> {
   throw new Error("Niimbot service not found on this device.");
 }
 
-async function writePacket(ch: any, pkt: Uint8Array) {
-  const CHUNK = 20;
-  for (let i = 0; i < pkt.length; i += CHUNK) {
-    const chunk = pkt.slice(i, i + CHUNK);
-    if (ch.properties?.writeWithoutResponse) {
-      await ch.writeValueWithoutResponse(chunk);
-    } else if (ch.writeValueWithResponse) {
-      await ch.writeValueWithResponse(chunk);
-    } else {
-      await ch.writeValue(chunk);
+async function writeBytes(ch: any, data: Uint8Array) {
+  // Niimbot expects each protocol frame as one BLE write. Splitting into 20-byte
+  // chunks can make the printer accept data but never start printing.
+  for (let tries = 0; tries < 30; tries++) {
+    try {
+      if (ch.properties?.writeWithoutResponse) {
+        await ch.writeValueWithoutResponse(data);
+      } else if (ch.writeValueWithResponse) {
+        await ch.writeValueWithResponse(data);
+      } else {
+        await ch.writeValue(data);
+      }
+      await sleep(10);
+      return;
+    } catch (error) {
+      if (tries === 29) throw error;
+      await sleep(8);
     }
-    // Small pacing gap — Niimbot dislikes back-to-back writes.
-    await new Promise((r) => setTimeout(r, 8));
   }
+}
+
+async function writePacket(ch: any, pkt: Uint8Array) {
+  await writeBytes(ch, pkt);
 }
 
 // Render a plain-text label to a monochrome bitmap. Width/height in mm,
@@ -72,7 +88,7 @@ export function renderLabelBitmap(
 ): { width: number; height: number; rows: Uint8Array[] } {
   if (typeof document === "undefined") throw new Error("Canvas not available");
   const DPM = 8; // dots per mm at 203dpi
-  const w = Math.round(widthMm * DPM);
+  const w = Math.ceil(Math.round(widthMm * DPM) / 8) * 8;
   const h = Math.round(heightMm * DPM);
   const wBytes = Math.ceil(w / 8);
 
@@ -212,7 +228,7 @@ export function renderFormattedLabelBitmap(
 ): NiimbotBitmap {
   if (typeof document === "undefined") throw new Error("Canvas not available");
   const DPM = 8;
-  const w = Math.round(widthMm * DPM);
+  const w = Math.ceil(Math.round(widthMm * DPM) / 8) * 8;
   const h = Math.round(heightMm * DPM);
   const scale = Math.max(0.72, Math.min(1.18, Math.min(widthMm / 58, heightMm / 40)));
   const margin = Math.max(10, Math.round(16 * scale));
@@ -349,6 +365,7 @@ async function printBitmapPage(ch: any, bmp: NiimbotBitmap, copies: number) {
   }
 
   await writePacket(ch, makePacket(0xe3, [0x01])); // page end
+  await sleep(120);
 }
 
 export async function printNiimbotBitmaps(opts: {
@@ -360,19 +377,27 @@ export async function printNiimbotBitmaps(opts: {
   const density = Math.min(5, Math.max(1, Math.round(opts.density)));
   const copies = Math.min(50, Math.max(1, Math.round(opts.copies ?? 1)));
   const ch = await getNiimbotWriteChar(opts.device);
-  const bitmaps = opts.bitmaps.filter((bmp) => bmp.width > 0 && bmp.height > 0 && bmp.rows.length > 0);
+  const sourceBitmaps = opts.bitmaps.filter((bmp) => bmp.width > 0 && bmp.height > 0 && bmp.rows.length > 0);
+  const bitmaps = Array.from({ length: copies }).flatMap(() => sourceBitmaps);
   if (bitmaps.length === 0) throw new Error("No label content to print.");
 
-  await writePacket(ch, makePacket(0xc1, [0x01])); // connect / wake
+  // B1-compatible wake/handshake. The leading 0x03 packet mirrors Niimbot's
+  // browser driver and helps protocol-3 B1 units arm before print jobs.
+  await writeBytes(ch, new Uint8Array([0x03, ...makePacket(0xc1, [0x01])]));
+  await sleep(200);
+  await writePacket(ch, makePacket(0xa5, [0x01])); // status data
+  for (const sub of [0x08, 0x0b, 0x0d, 0x0a, 0x07, 0x03, 0x0c, 0x09]) {
+    await writePacket(ch, makePacket(0x40, [sub])); // printer info keepalive sequence
+  }
+  await writePacket(ch, makePacket(0xdc, [0x04])); // heartbeat
+
   await writePacket(ch, makePacket(0x21, [density]));
   await writePacket(ch, makePacket(0x23, [0x01])); // label with gap
-  await writePacket(ch, makePacket(0x20, [0x01])); // clear previous print data
-  await writePacket(ch, makePacket(0x01, [0x01])); // start print
-  // Some B1 Bluetooth firmwares drop the first packet after PrintStart.
-  await writePacket(ch, makePacket(0xa3, [0x01]));
+  await writePacket(ch, makePacket(0x01, [...u16(bitmaps.length), 0, 0, 0, 0, 0])); // B1 print start, total pages
+  await writePacket(ch, makePacket(0xa3, [0x01])); // status packet also absorbs B1's first-packet drop
 
   for (const bmp of bitmaps) {
-    await printBitmapPage(ch, bmp, copies);
+    await printBitmapPage(ch, bmp, 1);
   }
 
   await writePacket(ch, makePacket(0xf3, [0x01])); // end print
