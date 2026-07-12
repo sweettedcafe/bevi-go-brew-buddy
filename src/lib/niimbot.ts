@@ -363,7 +363,7 @@ async function printBitmapPage(ch: any, bmp: NiimbotBitmap, copies: number) {
       await writePacket(ch, makePacket(0x84, [...u16(y), 1]));
       continue;
     }
-    await writePacket(ch, makePacket(0x85, [...u16(y), ...countBlackPixels(row), 1, ...row]));
+    await writePacket(ch, makePacket(0x85, [...u16(y), ...countBlackPixelsThirds(row, bmp.width), 1, ...row]));
   }
 
   await writePacket(ch, makePacket(0xe3, [0x01])); // page end
