@@ -61,7 +61,7 @@ function PrintSettingsPage() {
       label: "Labels",
       title: "Test Label",
       filename: "test-label.pdf",
-      widthMm: 58,
+      widthMm: 50,
       html: labelsHTML([{
         orderNo: 1, drinkName: "Latte", cupIndex: 1, cupTotal: 2,
         customerName: "Test Customer", notes: "extra hot",

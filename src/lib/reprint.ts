@@ -120,7 +120,7 @@ export async function reprintLabelsById(orderId: string): Promise<PrintPreviewDo
     title: `Labels #${orderNo}`,
     html: labelsHTML(labels, loadPrintSettings()),
     filename: `labels-${String(orderNo).padStart(3, "0")}.pdf`,
-    widthMm: 58,
+    widthMm: 50,
   };
 }
 
