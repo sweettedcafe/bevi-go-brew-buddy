@@ -9,7 +9,13 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { savePdfFromHTML, type PaperSize } from "@/lib/print-pdf";
-import { findBluetoothPrinter, isBluetoothSupported } from "@/lib/bt-printer";
+import {
+  findBluetoothPrinter,
+  isBluetoothSupported,
+  getPairedPrinter,
+  printTextToBluetooth,
+  htmlToPlainText,
+} from "@/lib/bt-printer";
 import { toast } from "sonner";
 
 export type PrintPreviewDocument = {
