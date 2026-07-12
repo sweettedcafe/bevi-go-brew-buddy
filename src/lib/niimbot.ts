@@ -282,12 +282,12 @@ export function renderFormattedLabelBitmap(
 
   const contentW = w - margin * 2;
   const headerPx = Math.round(12 * scale);
-  const namePx = Math.round(20 * scale);
-  const cupPx = Math.round(12 * scale);
-  const customerPx = Math.round(15 * scale);
-  const notesPx = Math.round(11 * scale);
-  const quotePx = Math.round(10 * scale);
-  const brandPx = Math.round(9 * scale);
+  const namePx = Math.round(26 * scale);
+  const cupPx = Math.round(16 * scale);
+  const customerPx = Math.round(20 * scale);
+  const notesPx = Math.round(12 * scale);
+  const quotePx = Math.round(13 * scale);
+  const brandPx = Math.round(12 * scale);
 
   ctx.font = `${headerPx}px system-ui, sans-serif`;
   fitText(ctx, label.order, margin, margin, Math.round(contentW * 0.68));
