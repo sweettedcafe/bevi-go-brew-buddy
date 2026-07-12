@@ -30,7 +30,7 @@ export function NiimbotPrintDialog({
   initialHeightMm?: number;
 }) {
   const paired = getPairedPrinter();
-  const [text, setText] = useState(initialText);
+  const [text, setText] = useState(() => toPlain(initialText));
   const [widthMm, setWidthMm] = useState(initialWidthMm);
   const [heightMm, setHeightMm] = useState(initialHeightMm);
   const [density, setDensity] = useState(3);
