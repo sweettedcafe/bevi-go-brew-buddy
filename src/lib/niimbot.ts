@@ -127,6 +127,182 @@ export function renderLabelBitmap(
   return { width: w, height: h, rows };
 }
 
+type ParsedLabel = {
+  order: string;
+  when: string;
+  name: string;
+  cup: string;
+  customer: string;
+  notes: string;
+  quote: string;
+  brand: string;
+};
+
+function canvasToBitmap(canvas: HTMLCanvasElement): NiimbotBitmap {
+  const ctx = canvas.getContext("2d")!;
+  const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const wBytes = Math.ceil(canvas.width / 8);
+  const rows: Uint8Array[] = [];
+  for (let row = 0; row < canvas.height; row++) {
+    const bytes = new Uint8Array(wBytes);
+    for (let col = 0; col < canvas.width; col++) {
+      const idx = (row * canvas.width + col) * 4;
+      const r = img.data[idx], g = img.data[idx + 1], b = img.data[idx + 2], a = img.data[idx + 3];
+      if (a > 0 && (r + g + b) / 3 < 150) bytes[col >> 3] |= 0x80 >> (col & 7);
+    }
+    rows.push(bytes);
+  }
+  return { width: canvas.width, height: canvas.height, rows };
+}
+
+function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, maxLines = 3) {
+  const words = text.replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
+  const lines: string[] = [];
+  let line = "";
+  for (const word of words) {
+    const test = line ? `${line} ${word}` : word;
+    if (ctx.measureText(test).width > maxWidth && line) {
+      lines.push(line);
+      line = word;
+      if (lines.length >= maxLines) break;
+    } else {
+      line = test;
+    }
+  }
+  if (line && lines.length < maxLines) lines.push(line);
+  return lines;
+}
+
+function fitText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxWidth: number) {
+  if (ctx.measureText(text).width <= maxWidth) {
+    ctx.fillText(text, x, y);
+    return;
+  }
+  let out = text;
+  while (out.length > 1 && ctx.measureText(`${out}…`).width > maxWidth) out = out.slice(0, -1);
+  ctx.fillText(`${out}…`, x, y);
+}
+
+function parseLabelsFromHtml(html: string): ParsedLabel[] {
+  if (typeof document === "undefined" || !html) return [];
+  const root = document.createElement("div");
+  root.innerHTML = html;
+  root.querySelectorAll("style, script, template").forEach((el) => el.remove());
+  const sections = Array.from(root.querySelectorAll("section.label"));
+  return sections.map((section) => ({
+    order: section.querySelector(".ord")?.textContent?.trim() ?? "",
+    when: section.querySelector(".when")?.textContent?.trim() ?? "",
+    name: section.querySelector(".name")?.textContent?.trim() ?? "",
+    cup: section.querySelector(".cup")?.textContent?.trim() ?? "",
+    customer: section.querySelector(".cust")?.textContent?.trim() ?? "",
+    notes: section.querySelector(".notes")?.textContent?.trim() ?? "",
+    quote: section.querySelector(".quote")?.textContent?.trim() ?? "",
+    brand: section.querySelector(".brand")?.textContent?.trim() ?? "",
+  })).filter((label) => label.order || label.name || label.customer || label.quote);
+}
+
+export function hasNiimbotLabelHtml(html: string) {
+  return parseLabelsFromHtml(html).length > 0;
+}
+
+export function renderFormattedLabelBitmap(
+  label: ParsedLabel,
+  widthMm: number,
+  heightMm: number,
+): NiimbotBitmap {
+  if (typeof document === "undefined") throw new Error("Canvas not available");
+  const DPM = 8;
+  const w = Math.round(widthMm * DPM);
+  const h = Math.round(heightMm * DPM);
+  const scale = Math.max(0.72, Math.min(1.18, Math.min(widthMm / 58, heightMm / 40)));
+  const margin = Math.max(10, Math.round(16 * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d")!;
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = "#000";
+  ctx.textBaseline = "top";
+
+  const contentW = w - margin * 2;
+  ctx.font = `${Math.round(18 * scale)}px system-ui, sans-serif`;
+  fitText(ctx, label.order, margin, margin, Math.round(contentW * 0.68));
+  const whenW = Math.round(contentW * 0.3);
+  fitText(ctx, label.when, w - margin - whenW, margin, whenW);
+
+  let y = margin + Math.round(24 * scale);
+  ctx.font = `700 ${Math.round(30 * scale)}px system-ui, sans-serif`;
+  const nameLines = wrapText(ctx, label.name, contentW, 2);
+  for (const line of nameLines) {
+    ctx.fillText(line, margin, y);
+    y += Math.round(34 * scale);
+  }
+
+  ctx.font = `${Math.round(20 * scale)}px system-ui, sans-serif`;
+  if (label.cup) {
+    fitText(ctx, label.cup, margin, y, contentW);
+    y += Math.round(23 * scale);
+  }
+
+  ctx.font = `700 ${Math.round(24 * scale)}px system-ui, sans-serif`;
+  if (label.customer) {
+    fitText(ctx, label.customer, margin, y, contentW);
+    y += Math.round(28 * scale);
+  }
+
+  ctx.font = `italic ${Math.round(18 * scale)}px system-ui, sans-serif`;
+  for (const line of wrapText(ctx, label.notes, contentW, 2)) {
+    ctx.fillText(line, margin, y);
+    y += Math.round(21 * scale);
+  }
+
+  const brandH = Math.round(18 * scale);
+  ctx.font = `italic ${Math.round(16 * scale)}px system-ui, sans-serif`;
+  const quoteLines = wrapText(ctx, label.quote, contentW, 2);
+  let quoteY = h - margin - brandH - quoteLines.length * Math.round(19 * scale);
+  quoteY = Math.max(y + Math.round(4 * scale), quoteY);
+  for (const line of quoteLines) {
+    if (quoteY > h - margin - brandH) break;
+    ctx.fillText(line, margin, quoteY);
+    quoteY += Math.round(19 * scale);
+  }
+
+  ctx.font = `${Math.round(14 * scale)}px system-ui, sans-serif`;
+  const brandWidth = ctx.measureText(label.brand).width;
+  ctx.fillText(label.brand, Math.max(margin, w - margin - brandWidth), h - margin - brandH);
+
+  return canvasToBitmap(canvas);
+}
+
+export function renderLabelHtmlBitmaps(
+  html: string,
+  widthMm: number,
+  heightMm: number,
+): NiimbotBitmap[] {
+  return parseLabelsFromHtml(html).map((label) => renderFormattedLabelBitmap(label, widthMm, heightMm));
+}
+
+export function bitmapToDataUrl(bmp: NiimbotBitmap): string {
+  if (typeof document === "undefined") return "";
+  const canvas = document.createElement("canvas");
+  canvas.width = bmp.width;
+  canvas.height = bmp.height;
+  const ctx = canvas.getContext("2d")!;
+  const img = ctx.createImageData(bmp.width, bmp.height);
+  for (let y = 0; y < bmp.height; y++) {
+    const row = bmp.rows[y];
+    for (let x = 0; x < bmp.width; x++) {
+      const bit = row[Math.floor(x / 8)] & (0x80 >> (x & 7));
+      const idx = (y * bmp.width + x) * 4;
+      const v = bit ? 0 : 255;
+      img.data[idx] = v; img.data[idx + 1] = v; img.data[idx + 2] = v; img.data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return canvas.toDataURL("image/png");
+}
+
 export type NiimbotOptions = {
   device: any; // BluetoothDevice
   text: string;
