@@ -288,6 +288,7 @@ export function renderFormattedLabelBitmap(
   const notesPx = Math.round(12 * scale);
   const quotePx = Math.round(13 * scale);
   const brandPx = Math.round(12 * scale);
+  const brandText = label.brand || "Bevi & Go";
 
   ctx.font = `${headerPx}px system-ui, sans-serif`;
   fitText(ctx, label.order, margin, margin, Math.round(contentW * 0.68));
@@ -316,12 +317,15 @@ export function renderFormattedLabelBitmap(
   }
 
   const brandH = Math.round(brandPx * 1.1);
-  const brandY = h - brandH - Math.round(2 * scale);
+  // Keep the footer safely inside the B1 printable area. The very bottom edge
+  // can be clipped by the feed gap, so draw Bevi & Go higher than the physical
+  // label edge and place it immediately after the quote when space allows.
+  const safeFooterY = h - brandH - Math.round(10 * scale);
   const quoteLineH = Math.round(quotePx * 1.15);
   ctx.font = `italic ${quotePx}px system-ui, sans-serif`;
   const quoteLines = wrapText(ctx, label.quote, contentW, 2);
   const quoteBlockH = quoteLines.length * quoteLineH;
-  const bottomReserved = brandH + quoteBlockH + Math.round(1 * scale);
+  const bottomReserved = brandH + quoteBlockH + Math.round(3 * scale);
   const notesBottom = h - margin - bottomReserved;
   ctx.font = `italic ${notesPx}px system-ui, sans-serif`;
   for (const line of wrapText(ctx, label.notes, contentW, 2)) {
@@ -332,16 +336,17 @@ export function renderFormattedLabelBitmap(
 
   ctx.font = `italic ${quotePx}px system-ui, sans-serif`;
   let quoteY = y + Math.round(1 * scale);
-  const quoteMaxY = brandY - Math.round(1 * scale);
+  const quoteMaxY = safeFooterY - Math.round(brandH * 0.2);
   for (const line of quoteLines) {
     if (quoteY + quotePx > quoteMaxY) break;
     ctx.fillText(line, margin, quoteY);
     quoteY += quoteLineH;
   }
 
-  ctx.font = `${brandPx}px system-ui, sans-serif`;
-  const brandWidth = ctx.measureText(label.brand).width;
-  ctx.fillText(label.brand, Math.max(margin, w - margin - brandWidth), brandY);
+  ctx.font = `700 ${brandPx}px system-ui, sans-serif`;
+  const brandWidth = ctx.measureText(brandText).width;
+  const brandY = Math.min(safeFooterY, Math.max(quoteY + Math.round(1 * scale), margin + Math.round(headerPx * 1.2)));
+  ctx.fillText(brandText, Math.max(margin, w - margin - brandWidth), brandY);
 
   return canvasToBitmap(canvas);
 }
