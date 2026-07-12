@@ -137,45 +137,74 @@ export type NiimbotOptions = {
   fontPx?: number;
 };
 
-export async function printNiimbotLabel(opts: NiimbotOptions) {
-  const { device, text, widthMm, heightMm, quantity, fontPx } = opts;
-  const density = Math.min(5, Math.max(1, Math.round(opts.density)));
-  const ch = await getNiimbotWriteChar(device);
-  const bmp = renderLabelBitmap(text, widthMm, heightMm, fontPx);
+export type NiimbotBitmap = { width: number; height: number; rows: Uint8Array[] };
 
-  // 1. density
-  await writePacket(ch, makePacket(0x21, [density]));
-  // 2. label type (1 = with gap)
-  await writePacket(ch, makePacket(0x23, [1]));
-  // 3. start print job
-  await writePacket(ch, makePacket(0x01, [0x01]));
-  // 4. start page
-  await writePacket(ch, makePacket(0x03, [0x01]));
-  // 5. dimensions (height_hi, height_lo, width_hi, width_lo)
-  await writePacket(
-    ch,
-    makePacket(0x13, [
-      (bmp.height >> 8) & 0xff, bmp.height & 0xff,
-      (bmp.width >> 8) & 0xff, bmp.width & 0xff,
-    ]),
-  );
-  // 6. quantity
-  await writePacket(ch, makePacket(0x15, [(quantity >> 8) & 0xff, quantity & 0xff]));
+function u16(n: number): [number, number] {
+  return [(n >> 8) & 0xff, n & 0xff];
+}
 
-  // 7. image rows (cmd 0x85) — skip pure-white rows with 0x84
+function countBlackPixels(row: Uint8Array): [number, number, number] {
+  let total = 0;
+  for (const value of row) {
+    let v = value;
+    while (v) {
+      total += v & 1;
+      v >>= 1;
+    }
+  }
+  return [0, total & 0xff, (total >> 8) & 0xff];
+}
+
+async function printBitmapPage(ch: any, bmp: NiimbotBitmap, copies: number) {
+  // B1 is more reliable with the 6-byte page-size payload: rows, cols, copies.
+  await writePacket(ch, makePacket(0x03, [0x01])); // page start
+  await writePacket(ch, makePacket(0x13, [...u16(bmp.height), ...u16(bmp.width), ...u16(copies)]));
+  await writePacket(ch, makePacket(0x15, [...u16(copies)]));
+
   for (let y = 0; y < bmp.rows.length; y++) {
     const row = bmp.rows[y];
     let any = false;
     for (let i = 0; i < row.length; i++) if (row[i]) { any = true; break; }
     if (!any) {
-      await writePacket(ch, makePacket(0x84, [(y >> 8) & 0xff, y & 0xff, 1]));
+      await writePacket(ch, makePacket(0x84, [...u16(y), 1]));
       continue;
     }
-    const header = [(y >> 8) & 0xff, y & 0xff, 0, 0, 1];
-    await writePacket(ch, makePacket(0x85, [...header, ...row]));
+    await writePacket(ch, makePacket(0x85, [...u16(y), ...countBlackPixels(row), 1, ...row]));
   }
 
-  // 8. end page + end print
-  await writePacket(ch, makePacket(0xe3, [1]));
-  await writePacket(ch, makePacket(0xf3, [1]));
+  await writePacket(ch, makePacket(0xe3, [0x01])); // page end
+}
+
+export async function printNiimbotBitmaps(opts: {
+  device: any;
+  bitmaps: NiimbotBitmap[];
+  density: number;
+  copies?: number;
+}) {
+  const density = Math.min(5, Math.max(1, Math.round(opts.density)));
+  const copies = Math.min(50, Math.max(1, Math.round(opts.copies ?? 1)));
+  const ch = await getNiimbotWriteChar(opts.device);
+  const bitmaps = opts.bitmaps.filter((bmp) => bmp.width > 0 && bmp.height > 0 && bmp.rows.length > 0);
+  if (bitmaps.length === 0) throw new Error("No label content to print.");
+
+  await writePacket(ch, makePacket(0xc1, [0x01])); // connect / wake
+  await writePacket(ch, makePacket(0x21, [density]));
+  await writePacket(ch, makePacket(0x23, [0x01])); // label with gap
+  await writePacket(ch, makePacket(0x20, [0x01])); // clear previous print data
+  await writePacket(ch, makePacket(0x01, [0x01])); // start print
+  // Some B1 Bluetooth firmwares drop the first packet after PrintStart.
+  await writePacket(ch, makePacket(0xa3, [0x01]));
+
+  for (const bmp of bitmaps) {
+    await printBitmapPage(ch, bmp, copies);
+  }
+
+  await writePacket(ch, makePacket(0xf3, [0x01])); // end print
+  await writePacket(ch, makePacket(0xdc, [0x01])); // harmless trailing packet for B1 firmwares that drop one after PrintEnd
+}
+
+export async function printNiimbotLabel(opts: NiimbotOptions) {
+  const { device, text, widthMm, heightMm, quantity, fontPx, density } = opts;
+  const bmp = renderLabelBitmap(text, widthMm, heightMm, fontPx);
+  await printNiimbotBitmaps({ device, bitmaps: [bmp], density, copies: quantity });
 }
