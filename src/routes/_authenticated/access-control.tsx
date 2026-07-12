@@ -7,6 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { GROUPS } from "@/routes/_authenticated";
+import { PasswordResetCard } from "@/components/PasswordResetCard";
 
 export const Route = createFileRoute("/_authenticated/access-control")({
   component: AccessControlPage,
