@@ -17,7 +17,7 @@ export const Route = createFileRoute("/api/public/dev-set-password")({
         if (newPassword.length < 6) return json({ error: "password_too_short" }, 400);
 
         const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://ewwtxzoruibaxalffyli.supabase.co";
-        const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        const SERVICE_ROLE = (process.env.APP_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY);
         if (!SUPABASE_URL || !SERVICE_ROLE) {
           return json({ error: "server_not_configured" }, 500);
         }
