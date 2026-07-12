@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
-import { getPairedDevice, getPairedPrinter, htmlToPlainText } from "@/lib/bt-printer";
+import { getOrRestorePairedDevice, getPairedPrinter, htmlToPlainText } from "@/lib/bt-printer";
 import {
   bitmapToDataUrl,
   hasNiimbotLabelHtml,
@@ -82,9 +82,9 @@ export function NiimbotPrintDialog({
   const dots = useMemo(() => ({ w: Math.round(widthMm * 8), h: Math.round(heightMm * 8) }), [widthMm, heightMm]);
 
   async function doPrint() {
-    const device = getPairedDevice();
+    const device = await getOrRestorePairedDevice();
     if (!device) {
-      toast.error("Pair a Niimbot printer first.");
+      toast.error("Pair a Niimbot printer first, then tap Print again.");
       return;
     }
     setSending(true);
