@@ -432,3 +432,26 @@ export async function printNiimbotLabel(opts: NiimbotOptions) {
   const bmp = renderLabelBitmap(text, widthMm, heightMm, fontPx);
   await printNiimbotBitmaps({ device, bitmaps: [bmp], density, copies: quantity });
 }
+
+export async function printNiimbotLabelHtml(opts: {
+  device: any;
+  html: string;
+  text: string;
+  density?: number;
+  copies?: number;
+  fontPx?: number;
+  widthMm?: number;
+  heightMm?: number;
+}) {
+  const widthMm = opts.widthMm ?? 50;
+  const heightMm = opts.heightMm ?? 30;
+  const bitmaps = hasNiimbotLabelHtml(opts.html)
+    ? renderLabelHtmlBitmaps(opts.html, widthMm, heightMm)
+    : [renderLabelBitmap(opts.text, widthMm, heightMm, opts.fontPx ?? 22)];
+  await printNiimbotBitmaps({
+    device: opts.device,
+    bitmaps,
+    density: opts.density ?? 3,
+    copies: opts.copies ?? 1,
+  });
+}
