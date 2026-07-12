@@ -436,7 +436,6 @@ async function printBitmapPage(ch: any, bmp: NiimbotBitmap, copies: number) {
   let packetCount = 0;
   for (let y = 0; y < bmp.rows.length;) {
     const row = bmp.rows[y];
-    if (isBlankRow(row)) continue;
     let repeat = 1;
     while (y + repeat < bmp.rows.length && repeat < 255 && rowEquals(row, bmp.rows[y + repeat])) repeat++;
 
