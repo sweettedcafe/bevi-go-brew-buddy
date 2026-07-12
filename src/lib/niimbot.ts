@@ -270,7 +270,10 @@ export function renderFormattedLabelBitmap(
   // 50×30mm on a B1 is only 384×240 dots. Keep everything in compact bands
   // with small, even margins so the printed label shows more than the header.
   const scale = Math.max(0.72, Math.min(1, Math.min(widthMm / 50, heightMm / 30)));
-  const margin = Math.max(6, Math.round(8 * scale));
+  // Use equal left/right margins large enough to survive the B1 printhead
+  // offset (raster is 384 dots but the 50mm label is 400 dots, so ~2mm of
+  // slack is needed on the right edge to avoid clipping words).
+  const margin = Math.max(16, Math.round(20 * scale));
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;
