@@ -114,41 +114,69 @@ function SelfOrderPage() {
     return () => { cancelled = true; window.clearInterval(t); };
   }, [done, token]);
 
-  // Ready alert: vibrate + beep in a loop until user taps stop
-  const audioRef = useRef<{ ctx: AudioContext; timer: number } | null>(null);
+  // Pre-unlocked AudioContext. iOS Safari blocks Web Audio until a user
+  // gesture, so we create/resume it inside the "Place order" tap handler
+  // and reuse it later for the ready-alert beeps.
+  const unlockedCtxRef = useRef<AudioContext | null>(null);
+  function unlockAudio() {
+    try {
+      const AC = (window as any).AudioContext || (window as any).webkitAudioContext;
+      if (!AC) return;
+      if (!unlockedCtxRef.current) unlockedCtxRef.current = new AC();
+      const ctx = unlockedCtxRef.current!;
+      if (ctx.state === "suspended") void ctx.resume();
+      // Play an inaudible blip to fully unlock output on iOS.
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      g.gain.value = 0.0001;
+      o.connect(g).connect(ctx.destination);
+      o.start(); o.stop(ctx.currentTime + 0.02);
+    } catch { /* ignore */ }
+  }
+
+  // Ready alert: beep + vibrate (Android) + visual flash (all platforms,
+  // including iOS which does not support the Vibration API).
   useEffect(() => {
     if (!alerting) return;
-    // vibration pattern loop
+
+    // Android/Chrome vibration. iOS Safari has no Vibration API — the
+    // visual flash + audio loop below is the iOS-compatible substitute.
     const vibrate = () => {
       if (typeof navigator !== "undefined" && "vibrate" in navigator) {
-        // pattern: buzz-pause-buzz
-        (navigator as any).vibrate([400, 150, 400, 150, 400]);
+        try { (navigator as any).vibrate([400, 150, 400, 150, 400]); } catch { /* noop */ }
       }
     };
     vibrate();
     const vTimer = window.setInterval(vibrate, 2000);
 
-    // audio beep loop
-    let ctx: AudioContext | null = null;
+    // Audio beep loop — reuse the unlocked context if available.
+    let ctx: AudioContext | null = unlockedCtxRef.current;
+    let ownsCtx = false;
     let aTimer = 0;
     try {
       const AC = (window as any).AudioContext || (window as any).webkitAudioContext;
-      if (AC) {
-        ctx = new AC();
+      if (!ctx && AC) { ctx = new AC(); ownsCtx = true; }
+      if (ctx && ctx.state === "suspended") void ctx.resume();
+      if (ctx) {
         const beep = () => {
           if (!ctx) return;
-          const o = ctx.createOscillator();
-          const g = ctx.createGain();
-          o.type = "sine"; o.frequency.value = 880;
-          g.gain.setValueAtTime(0.001, ctx.currentTime);
-          g.gain.exponentialRampToValueAtTime(0.5, ctx.currentTime + 0.02);
-          g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
-          o.connect(g).connect(ctx.destination);
-          o.start(); o.stop(ctx.currentTime + 0.55);
+          if (ctx.state === "suspended") void ctx.resume();
+          // Two-tone chirp is more attention-grabbing on iPhone speakers.
+          const now = ctx.currentTime;
+          [0, 0.28].forEach((offset, i) => {
+            const o = ctx!.createOscillator();
+            const g = ctx!.createGain();
+            o.type = "square";
+            o.frequency.value = i === 0 ? 988 : 1319; // B5 -> E6
+            g.gain.setValueAtTime(0.0001, now + offset);
+            g.gain.exponentialRampToValueAtTime(0.6, now + offset + 0.02);
+            g.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.22);
+            o.connect(g).connect(ctx!.destination);
+            o.start(now + offset); o.stop(now + offset + 0.25);
+          });
         };
         beep();
-        aTimer = window.setInterval(beep, 1200);
-        audioRef.current = { ctx: ctx as AudioContext, timer: aTimer };
+        aTimer = window.setInterval(beep, 900);
       }
     } catch { /* ignore */ }
 
@@ -158,8 +186,7 @@ function SelfOrderPage() {
       if (typeof navigator !== "undefined" && "vibrate" in navigator) {
         try { (navigator as any).vibrate(0); } catch { /* noop */ }
       }
-      try { ctx?.close(); } catch { /* noop */ }
-      audioRef.current = null;
+      if (ownsCtx) { try { ctx?.close(); } catch { /* noop */ } }
     };
   }, [alerting]);
 
