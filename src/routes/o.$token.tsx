@@ -315,8 +315,8 @@ function SelfOrderPage() {
     const ready = orderStatus === "completed";
     const voided = orderStatus === "voided";
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-background">
-        <Card className="max-w-md w-full p-6 text-center space-y-3">
+      <div className={`min-h-screen flex items-center justify-center p-4 transition-colors duration-200 ${alerting ? "bg-red-600 animate-pulse" : "bg-background"}`}>
+        <Card className={`max-w-md w-full p-6 text-center space-y-3 ${alerting ? "ring-4 ring-red-400 shadow-2xl" : ""}`}>
           <Coffee className="h-8 w-8 text-primary mx-auto" />
           <h1 className="font-display text-2xl">
             {ready ? "Your order is ready!" : voided ? "Order cancelled" : "Order placed!"}
