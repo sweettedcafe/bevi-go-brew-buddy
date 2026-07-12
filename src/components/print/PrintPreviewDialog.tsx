@@ -170,6 +170,7 @@ export function PrintPreviewDialog({
   if (!active) return null;
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl h-[92vh] p-0 overflow-hidden grid grid-rows-[auto,auto,1fr,auto]">
         <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-6 pb-3 border-b">
