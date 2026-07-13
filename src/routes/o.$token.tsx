@@ -58,6 +58,7 @@ function SelfOrderPage() {
   const [done, setDone] = useState<{ order_no: number; order_id: string; total: number } | null>(null);
   const [orderStatus, setOrderStatus] = useState<string | null>(null);
   const [alerting, setAlerting] = useState(false);
+  const [imagePreview, setImagePreview] = useState<{ url: string; name: string } | null>(null);
   // Once the customer dismisses the alert for an order, don't re-alert
   const dismissedRef = useRef<Set<string>>(new Set());
 
@@ -489,7 +490,8 @@ function SelfOrderPage() {
                 className="text-left rounded-lg border bg-card hover:bg-accent active:scale-[0.98] transition-all overflow-hidden min-h-[88px] touch-manipulation flex flex-col">
                 {it.image_url && (
                   <img src={it.image_url} alt={it.name}
-                    className="w-full aspect-square object-cover" loading="lazy" />
+                    onClick={(e) => { e.stopPropagation(); setImagePreview({ url: it.image_url!, name: it.name }); }}
+                    className="w-full aspect-square object-cover cursor-zoom-in" loading="lazy" />
                 )}
                 <div className="p-3 flex-1 flex flex-col">
                   <div className="font-medium leading-tight">{it.name}</div>
@@ -604,6 +606,26 @@ function SelfOrderPage() {
             setUpsell(null);
           }}
         />
+      )}
+
+      {imagePreview && (
+        <div
+          onClick={() => setImagePreview(null)}
+          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 cursor-zoom-out"
+        >
+          <div className="relative max-w-full max-h-full" onClick={(e) => e.stopPropagation()}>
+            <img src={imagePreview.url} alt={imagePreview.name}
+              className="max-w-full max-h-[85vh] rounded-lg object-contain" />
+            <div className="mt-2 text-center text-white text-sm">{imagePreview.name}</div>
+            <button
+              onClick={() => setImagePreview(null)}
+              className="absolute -top-2 -right-2 bg-white text-black rounded-full h-8 w-8 flex items-center justify-center shadow-lg"
+              aria-label="Close"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
