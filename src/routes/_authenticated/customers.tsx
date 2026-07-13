@@ -346,16 +346,16 @@ function CustomerDetailDialog({ customer, onClose }: { customer: Customer; onClo
 }
 
 function RegisterQrCard() {
-  const url = typeof window !== "undefined" ? `${window.location.origin}/register` : "/register";
+  const url = typeof window !== "undefined" ? `${window.location.origin}/welcome` : "/welcome";
   function printPoster() {
     const w = window.open("", "_blank", "width=500,height=700");
     if (!w) return;
     w.document.write(`
-      <html><head><title>Join our Rewards</title>
+      <html><head><title>Bevi & Go — Scan to Order</title>
       <style>body{font-family:system-ui;padding:32px;text-align:center}h1{margin:0 0 8px}p{color:#555}</style></head>
       <body>
-        <h1>Join Bevi & Go Rewards</h1>
-        <p>Scan to register and start earning points</p>
+        <h1>Scan to Order</h1>
+        <p>Registered? Enter your email to jump to ordering.<br/>New? We'll sign you up in seconds.</p>
         <div id="qr" style="display:flex;justify-content:center;margin:24px 0"></div>
         <p style="font-size:12px;color:#888">${url}</p>
         <script src="https://cdn.jsdelivr.net/npm/qrcode@1/build/qrcode.min.js"></script>
@@ -366,6 +366,7 @@ function RegisterQrCard() {
       </body></html>`);
     w.document.close();
   }
+
   return (
     <Card className="p-4">
       <div className="flex flex-wrap items-center gap-4">
@@ -375,22 +376,24 @@ function RegisterQrCard() {
         <div className="flex-1 min-w-[200px] space-y-1">
           <div className="flex items-center gap-2">
             <QrCode className="h-4 w-4 text-primary" />
-            <div className="font-display text-lg">Customer registration QR</div>
+            <div className="font-display text-lg">Walk-in ordering QR</div>
           </div>
           <p className="text-sm text-muted-foreground">
-            Display this QR in-store. Customers scan it to open the registration page and join the loyalty program.
+            Display this QR in-store. Customers scan it, enter their email, and are taken straight
+            to their ordering page — new customers are routed to registration first.
           </p>
           <div className="text-xs text-muted-foreground break-all">{url}</div>
           <div className="flex gap-2 pt-2">
             <Button size="sm" variant="outline" onClick={printPoster}>
               <Printer className="h-3 w-3 mr-1" /> Print poster
             </Button>
-            <a href="/register" target="_blank">
+            <a href="/welcome" target="_blank">
               <Button size="sm" variant="outline">
                 <ExternalLink className="h-3 w-3 mr-1" /> Open page
               </Button>
             </a>
           </div>
+
         </div>
       </div>
     </Card>
