@@ -486,11 +486,17 @@ function SelfOrderPage() {
             const fromPrice = vs.length > 0 ? Math.min(...vs.map((v) => Number(v.price))) : Number(it.price);
             return (
               <button key={it.id} onClick={() => tap(it)}
-                className="text-left rounded-lg border bg-card hover:bg-accent active:scale-[0.98] transition-all p-3 min-h-[88px] touch-manipulation">
-                <div className="font-medium leading-tight">{it.name}</div>
-                {it.description && <div className="text-xs text-muted-foreground mt-1 line-clamp-2">{it.description}</div>}
-                <div className="mt-2 font-display text-lg text-primary">
-                  {vs.length > 0 ? `${fmt(fromPrice)}+` : fmt(fromPrice)}
+                className="text-left rounded-lg border bg-card hover:bg-accent active:scale-[0.98] transition-all overflow-hidden min-h-[88px] touch-manipulation flex flex-col">
+                {it.image_url && (
+                  <img src={it.image_url} alt={it.name}
+                    className="w-full aspect-square object-cover" loading="lazy" />
+                )}
+                <div className="p-3 flex-1 flex flex-col">
+                  <div className="font-medium leading-tight">{it.name}</div>
+                  {it.description && <div className="text-xs text-muted-foreground mt-1 line-clamp-2">{it.description}</div>}
+                  <div className="mt-2 font-display text-lg text-primary">
+                    {vs.length > 0 ? `${fmt(fromPrice)}+` : fmt(fromPrice)}
+                  </div>
                 </div>
               </button>
             );
