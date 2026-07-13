@@ -37,6 +37,7 @@ type Item = {
   owner_id: string | null;
   sort_order: number;
   options: MenuOptions | null;
+  image_url: string | null;
 };
 type Cat = { id: string; name: string };
 type Owner = { id: string; name: string; is_active: boolean };
