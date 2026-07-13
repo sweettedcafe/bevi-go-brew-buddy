@@ -555,6 +555,8 @@ function SelfOrderPage() {
           options={customizing.options ?? {}}
           variants={customizingVariants}
           hideOther
+          imageUrl={customizing.image_url}
+          onImageClick={() => customizing.image_url && setImagePreview({ url: customizing.image_url, name: customizing.name })}
           onConfirm={(res) => {
             const it = customizing;
             addCustom(it, res);

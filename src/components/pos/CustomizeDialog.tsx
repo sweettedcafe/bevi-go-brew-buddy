@@ -23,7 +23,7 @@ export type VariantChoice = {
 
 export function CustomizeDialog({
   open, onOpenChange, itemName, basePrice, options, onConfirm,
-  initial, variants, hideOther = false,
+  initial, variants, hideOther = false, imageUrl, onImageClick,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -33,6 +33,8 @@ export function CustomizeDialog({
   variants?: VariantChoice[];
   initial?: { custom: SelectedCustom | null; qty: number; notes: string; variantId?: string | null };
   hideOther?: boolean;          // NEW — customer self-order should hide free-form price input
+  imageUrl?: string | null;
+  onImageClick?: () => void;
   onConfirm: (sel: {
     custom: SelectedCustom; addon: number; qty: number; notes: string;
     variant: VariantChoice | null;
@@ -146,6 +148,17 @@ export function CustomizeDialog({
         <DialogHeader>
           <DialogTitle>{itemName}</DialogTitle>
         </DialogHeader>
+
+        {imageUrl && (
+          <button
+            type="button"
+            onClick={onImageClick}
+            className="-mt-1 block w-full overflow-hidden rounded-lg border bg-muted text-left"
+            aria-label={`View ${itemName} image`}
+          >
+            <img src={imageUrl} alt={itemName} className="h-44 w-full object-cover" loading="lazy" />
+          </button>
+        )}
 
         <div className="space-y-4 text-sm">
           {hasVariants && (
