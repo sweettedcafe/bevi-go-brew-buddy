@@ -114,18 +114,78 @@ function SelfOrderPage() {
     return () => { cancelled = true; window.clearInterval(t); };
   }, [done, token]);
 
-  // Pre-unlocked AudioContext. iOS Safari blocks Web Audio until a user
-  // gesture, so we create/resume it inside the "Place order" tap handler
-  // and reuse it later for the ready-alert beeps.
+  // Pre-unlocked AudioContext + HTMLAudio fallback. iOS Safari blocks any
+  // audio until a user gesture, and Web Audio in particular is unreliable
+  // when the tab is backgrounded or the screen is off. We unlock BOTH
+  // channels inside the "Place order" tap and prefer HTMLAudioElement
+  // (which keeps playing on iOS lock screen while a beep loop file is
+  // active) for the ready-alert.
   const unlockedCtxRef = useRef<AudioContext | null>(null);
+  const beepAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Build a looping two-tone beep as a WAV Blob URL once, lazily.
+  function ensureBeepAudio(): HTMLAudioElement | null {
+    if (typeof window === "undefined") return null;
+    if (beepAudioRef.current) return beepAudioRef.current;
+    try {
+      const sr = 22050;
+      const dur = 1.0; // 1s loop: beep-beep-silence
+      const n = Math.floor(sr * dur);
+      const pcm = new Int16Array(n);
+      for (let i = 0; i < n; i++) {
+        const t = i / sr;
+        let s = 0;
+        // two chirps at 0.00-0.22 and 0.28-0.50; silence after
+        if (t < 0.22) s = Math.sin(2 * Math.PI * 988 * t);
+        else if (t >= 0.28 && t < 0.50) s = Math.sin(2 * Math.PI * 1319 * t);
+        // simple envelope to avoid clicks
+        const localT = t < 0.22 ? t : (t >= 0.28 && t < 0.5 ? t - 0.28 : 0);
+        const env = s === 0 ? 0 : Math.min(1, localT * 40) * Math.min(1, (0.22 - (t < 0.22 ? t : t - 0.28)) * 20);
+        pcm[i] = Math.max(-1, Math.min(1, s * env)) * 0x7fff;
+      }
+      const buf = new ArrayBuffer(44 + pcm.byteLength);
+      const view = new DataView(buf);
+      const wr = (o: number, s: string) => { for (let i = 0; i < s.length; i++) view.setUint8(o + i, s.charCodeAt(i)); };
+      wr(0, "RIFF"); view.setUint32(4, 36 + pcm.byteLength, true); wr(8, "WAVE");
+      wr(12, "fmt "); view.setUint32(16, 16, true); view.setUint16(20, 1, true);
+      view.setUint16(22, 1, true); view.setUint32(24, sr, true);
+      view.setUint32(28, sr * 2, true); view.setUint16(32, 2, true); view.setUint16(34, 16, true);
+      wr(36, "data"); view.setUint32(40, pcm.byteLength, true);
+      new Int16Array(buf, 44).set(pcm);
+      const url = URL.createObjectURL(new Blob([buf], { type: "audio/wav" }));
+      const a = new Audio(url);
+      a.loop = true;
+      a.preload = "auto";
+      a.volume = 1.0;
+      (a as any).playsInline = true;
+      a.setAttribute("playsinline", "true");
+      beepAudioRef.current = a;
+      return a;
+    } catch { return null; }
+  }
+
   function unlockAudio() {
+    // 1) Unlock HTMLAudio (most reliable on iOS)
+    try {
+      const a = ensureBeepAudio();
+      if (a) {
+        a.muted = true;
+        const p = a.play();
+        if (p && typeof p.then === "function") {
+          p.then(() => { try { a.pause(); a.currentTime = 0; a.muted = false; } catch { /* noop */ } })
+           .catch(() => { /* will retry on alert */ });
+        } else {
+          try { a.pause(); a.currentTime = 0; a.muted = false; } catch { /* noop */ }
+        }
+      }
+    } catch { /* ignore */ }
+    // 2) Unlock Web Audio as a secondary channel
     try {
       const AC = (window as any).AudioContext || (window as any).webkitAudioContext;
       if (!AC) return;
       if (!unlockedCtxRef.current) unlockedCtxRef.current = new AC();
       const ctx = unlockedCtxRef.current!;
       if (ctx.state === "suspended") void ctx.resume();
-      // Play an inaudible blip to fully unlock output on iOS.
       const o = ctx.createOscillator();
       const g = ctx.createGain();
       g.gain.value = 0.0001;
@@ -134,13 +194,10 @@ function SelfOrderPage() {
     } catch { /* ignore */ }
   }
 
-  // Ready alert: beep + vibrate (Android) + visual flash (all platforms,
-  // including iOS which does not support the Vibration API).
+  // Ready alert: HTMLAudio loop (iOS + Android) + Web Audio beep + vibrate + flash
   useEffect(() => {
     if (!alerting) return;
 
-    // Android/Chrome vibration. iOS Safari has no Vibration API — the
-    // visual flash + audio loop below is the iOS-compatible substitute.
     const vibrate = () => {
       if (typeof navigator !== "undefined" && "vibrate" in navigator) {
         try { (navigator as any).vibrate([400, 150, 400, 150, 400]); } catch { /* noop */ }
@@ -149,7 +206,17 @@ function SelfOrderPage() {
     vibrate();
     const vTimer = window.setInterval(vibrate, 2000);
 
-    // Audio beep loop — reuse the unlocked context if available.
+    // Primary channel: looping HTMLAudio (works on iOS even when screen locks)
+    const a = ensureBeepAudio();
+    if (a) {
+      try {
+        a.muted = false;
+        a.currentTime = 0;
+        void a.play().catch(() => { /* user may need to tap */ });
+      } catch { /* noop */ }
+    }
+
+    // Secondary channel: Web Audio beep (louder, more attention-grabbing)
     let ctx: AudioContext | null = unlockedCtxRef.current;
     let ownsCtx = false;
     let aTimer = 0;
@@ -161,13 +228,12 @@ function SelfOrderPage() {
         const beep = () => {
           if (!ctx) return;
           if (ctx.state === "suspended") void ctx.resume();
-          // Two-tone chirp is more attention-grabbing on iPhone speakers.
           const now = ctx.currentTime;
           [0, 0.28].forEach((offset, i) => {
             const o = ctx!.createOscillator();
             const g = ctx!.createGain();
             o.type = "square";
-            o.frequency.value = i === 0 ? 988 : 1319; // B5 -> E6
+            o.frequency.value = i === 0 ? 988 : 1319;
             g.gain.setValueAtTime(0.0001, now + offset);
             g.gain.exponentialRampToValueAtTime(0.6, now + offset + 0.02);
             g.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.22);
@@ -186,9 +252,11 @@ function SelfOrderPage() {
       if (typeof navigator !== "undefined" && "vibrate" in navigator) {
         try { (navigator as any).vibrate(0); } catch { /* noop */ }
       }
+      if (a) { try { a.pause(); a.currentTime = 0; } catch { /* noop */ } }
       if (ownsCtx) { try { ctx?.close(); } catch { /* noop */ } }
     };
   }, [alerting]);
+
 
   const filtered = useMemo(
     () => items.filter((i) => activeCat === "all" || i.category_id === activeCat),
