@@ -354,6 +354,7 @@ function EditMenuDialog({
       has_variants: f.has_variants,
       sort_order: Number(f.sort_order) || 0,
       options,
+      image_url: f.image_url.trim() || null,
     };
     let id = item.id;
     if (id) {
