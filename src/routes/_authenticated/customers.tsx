@@ -346,16 +346,16 @@ function CustomerDetailDialog({ customer, onClose }: { customer: Customer; onClo
 }
 
 function RegisterQrCard() {
-  const url = typeof window !== "undefined" ? `${window.location.origin}/register` : "/register";
+  const url = typeof window !== "undefined" ? `${window.location.origin}/welcome` : "/welcome";
   function printPoster() {
     const w = window.open("", "_blank", "width=500,height=700");
     if (!w) return;
     w.document.write(`
-      <html><head><title>Join our Rewards</title>
+      <html><head><title>Bevi & Go — Scan to Order</title>
       <style>body{font-family:system-ui;padding:32px;text-align:center}h1{margin:0 0 8px}p{color:#555}</style></head>
       <body>
-        <h1>Join Bevi & Go Rewards</h1>
-        <p>Scan to register and start earning points</p>
+        <h1>Scan to Order</h1>
+        <p>Registered? Enter your email to jump to ordering.<br/>New? We'll sign you up in seconds.</p>
         <div id="qr" style="display:flex;justify-content:center;margin:24px 0"></div>
         <p style="font-size:12px;color:#888">${url}</p>
         <script src="https://cdn.jsdelivr.net/npm/qrcode@1/build/qrcode.min.js"></script>
@@ -366,6 +366,7 @@ function RegisterQrCard() {
       </body></html>`);
     w.document.close();
   }
+
   return (
     <Card className="p-4">
       <div className="flex flex-wrap items-center gap-4">
