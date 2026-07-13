@@ -454,8 +454,12 @@ function EditMenuDialog({
       const { data: pub } = (supabase.storage.from("menu-images") as any).getPublicUrl(path);
       const url = pub?.publicUrl ?? "";
       if (!url) throw new Error("No public URL returned");
+      if (item.id) {
+        const { error: saveErr } = await db.from("menu_items").update({ image_url: url }).eq("id", item.id);
+        if (saveErr) throw saveErr;
+      }
       setF((cur) => ({ ...cur, image_url: url }));
-      toast.success("Image uploaded");
+      toast.success(item.id ? "Image uploaded and saved" : "Image uploaded");
     } catch (e: any) {
       const msg = String(e?.message ?? e);
       if (/bucket/i.test(msg) && /not found/i.test(msg)) {

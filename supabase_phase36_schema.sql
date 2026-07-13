@@ -62,8 +62,6 @@ do $$ begin
   end if;
 end $$;
 
-notify pgrst, 'reload schema';
-
 -- Public read (customers on the ordering page are anonymous)
 do $$ begin
   if not exists (
@@ -75,6 +73,8 @@ do $$ begin
       for select using (bucket_id = 'menu-images');
   end if;
 end $$;
+
+notify pgrst, 'reload schema';
 
 -- Update / replace
 do $$ begin
