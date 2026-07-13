@@ -376,22 +376,24 @@ function RegisterQrCard() {
         <div className="flex-1 min-w-[200px] space-y-1">
           <div className="flex items-center gap-2">
             <QrCode className="h-4 w-4 text-primary" />
-            <div className="font-display text-lg">Customer registration QR</div>
+            <div className="font-display text-lg">Walk-in ordering QR</div>
           </div>
           <p className="text-sm text-muted-foreground">
-            Display this QR in-store. Customers scan it to open the registration page and join the loyalty program.
+            Display this QR in-store. Customers scan it, enter their email, and are taken straight
+            to their ordering page — new customers are routed to registration first.
           </p>
           <div className="text-xs text-muted-foreground break-all">{url}</div>
           <div className="flex gap-2 pt-2">
             <Button size="sm" variant="outline" onClick={printPoster}>
               <Printer className="h-3 w-3 mr-1" /> Print poster
             </Button>
-            <a href="/register" target="_blank">
+            <a href="/welcome" target="_blank">
               <Button size="sm" variant="outline">
                 <ExternalLink className="h-3 w-3 mr-1" /> Open page
               </Button>
             </a>
           </div>
+
         </div>
       </div>
     </Card>
