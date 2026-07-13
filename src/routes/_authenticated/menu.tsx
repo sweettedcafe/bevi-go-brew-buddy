@@ -37,6 +37,7 @@ type Item = {
   owner_id: string | null;
   sort_order: number;
   options: MenuOptions | null;
+  image_url: string | null;
 };
 type Cat = { id: string; name: string };
 type Owner = { id: string; name: string; is_active: boolean };
@@ -151,7 +152,7 @@ function MenuPage() {
               is_active: true, has_variants: false,
               category_id: cats[0]?.id ?? null, owner_id: null,
               sort_order: items.length + 1,
-              options: emptyOptions(),
+              options: emptyOptions(), image_url: null,
             })}>
               <Plus className="h-3 w-3 mr-1" /> New item
             </Button>
@@ -310,7 +311,9 @@ function EditMenuDialog({
     is_active: item.is_active,
     has_variants: item.has_variants,
     sort_order: String(item.sort_order),
+    image_url: item.image_url ?? "",
   });
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [rcs, setRcs] = useState<Array<{ inventory_item_id: string; qty: string }>>(
     initialRecipes.map((r) => ({ inventory_item_id: r.inventory_item_id, qty: String(r.qty_per_unit) })),
   );
@@ -351,6 +354,7 @@ function EditMenuDialog({
       has_variants: f.has_variants,
       sort_order: Number(f.sort_order) || 0,
       options,
+      image_url: f.image_url.trim() || null,
     };
     let id = item.id;
     if (id) {
@@ -438,6 +442,32 @@ function EditMenuDialog({
     updateVariant(i, { rcs: vEdits[i].rcs.filter((_, k) => k !== j) });
   }
 
+  async function uploadImage(file: File) {
+    setUploadingImage(true);
+    try {
+      const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+      const path = `items/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const { error: upErr } = await (supabase.storage.from("menu-images") as any).upload(path, file, {
+        upsert: false, contentType: file.type || undefined,
+      });
+      if (upErr) throw upErr;
+      const { data: pub } = (supabase.storage.from("menu-images") as any).getPublicUrl(path);
+      const url = pub?.publicUrl ?? "";
+      if (!url) throw new Error("No public URL returned");
+      setF((cur) => ({ ...cur, image_url: url }));
+      toast.success("Image uploaded");
+    } catch (e: any) {
+      const msg = String(e?.message ?? e);
+      if (/bucket/i.test(msg) && /not found/i.test(msg)) {
+        toast.error("Image bucket missing. Run supabase_phase36_schema.sql to create the 'menu-images' bucket.");
+      } else {
+        toast.error(`Upload failed: ${msg}`);
+      }
+    } finally {
+      setUploadingImage(false);
+    }
+  }
+
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
@@ -457,6 +487,37 @@ function EditMenuDialog({
           <div className="col-span-2">
             <label className="text-xs text-muted-foreground">Description</label>
             <Textarea rows={2} value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} />
+          </div>
+          <div className="col-span-2">
+            <label className="text-xs text-muted-foreground">Product image (shown on the customer ordering page)</label>
+            <div className="flex items-start gap-3 mt-1">
+              {f.image_url ? (
+                <img src={f.image_url} alt="" className="h-20 w-20 rounded object-cover border" />
+              ) : (
+                <div className="h-20 w-20 rounded border border-dashed flex items-center justify-center text-[10px] text-muted-foreground text-center px-1">
+                  No image
+                </div>
+              )}
+              <div className="flex-1 space-y-2">
+                <Input
+                  type="file"
+                  accept="image/*"
+                  disabled={uploadingImage}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) void uploadImage(file);
+                    e.currentTarget.value = "";
+                  }}
+                />
+                {f.image_url && (
+                  <Button type="button" size="sm" variant="ghost"
+                    onClick={() => setF({ ...f, image_url: "" })}>
+                    <Trash2 className="h-3 w-3 mr-1" /> Remove image
+                  </Button>
+                )}
+                {uploadingImage && <div className="text-xs text-muted-foreground">Uploading…</div>}
+              </div>
+            </div>
           </div>
           {!f.has_variants && (
             <div>
