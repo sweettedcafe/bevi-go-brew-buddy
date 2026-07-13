@@ -442,6 +442,32 @@ function EditMenuDialog({
     updateVariant(i, { rcs: vEdits[i].rcs.filter((_, k) => k !== j) });
   }
 
+  async function uploadImage(file: File) {
+    setUploadingImage(true);
+    try {
+      const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+      const path = `items/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const { error: upErr } = await (supabase.storage.from("menu-images") as any).upload(path, file, {
+        upsert: false, contentType: file.type || undefined,
+      });
+      if (upErr) throw upErr;
+      const { data: pub } = (supabase.storage.from("menu-images") as any).getPublicUrl(path);
+      const url = pub?.publicUrl ?? "";
+      if (!url) throw new Error("No public URL returned");
+      setF((cur) => ({ ...cur, image_url: url }));
+      toast.success("Image uploaded");
+    } catch (e: any) {
+      const msg = String(e?.message ?? e);
+      if (/bucket/i.test(msg) && /not found/i.test(msg)) {
+        toast.error("Image bucket missing. Run supabase_phase36_schema.sql to create the 'menu-images' bucket.");
+      } else {
+        toast.error(`Upload failed: ${msg}`);
+      }
+    } finally {
+      setUploadingImage(false);
+    }
+  }
+
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
