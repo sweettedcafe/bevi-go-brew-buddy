@@ -607,6 +607,26 @@ function SelfOrderPage() {
           }}
         />
       )}
+
+      {imagePreview && (
+        <div
+          onClick={() => setImagePreview(null)}
+          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 cursor-zoom-out"
+        >
+          <div className="relative max-w-full max-h-full" onClick={(e) => e.stopPropagation()}>
+            <img src={imagePreview.url} alt={imagePreview.name}
+              className="max-w-full max-h-[85vh] rounded-lg object-contain" />
+            <div className="mt-2 text-center text-white text-sm">{imagePreview.name}</div>
+            <button
+              onClick={() => setImagePreview(null)}
+              className="absolute -top-2 -right-2 bg-white text-black rounded-full h-8 w-8 flex items-center justify-center shadow-lg"
+              aria-label="Close"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
