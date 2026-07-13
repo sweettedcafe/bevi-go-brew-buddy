@@ -488,6 +488,37 @@ function EditMenuDialog({
             <label className="text-xs text-muted-foreground">Description</label>
             <Textarea rows={2} value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} />
           </div>
+          <div className="col-span-2">
+            <label className="text-xs text-muted-foreground">Product image (shown on the customer ordering page)</label>
+            <div className="flex items-start gap-3 mt-1">
+              {f.image_url ? (
+                <img src={f.image_url} alt="" className="h-20 w-20 rounded object-cover border" />
+              ) : (
+                <div className="h-20 w-20 rounded border border-dashed flex items-center justify-center text-[10px] text-muted-foreground text-center px-1">
+                  No image
+                </div>
+              )}
+              <div className="flex-1 space-y-2">
+                <Input
+                  type="file"
+                  accept="image/*"
+                  disabled={uploadingImage}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) void uploadImage(file);
+                    e.currentTarget.value = "";
+                  }}
+                />
+                {f.image_url && (
+                  <Button type="button" size="sm" variant="ghost"
+                    onClick={() => setF({ ...f, image_url: "" })}>
+                    <Trash2 className="h-3 w-3 mr-1" /> Remove image
+                  </Button>
+                )}
+                {uploadingImage && <div className="text-xs text-muted-foreground">Uploading…</div>}
+              </div>
+            </div>
+          </div>
           {!f.has_variants && (
             <div>
               <label className="text-xs text-muted-foreground">Price</label>
