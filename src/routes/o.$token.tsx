@@ -21,6 +21,7 @@ const fmt = (n: number) => n.toFixed(2);
 type Item = {
   id: string; category_id: string | null; name: string; description: string | null;
   price: number; options: MenuOptions | null; has_variants?: boolean;
+  image_url?: string | null;
 };
 type Cat = { id: string; name: string; sort_order: number };
 type Variant = { id: string; menu_item_id: string; name: string; price: number; sort_order: number };
