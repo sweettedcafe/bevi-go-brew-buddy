@@ -152,7 +152,7 @@ function MenuPage() {
               is_active: true, has_variants: false,
               category_id: cats[0]?.id ?? null, owner_id: null,
               sort_order: items.length + 1,
-              options: emptyOptions(),
+              options: emptyOptions(), image_url: null,
             })}>
               <Plus className="h-3 w-3 mr-1" /> New item
             </Button>
