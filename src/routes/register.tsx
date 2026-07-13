@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,13 @@ import { toast } from "sonner";
 import { QrCanvas, BarcodeSvg } from "@/components/customers/CodeRenderers";
 import { Coffee, Mail } from "lucide-react";
 
-export const Route = createFileRoute("/register")({ component: RegisterPage });
+export const Route = createFileRoute("/register")({
+  component: RegisterPage,
+  validateSearch: (s: Record<string, unknown>) => ({
+    email: typeof s.email === "string" ? s.email : undefined,
+  }),
+});
+
 
 const db = supabase as any;
 
@@ -23,9 +29,11 @@ function isValidPhone(p: string) {
 
 function RegisterPage() {
   const nav = useNavigate();
+  const { email: prefillEmail } = useSearch({ from: "/register" }) as { email?: string };
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(prefillEmail ?? "");
+
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ code: string; token: string; existed: boolean } | null>(null);
   const [emailStatus, setEmailStatus] = useState<"idle" | "sending" | "sent" | "failed">("idle");
