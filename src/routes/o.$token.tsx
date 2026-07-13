@@ -490,7 +490,8 @@ function SelfOrderPage() {
                 className="text-left rounded-lg border bg-card hover:bg-accent active:scale-[0.98] transition-all overflow-hidden min-h-[88px] touch-manipulation flex flex-col">
                 {it.image_url && (
                   <img src={it.image_url} alt={it.name}
-                    className="w-full aspect-square object-cover" loading="lazy" />
+                    onClick={(e) => { e.stopPropagation(); setImagePreview({ url: it.image_url!, name: it.name }); }}
+                    className="w-full aspect-square object-cover cursor-zoom-in" loading="lazy" />
                 )}
                 <div className="p-3 flex-1 flex flex-col">
                   <div className="font-medium leading-tight">{it.name}</div>
