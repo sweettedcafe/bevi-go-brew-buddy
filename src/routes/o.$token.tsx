@@ -65,8 +65,26 @@ function SelfOrderPage() {
   async function loadMenu() {
     const { data: m } = await db.rpc("public_menu");
     const d: any = m ?? {};
+    let menuItems = (d.items ?? []) as Item[];
+
+    if (menuItems.length > 0 && menuItems.some((item) => !("image_url" in item) || !item.image_url)) {
+      try {
+        const res = await fetch("/api/public/menu-images");
+        if (res.ok) {
+          const payload = await res.json() as { images?: Array<{ id: string; image_url: string | null }> };
+          const imageById = new Map((payload.images ?? []).map((row) => [row.id, row.image_url]));
+          menuItems = menuItems.map((item) => ({
+            ...item,
+            image_url: item.image_url ?? imageById.get(item.id) ?? null,
+          }));
+        }
+      } catch {
+        // Keep the menu usable even if the image fallback is unavailable.
+      }
+    }
+
     setCats((d.categories ?? []) as Cat[]);
-    setItems((d.items ?? []) as Item[]);
+    setItems(menuItems);
     setVariants((d.variants ?? []) as Variant[]);
     setBundles((d.bundles ?? []) as Bundle[]);
     setBundleItems((d.bundle_items ?? []) as BundleItem[]);
@@ -555,6 +573,8 @@ function SelfOrderPage() {
           options={customizing.options ?? {}}
           variants={customizingVariants}
           hideOther
+          imageUrl={customizing.image_url}
+          onImageClick={() => customizing.image_url && setImagePreview({ url: customizing.image_url, name: customizing.name })}
           onConfirm={(res) => {
             const it = customizing;
             addCustom(it, res);
