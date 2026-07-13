@@ -58,6 +58,7 @@ function SelfOrderPage() {
   const [done, setDone] = useState<{ order_no: number; order_id: string; total: number } | null>(null);
   const [orderStatus, setOrderStatus] = useState<string | null>(null);
   const [alerting, setAlerting] = useState(false);
+  const [imagePreview, setImagePreview] = useState<{ url: string; name: string } | null>(null);
   // Once the customer dismisses the alert for an order, don't re-alert
   const dismissedRef = useRef<Set<string>>(new Set());
 
