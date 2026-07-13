@@ -311,7 +311,9 @@ function EditMenuDialog({
     is_active: item.is_active,
     has_variants: item.has_variants,
     sort_order: String(item.sort_order),
+    image_url: item.image_url ?? "",
   });
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [rcs, setRcs] = useState<Array<{ inventory_item_id: string; qty: string }>>(
     initialRecipes.map((r) => ({ inventory_item_id: r.inventory_item_id, qty: String(r.qty_per_unit) })),
   );
