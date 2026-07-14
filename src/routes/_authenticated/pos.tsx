@@ -762,6 +762,14 @@ function POSPage() {
 
         <div className="px-6 py-3 border-b bg-card flex gap-2 overflow-x-auto">
           <Button size="sm" variant={activeCat === "all" ? "default" : "outline"} onClick={() => setActiveCat("all")}>All</Button>
+          <Button
+            size="sm"
+            variant={activeCat === "__fav__" ? "default" : "outline"}
+            onClick={() => setActiveCat("__fav__")}
+            title="Favorites"
+          >
+            <Star className={`h-3 w-3 mr-1 ${activeCat === "__fav__" ? "fill-current" : ""}`} /> Favorites
+          </Button>
           {bundles.length > 0 && (
             <Button size="sm"
               variant={activeCat === "__bundles__" ? "default" : "outline"}
@@ -770,11 +778,28 @@ function POSPage() {
             </Button>
           )}
           {cats.map((c) => (
-            <Button key={c.id} size="sm" variant={activeCat === c.id ? "default" : "outline"} onClick={() => setActiveCat(c.id)}>
+            <Button
+              key={c.id}
+              size="sm"
+              variant={activeCat === c.id ? "default" : "outline"}
+              onClick={() => setActiveCat(c.id)}
+              draggable
+              onDragStart={() => setDragCatId(c.id)}
+              onDragOver={(e) => { e.preventDefault(); }}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (dragCatId) void reorderCats(dragCatId, c.id);
+                setDragCatId(null);
+              }}
+              onDragEnd={() => setDragCatId(null)}
+              className={`cursor-grab active:cursor-grabbing ${dragCatId === c.id ? "opacity-60" : ""}`}
+            >
               {c.name}
             </Button>
           ))}
         </div>
+
+
 
         <div className="flex-1 overflow-y-auto p-6">
           {loading ? (
