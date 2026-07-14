@@ -93,7 +93,7 @@ function POSPage() {
   const [items, setItems] = useState<MenuItem[]>([]);
   const [variants, setVariants] = useState<Variant[]>([]);
   const [pms, setPms] = useState<PMConfig[]>([]);
-  const [activeCat, setActiveCat] = useState<string | "all" | "__bundles__">("all");
+  const [activeCat, setActiveCat] = useState<string | "all" | "__bundles__" | "__fav__">("all");
   
   const [query, setQuery] = useState("");
   const [cart, setCart] = useState<CartLine[]>([]);
