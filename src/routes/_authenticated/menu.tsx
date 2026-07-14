@@ -160,6 +160,44 @@ function MenuPage() {
         )}
       </div>
 
+      {isAdmin && cats.length > 0 && (
+        <Card className="p-4 mb-4">
+          <div className="text-sm font-medium mb-2">Categories</div>
+          <div className="flex flex-wrap gap-2">
+            {cats.map((c) => (
+              <div key={c.id} className="flex items-center gap-1 rounded-md border bg-card px-2 py-1">
+                <span className="text-sm">{c.name}</span>
+                <Button size="icon" variant="ghost" className="h-6 w-6"
+                  onClick={async () => {
+                    const name = window.prompt("Rename category", c.name)?.trim();
+                    if (!name || name === c.name) return;
+                    const { error } = await db.rpc("admin_rename_category", { p_id: c.id, p_name: name });
+                    if (error) return toast.error(error.message);
+                    toast.success("Category renamed");
+                    void load();
+                  }}>
+                  <Pencil className="h-3 w-3" />
+                </Button>
+                <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive hover:text-destructive"
+                  onClick={async () => {
+                    const used = items.filter((it) => it.category_id === c.id).length;
+                    const msg = used > 0
+                      ? `Delete "${c.name}"? ${used} item(s) will become uncategorized.`
+                      : `Delete "${c.name}"?`;
+                    if (!window.confirm(msg)) return;
+                    const { error } = await db.rpc("admin_delete_category", { p_id: c.id });
+                    if (error) return toast.error(error.message);
+                    toast.success("Category deleted");
+                    void load();
+                  }}>
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
       {loading ? (
         <div className="text-muted-foreground text-sm">Loading…</div>
       ) : items.length === 0 ? (

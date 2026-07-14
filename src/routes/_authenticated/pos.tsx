@@ -39,6 +39,7 @@ type MenuItem = {
   options: MenuOptions | null;
   has_variants?: boolean;
   product_code?: string | null;
+  is_favorite?: boolean;
 };
 type Variant = { id: string; menu_item_id: string; name: string; price: number; sort_order: number; is_active: boolean };
 type CartLine = {
@@ -92,7 +93,7 @@ function POSPage() {
   const [items, setItems] = useState<MenuItem[]>([]);
   const [variants, setVariants] = useState<Variant[]>([]);
   const [pms, setPms] = useState<PMConfig[]>([]);
-  const [activeCat, setActiveCat] = useState<string | "all" | "__bundles__">("all");
+  const [activeCat, setActiveCat] = useState<string | "all" | "__bundles__" | "__fav__">("all");
   
   const [query, setQuery] = useState("");
   const [cart, setCart] = useState<CartLine[]>([]);
@@ -180,10 +181,56 @@ function POSPage() {
     const q = query.trim().toLowerCase();
     return items.filter(
       (i) =>
-        (activeCat === "all" || i.category_id === activeCat) &&
+        (activeCat === "all"
+          ? true
+          : activeCat === "__fav__"
+            ? !!i.is_favorite
+            : i.category_id === activeCat) &&
         (q === "" || i.name.toLowerCase().includes(q)),
     );
   }, [items, activeCat, query]);
+
+  // Drag & drop state (categories + tiles)
+  const [dragCatId, setDragCatId] = useState<string | null>(null);
+  const [dragItemId, setDragItemId] = useState<string | null>(null);
+
+  async function reorderCats(fromId: string, toId: string) {
+    if (fromId === toId) return;
+    const ids = cats.map((c) => c.id);
+    const from = ids.indexOf(fromId);
+    const to = ids.indexOf(toId);
+    if (from < 0 || to < 0) return;
+    ids.splice(to, 0, ids.splice(from, 1)[0]);
+    const next = ids.map((id, i) => ({ ...cats.find((c) => c.id === id)!, sort_order: i + 1 }));
+    setCats(next);
+    const { error } = await db.rpc("pos_reorder_categories", { p_ids: ids });
+    if (error) toast.error(error.message);
+  }
+
+  async function reorderItems(fromId: string, toId: string) {
+    if (fromId === toId) return;
+    const ids = items.map((i) => i.id);
+    const from = ids.indexOf(fromId);
+    const to = ids.indexOf(toId);
+    if (from < 0 || to < 0) return;
+    ids.splice(to, 0, ids.splice(from, 1)[0]);
+    const next = ids.map((id, i) => ({ ...items.find((x) => x.id === id)!, sort_order: i + 1 }));
+    setItems(next);
+    const { error } = await db.rpc("pos_reorder_menu_items", { p_ids: ids });
+    if (error) toast.error(error.message);
+  }
+
+  async function toggleFavorite(it: MenuItem) {
+    const next = !it.is_favorite;
+    setItems((cur) => cur.map((x) => (x.id === it.id ? { ...x, is_favorite: next } : x)));
+    const { error } = await db.rpc("pos_toggle_favorite", { p_item_id: it.id, p_value: next });
+    if (error) {
+      setItems((cur) => cur.map((x) => (x.id === it.id ? { ...x, is_favorite: !next } : x)));
+      toast.error(error.message);
+    } else {
+      toast.success(next ? `${it.name} added to Favorites` : `${it.name} removed from Favorites`);
+    }
+  }
 
   const subtotal = cart.reduce((s, l) => s + l.unit_price * l.qty, 0);
 
@@ -715,6 +762,14 @@ function POSPage() {
 
         <div className="px-6 py-3 border-b bg-card flex gap-2 overflow-x-auto">
           <Button size="sm" variant={activeCat === "all" ? "default" : "outline"} onClick={() => setActiveCat("all")}>All</Button>
+          <Button
+            size="sm"
+            variant={activeCat === "__fav__" ? "default" : "outline"}
+            onClick={() => setActiveCat("__fav__")}
+            title="Favorites"
+          >
+            <Star className={`h-3 w-3 mr-1 ${activeCat === "__fav__" ? "fill-current" : ""}`} /> Favorites
+          </Button>
           {bundles.length > 0 && (
             <Button size="sm"
               variant={activeCat === "__bundles__" ? "default" : "outline"}
@@ -723,11 +778,28 @@ function POSPage() {
             </Button>
           )}
           {cats.map((c) => (
-            <Button key={c.id} size="sm" variant={activeCat === c.id ? "default" : "outline"} onClick={() => setActiveCat(c.id)}>
+            <Button
+              key={c.id}
+              size="sm"
+              variant={activeCat === c.id ? "default" : "outline"}
+              onClick={() => setActiveCat(c.id)}
+              draggable
+              onDragStart={() => setDragCatId(c.id)}
+              onDragOver={(e) => { e.preventDefault(); }}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (dragCatId) void reorderCats(dragCatId, c.id);
+                setDragCatId(null);
+              }}
+              onDragEnd={() => setDragCatId(null)}
+              className={`cursor-grab active:cursor-grabbing ${dragCatId === c.id ? "opacity-60" : ""}`}
+            >
               {c.name}
             </Button>
           ))}
         </div>
+
+
 
         <div className="flex-1 overflow-y-auto p-6">
           {loading ? (
@@ -779,26 +851,48 @@ function POSPage() {
                   : [];
                 const minPrice = itemVariants.length > 0 ? Math.min(...itemVariants.map((v) => Number(v.price))) : Number(it.price);
                 return (
-                  <button key={it.id} onClick={() => addItem(it)}
-                    className="relative text-left rounded-lg border bg-card hover:bg-accent hover:border-primary/50 transition-colors p-4 shadow-sm">
-                    {isPop && (
-                      <span className="absolute -top-2 -right-2 inline-flex items-center gap-1 rounded-full bg-primary text-primary-foreground text-[10px] px-2 py-0.5 shadow">
-                        <Star className="h-3 w-3 fill-current" /> Most Ordered
-                      </span>
-                    )}
-                    <div className="font-medium leading-tight">{it.name}</div>
-                    {it.description && <div className="text-xs text-muted-foreground mt-1 line-clamp-2">{it.description}</div>}
-                    {itemVariants.length > 0 && (
-                      <div className="mt-1 text-[10px] text-muted-foreground">
-                        {itemVariants.map((v) => v.name).join(" · ")}
+                  <div
+                    key={it.id}
+                    draggable
+                    onDragStart={() => setDragItemId(it.id)}
+                    onDragOver={(e) => { e.preventDefault(); }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      if (dragItemId) void reorderItems(dragItemId, it.id);
+                      setDragItemId(null);
+                    }}
+                    onDragEnd={() => setDragItemId(null)}
+                    className={`relative cursor-grab active:cursor-grabbing ${dragItemId === it.id ? "opacity-60" : ""}`}
+                  >
+                    <button onClick={() => addItem(it)}
+                      className="w-full text-left rounded-lg border bg-card hover:bg-accent hover:border-primary/50 transition-colors p-4 shadow-sm">
+                      {isPop && (
+                        <span className="absolute -top-2 -right-2 inline-flex items-center gap-1 rounded-full bg-primary text-primary-foreground text-[10px] px-2 py-0.5 shadow">
+                          <Star className="h-3 w-3 fill-current" /> Most Ordered
+                        </span>
+                      )}
+                      <div className="font-medium leading-tight pr-6">{it.name}</div>
+                      {it.description && <div className="text-xs text-muted-foreground mt-1 line-clamp-2">{it.description}</div>}
+                      {itemVariants.length > 0 && (
+                        <div className="mt-1 text-[10px] text-muted-foreground">
+                          {itemVariants.map((v) => v.name).join(" · ")}
+                        </div>
+                      )}
+                      <div className="mt-3 flex items-end justify-between gap-2">
+                        <div className="font-display text-lg text-primary">
+                          {fmt(minPrice)}{itemVariants.length > 0 ? "+" : ""}
+                        </div>
                       </div>
-                    )}
-                    <div className="mt-3 flex items-end justify-between gap-2">
-                      <div className="font-display text-lg text-primary">
-                        {fmt(minPrice)}{itemVariants.length > 0 ? "+" : ""}
-                      </div>
-                    </div>
-                  </button>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); void toggleFavorite(it); }}
+                      title={it.is_favorite ? "Remove from Favorites" : "Add to Favorites"}
+                      className={`absolute top-1.5 right-1.5 rounded-full p-1 border bg-card/90 hover:bg-accent ${it.is_favorite ? "text-yellow-500" : "text-muted-foreground"}`}
+                    >
+                      <Star className={`h-3.5 w-3.5 ${it.is_favorite ? "fill-current" : ""}`} />
+                    </button>
+                  </div>
                 );
               })}
             </div>
