@@ -181,10 +181,56 @@ function POSPage() {
     const q = query.trim().toLowerCase();
     return items.filter(
       (i) =>
-        (activeCat === "all" || i.category_id === activeCat) &&
+        (activeCat === "all"
+          ? true
+          : activeCat === "__fav__"
+            ? !!i.is_favorite
+            : i.category_id === activeCat) &&
         (q === "" || i.name.toLowerCase().includes(q)),
     );
   }, [items, activeCat, query]);
+
+  // Drag & drop state (categories + tiles)
+  const [dragCatId, setDragCatId] = useState<string | null>(null);
+  const [dragItemId, setDragItemId] = useState<string | null>(null);
+
+  async function reorderCats(fromId: string, toId: string) {
+    if (fromId === toId) return;
+    const ids = cats.map((c) => c.id);
+    const from = ids.indexOf(fromId);
+    const to = ids.indexOf(toId);
+    if (from < 0 || to < 0) return;
+    ids.splice(to, 0, ids.splice(from, 1)[0]);
+    const next = ids.map((id, i) => ({ ...cats.find((c) => c.id === id)!, sort_order: i + 1 }));
+    setCats(next);
+    const { error } = await db.rpc("pos_reorder_categories", { p_ids: ids });
+    if (error) toast.error(error.message);
+  }
+
+  async function reorderItems(fromId: string, toId: string) {
+    if (fromId === toId) return;
+    const ids = items.map((i) => i.id);
+    const from = ids.indexOf(fromId);
+    const to = ids.indexOf(toId);
+    if (from < 0 || to < 0) return;
+    ids.splice(to, 0, ids.splice(from, 1)[0]);
+    const next = ids.map((id, i) => ({ ...items.find((x) => x.id === id)!, sort_order: i + 1 }));
+    setItems(next);
+    const { error } = await db.rpc("pos_reorder_menu_items", { p_ids: ids });
+    if (error) toast.error(error.message);
+  }
+
+  async function toggleFavorite(it: MenuItem) {
+    const next = !it.is_favorite;
+    setItems((cur) => cur.map((x) => (x.id === it.id ? { ...x, is_favorite: next } : x)));
+    const { error } = await db.rpc("pos_toggle_favorite", { p_item_id: it.id, p_value: next });
+    if (error) {
+      setItems((cur) => cur.map((x) => (x.id === it.id ? { ...x, is_favorite: !next } : x)));
+      toast.error(error.message);
+    } else {
+      toast.success(next ? `${it.name} added to Favorites` : `${it.name} removed from Favorites`);
+    }
+  }
 
   const subtotal = cart.reduce((s, l) => s + l.unit_price * l.qty, 0);
 
