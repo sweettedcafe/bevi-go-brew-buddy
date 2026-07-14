@@ -851,26 +851,48 @@ function POSPage() {
                   : [];
                 const minPrice = itemVariants.length > 0 ? Math.min(...itemVariants.map((v) => Number(v.price))) : Number(it.price);
                 return (
-                  <button key={it.id} onClick={() => addItem(it)}
-                    className="relative text-left rounded-lg border bg-card hover:bg-accent hover:border-primary/50 transition-colors p-4 shadow-sm">
-                    {isPop && (
-                      <span className="absolute -top-2 -right-2 inline-flex items-center gap-1 rounded-full bg-primary text-primary-foreground text-[10px] px-2 py-0.5 shadow">
-                        <Star className="h-3 w-3 fill-current" /> Most Ordered
-                      </span>
-                    )}
-                    <div className="font-medium leading-tight">{it.name}</div>
-                    {it.description && <div className="text-xs text-muted-foreground mt-1 line-clamp-2">{it.description}</div>}
-                    {itemVariants.length > 0 && (
-                      <div className="mt-1 text-[10px] text-muted-foreground">
-                        {itemVariants.map((v) => v.name).join(" · ")}
+                  <div
+                    key={it.id}
+                    draggable
+                    onDragStart={() => setDragItemId(it.id)}
+                    onDragOver={(e) => { e.preventDefault(); }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      if (dragItemId) void reorderItems(dragItemId, it.id);
+                      setDragItemId(null);
+                    }}
+                    onDragEnd={() => setDragItemId(null)}
+                    className={`relative cursor-grab active:cursor-grabbing ${dragItemId === it.id ? "opacity-60" : ""}`}
+                  >
+                    <button onClick={() => addItem(it)}
+                      className="w-full text-left rounded-lg border bg-card hover:bg-accent hover:border-primary/50 transition-colors p-4 shadow-sm">
+                      {isPop && (
+                        <span className="absolute -top-2 -right-2 inline-flex items-center gap-1 rounded-full bg-primary text-primary-foreground text-[10px] px-2 py-0.5 shadow">
+                          <Star className="h-3 w-3 fill-current" /> Most Ordered
+                        </span>
+                      )}
+                      <div className="font-medium leading-tight pr-6">{it.name}</div>
+                      {it.description && <div className="text-xs text-muted-foreground mt-1 line-clamp-2">{it.description}</div>}
+                      {itemVariants.length > 0 && (
+                        <div className="mt-1 text-[10px] text-muted-foreground">
+                          {itemVariants.map((v) => v.name).join(" · ")}
+                        </div>
+                      )}
+                      <div className="mt-3 flex items-end justify-between gap-2">
+                        <div className="font-display text-lg text-primary">
+                          {fmt(minPrice)}{itemVariants.length > 0 ? "+" : ""}
+                        </div>
                       </div>
-                    )}
-                    <div className="mt-3 flex items-end justify-between gap-2">
-                      <div className="font-display text-lg text-primary">
-                        {fmt(minPrice)}{itemVariants.length > 0 ? "+" : ""}
-                      </div>
-                    </div>
-                  </button>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); void toggleFavorite(it); }}
+                      title={it.is_favorite ? "Remove from Favorites" : "Add to Favorites"}
+                      className={`absolute top-1.5 right-1.5 rounded-full p-1 border bg-card/90 hover:bg-accent ${it.is_favorite ? "text-yellow-500" : "text-muted-foreground"}`}
+                    >
+                      <Star className={`h-3.5 w-3.5 ${it.is_favorite ? "fill-current" : ""}`} />
+                    </button>
+                  </div>
                 );
               })}
             </div>
