@@ -358,21 +358,22 @@ function SelfOrderPage() {
   function addCustom(it: Item, res: {
     custom: SelectedCustom; addon: number; qty: number; notes: string;
     variant: VariantChoice | null;
-  }) {
+  }, isUpsell = false) {
     const base = res.variant ? Number(res.variant.price) : Number(it.price);
     const unit = base + res.addon;
     const notes = res.notes.trim() || null;
     const name = res.variant ? `${it.name} — ${res.variant.name}` : it.name;
     setCart((c) => {
-      const sig = customSignature(res.custom, notes) + `|V:${res.variant?.id ?? ""}`;
+      const sig = customSignature(res.custom, notes) + `|V:${res.variant?.id ?? ""}` + `|U:${isUpsell ? 1 : 0}`;
       const dup = c.find((l) => l.kind === "item" && l.menu_item_id === it.id
-        && (customSignature(l.customization, l.notes) + `|V:${l.variant_id ?? ""}`) === sig);
+        && (customSignature(l.customization, l.notes) + `|V:${l.variant_id ?? ""}` + `|U:${l.is_upsell ? 1 : 0}`) === sig);
       if (dup) return c.map((l) => l.lineId === dup.lineId ? { ...l, qty: l.qty + res.qty } : l);
       return [...c, {
         lineId: newId(), kind: "item",
         menu_item_id: it.id, bundle_id: null, name,
         unit_price: unit, qty: res.qty, addon_total: res.addon,
         customization: res.custom, notes, variant_id: res.variant?.id ?? null,
+        is_upsell: isUpsell,
       }];
     });
   }
