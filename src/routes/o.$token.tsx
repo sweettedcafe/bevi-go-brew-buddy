@@ -298,7 +298,12 @@ function SelfOrderPage() {
       .map((id) => items.find((x) => x.id === id))
       .filter((x): x is Item => !!x)
       .filter((x) => !currentCart.some((l) => l.menu_item_id === x.id))
-      .map((x) => ({ id: x.id, name: x.name, price: Number(x.price) }));
+      .map((x) => ({
+        id: x.id,
+        name: x.name,
+        price: Number(x.price),
+        hasCustomization: !!x.has_variants || hasAnyCustomization(x.options) || itemVariants(x.id).length > 0,
+      }));
     if (suggestions.length === 0) return;
     setUpsell({ trigger: it.name, suggestions });
   }
