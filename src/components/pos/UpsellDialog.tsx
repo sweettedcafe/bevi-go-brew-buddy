@@ -3,12 +3,13 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Sparkles } from "lucide-react";
+import { Sparkles, Settings2 } from "lucide-react";
 
 export type UpsellChoice = {
   id: string;
   name: string;
   price: number;
+  hasCustomization?: boolean;
 };
 
 const fmt = (n: number) => Number(n).toFixed(2);
@@ -16,9 +17,12 @@ const fmt = (n: number) => Number(n).toFixed(2);
 /**
  * Suggests complementary items after an order is added to cart.
  * User can pick any (or none) and Skip / Add.
+ *
+ * If an item has customization/variants and `onCustomize` is provided, tapping
+ * that item opens the item's customization dialog instead of just toggling.
  */
 export function UpsellDialog({
-  open, onOpenChange, triggerName, suggestions, onAdd, onSkip,
+  open, onOpenChange, triggerName, suggestions, onAdd, onSkip, onCustomize,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -26,6 +30,7 @@ export function UpsellDialog({
   suggestions: UpsellChoice[];
   onAdd: (picked: UpsellChoice[]) => void;
   onSkip: () => void;
+  onCustomize?: (choice: UpsellChoice) => void;
 }) {
   const [picked, setPicked] = useState<Record<string, boolean>>({});
 
@@ -55,17 +60,36 @@ export function UpsellDialog({
           ) : (
             suggestions.map((s) => {
               const on = !!picked[s.id];
+              const customizable = !!s.hasCustomization && !!onCustomize;
               return (
                 <button key={s.id}
-                  onClick={() => toggle(s.id)}
+                  onClick={() => {
+                    if (customizable) {
+                      onCustomize!(s);
+                    } else {
+                      toggle(s.id);
+                    }
+                  }}
                   className={`w-full flex items-center gap-3 rounded-md border p-3 text-left transition-colors ${
                     on ? "border-primary bg-primary/10" : "hover:bg-accent"
                   }`}>
                   <div className="flex-1">
                     <div className="font-medium leading-tight">{s.name}</div>
-                    <div className="text-xs text-muted-foreground">₱{fmt(s.price)}</div>
+                    <div className="text-xs text-muted-foreground">
+                      ₱{fmt(s.price)}
+                      {customizable && <span className="ml-1">· starts at</span>}
+                    </div>
+                    {customizable && (
+                      <div className="mt-1 inline-flex items-center gap-1 text-[11px] text-primary">
+                        <Settings2 className="h-3 w-3" /> Choose options
+                      </div>
+                    )}
                   </div>
-                  <div className={`h-4 w-4 rounded-full border ${on ? "bg-primary border-primary" : ""}`} />
+                  {customizable ? (
+                    <span className="text-xs text-primary font-medium">Customize →</span>
+                  ) : (
+                    <div className={`h-4 w-4 rounded-full border ${on ? "bg-primary border-primary" : ""}`} />
+                  )}
                 </button>
               );
             })

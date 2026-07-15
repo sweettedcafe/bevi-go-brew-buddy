@@ -292,6 +292,7 @@ function POSPage() {
     item: MenuItem;
     initial?: { custom: SelectedCustom | null; qty: number; notes: string };
     editingLineId?: string;
+    isUpsell?: boolean;
   } | null>(null);
 
   // Upsell state — offer complementary items after adding a line
@@ -304,7 +305,12 @@ function POSPage() {
       .map((id) => items.find((x) => x.id === id))
       .filter((x): x is MenuItem => !!x && x.is_active)
       .filter((x) => !cart.some((l) => l.menu_item_id === x.id))
-      .map((x) => ({ id: x.id, name: x.name, price: Number(x.price) }));
+      .map((x) => ({
+        id: x.id,
+        name: x.name,
+        price: Number(x.price),
+        hasCustomization: !!x.has_variants || hasAnyCustomization(x.options),
+      }));
     if (suggestions.length === 0) return;
     setUpsell({ trigger: item.name, suggestions });
   }
@@ -355,6 +361,7 @@ function POSPage() {
     item: MenuItem; custom: SelectedCustom; addon: number; qty: number; notes: string;
     variant: { id: string; name: string; price: number } | null;
     editingLineId?: string;
+    isUpsell?: boolean;
   }) {
     const base = Number(args.variant?.price ?? args.item.price);
     const unit = base + args.addon;
@@ -373,6 +380,7 @@ function POSPage() {
       const dup = c.find((l) =>
         l.menu_item_id === args.item.id &&
         l.variant_id === variantId &&
+        !l.is_upsell === !args.isUpsell &&
         customSignature(l.customization, l.notes) === sig);
       if (dup) return c.map((l) => l.lineId === dup.lineId ? { ...l, qty: l.qty + args.qty } : l);
       return [...c, {
@@ -383,6 +391,7 @@ function POSPage() {
         name: displayName,
         base_price: base, unit_price: unit, qty: args.qty,
         customization: args.custom, addon_total: args.addon, notes: cleanNotes,
+        is_upsell: !!args.isUpsell,
       }];
     });
   }
@@ -1401,6 +1410,7 @@ function POSPage() {
           onConfirm={(res) => {
             const it = customizing.item;
             const wasEdit = !!customizing.editingLineId;
+            const wasUpsell = !!customizing.isUpsell;
             addCustomizedLine({
               item: it,
               custom: res.custom,
@@ -1409,9 +1419,19 @@ function POSPage() {
               notes: res.notes,
               variant: res.variant,
               editingLineId: customizing.editingLineId,
+              isUpsell: wasUpsell,
             });
             setCustomizing(null);
-            if (!wasEdit) maybeOfferUpsell(it);
+            if (wasUpsell) {
+              void (supabase as any).rpc("log_upsell_event", {
+                p_source: "barista",
+                p_suggestions_count: upsell?.suggestions.length ?? 0,
+                p_added_count: 1,
+              });
+              setUpsell(null);
+            } else if (!wasEdit) {
+              maybeOfferUpsell(it);
+            }
           }}
         />
       )}
@@ -1422,6 +1442,12 @@ function POSPage() {
           onOpenChange={(o) => !o && setUpsell(null)}
           triggerName={upsell.trigger}
           suggestions={upsell.suggestions}
+          onCustomize={(choice) => {
+            const it = items.find((x) => x.id === choice.id);
+            if (!it) return;
+            setUpsell(null);
+            setCustomizing({ item: it, isUpsell: true });
+          }}
           onSkip={() => {
             void (supabase as any).rpc("log_upsell_event", {
               p_source: "barista",

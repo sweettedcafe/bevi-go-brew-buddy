@@ -53,6 +53,7 @@ function SelfOrderPage() {
   const [activeCat, setActiveCat] = useState<string | "all" | "__bundles__">("all");
   const [cart, setCart] = useState<CartLine[]>([]);
   const [customizing, setCustomizing] = useState<Item | null>(null);
+  const [customizingIsUpsell, setCustomizingIsUpsell] = useState(false);
   const [loading, setLoading] = useState(true);
   const [placing, setPlacing] = useState(false);
   const [done, setDone] = useState<{ order_no: number; order_id: string; total: number } | null>(null);
@@ -297,7 +298,12 @@ function SelfOrderPage() {
       .map((id) => items.find((x) => x.id === id))
       .filter((x): x is Item => !!x)
       .filter((x) => !currentCart.some((l) => l.menu_item_id === x.id))
-      .map((x) => ({ id: x.id, name: x.name, price: Number(x.price) }));
+      .map((x) => ({
+        id: x.id,
+        name: x.name,
+        price: Number(x.price),
+        hasCustomization: !!x.has_variants || hasAnyCustomization(x.options) || itemVariants(x.id).length > 0,
+      }));
     if (suggestions.length === 0) return;
     setUpsell({ trigger: it.name, suggestions });
   }
@@ -352,21 +358,22 @@ function SelfOrderPage() {
   function addCustom(it: Item, res: {
     custom: SelectedCustom; addon: number; qty: number; notes: string;
     variant: VariantChoice | null;
-  }) {
+  }, isUpsell = false) {
     const base = res.variant ? Number(res.variant.price) : Number(it.price);
     const unit = base + res.addon;
     const notes = res.notes.trim() || null;
     const name = res.variant ? `${it.name} — ${res.variant.name}` : it.name;
     setCart((c) => {
-      const sig = customSignature(res.custom, notes) + `|V:${res.variant?.id ?? ""}`;
+      const sig = customSignature(res.custom, notes) + `|V:${res.variant?.id ?? ""}` + `|U:${isUpsell ? 1 : 0}`;
       const dup = c.find((l) => l.kind === "item" && l.menu_item_id === it.id
-        && (customSignature(l.customization, l.notes) + `|V:${l.variant_id ?? ""}`) === sig);
+        && (customSignature(l.customization, l.notes) + `|V:${l.variant_id ?? ""}` + `|U:${l.is_upsell ? 1 : 0}`) === sig);
       if (dup) return c.map((l) => l.lineId === dup.lineId ? { ...l, qty: l.qty + res.qty } : l);
       return [...c, {
         lineId: newId(), kind: "item",
         menu_item_id: it.id, bundle_id: null, name,
         unit_price: unit, qty: res.qty, addon_total: res.addon,
         customization: res.custom, notes, variant_id: res.variant?.id ?? null,
+        is_upsell: isUpsell,
       }];
     });
   }
@@ -568,7 +575,7 @@ function SelfOrderPage() {
 
       {customizing && (
         <CustomizeDialog
-          open onOpenChange={(o) => !o && setCustomizing(null)}
+          open onOpenChange={(o) => { if (!o) { setCustomizing(null); setCustomizingIsUpsell(false); } }}
           itemName={customizing.name} basePrice={Number(customizing.price)}
           options={customizing.options ?? {}}
           variants={customizingVariants}
@@ -577,9 +584,20 @@ function SelfOrderPage() {
           onImageClick={() => customizing.image_url && setImagePreview({ url: customizing.image_url, name: customizing.name })}
           onConfirm={(res) => {
             const it = customizing;
-            addCustom(it, res);
+            const wasUpsell = customizingIsUpsell;
+            addCustom(it, res, wasUpsell);
             setCustomizing(null);
-            maybeOfferUpsell(it, cart);
+            setCustomizingIsUpsell(false);
+            if (wasUpsell) {
+              void (supabase as any).rpc("log_upsell_event", {
+                p_source: "customer",
+                p_suggestions_count: upsell?.suggestions.length ?? 0,
+                p_added_count: 1,
+              });
+              setUpsell(null);
+            } else {
+              maybeOfferUpsell(it, cart);
+            }
           }}
         />
       )}
@@ -590,6 +608,13 @@ function SelfOrderPage() {
           onOpenChange={(o) => !o && setUpsell(null)}
           triggerName={upsell.trigger}
           suggestions={upsell.suggestions}
+          onCustomize={(choice) => {
+            const it = items.find((x) => x.id === choice.id);
+            if (!it) return;
+            setUpsell(null);
+            setCustomizingIsUpsell(true);
+            setCustomizing(it);
+          }}
           onSkip={() => {
             void (supabase as any).rpc("log_upsell_event", {
               p_source: "customer",
