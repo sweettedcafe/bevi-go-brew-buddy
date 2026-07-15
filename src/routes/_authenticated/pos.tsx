@@ -361,6 +361,7 @@ function POSPage() {
     item: MenuItem; custom: SelectedCustom; addon: number; qty: number; notes: string;
     variant: { id: string; name: string; price: number } | null;
     editingLineId?: string;
+    isUpsell?: boolean;
   }) {
     const base = Number(args.variant?.price ?? args.item.price);
     const unit = base + args.addon;
@@ -379,6 +380,7 @@ function POSPage() {
       const dup = c.find((l) =>
         l.menu_item_id === args.item.id &&
         l.variant_id === variantId &&
+        !l.is_upsell === !args.isUpsell &&
         customSignature(l.customization, l.notes) === sig);
       if (dup) return c.map((l) => l.lineId === dup.lineId ? { ...l, qty: l.qty + args.qty } : l);
       return [...c, {
@@ -389,6 +391,7 @@ function POSPage() {
         name: displayName,
         base_price: base, unit_price: unit, qty: args.qty,
         customization: args.custom, addon_total: args.addon, notes: cleanNotes,
+        is_upsell: !!args.isUpsell,
       }];
     });
   }
