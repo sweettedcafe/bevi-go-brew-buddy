@@ -292,6 +292,7 @@ function POSPage() {
     item: MenuItem;
     initial?: { custom: SelectedCustom | null; qty: number; notes: string };
     editingLineId?: string;
+    isUpsell?: boolean;
   } | null>(null);
 
   // Upsell state — offer complementary items after adding a line
@@ -304,7 +305,12 @@ function POSPage() {
       .map((id) => items.find((x) => x.id === id))
       .filter((x): x is MenuItem => !!x && x.is_active)
       .filter((x) => !cart.some((l) => l.menu_item_id === x.id))
-      .map((x) => ({ id: x.id, name: x.name, price: Number(x.price) }));
+      .map((x) => ({
+        id: x.id,
+        name: x.name,
+        price: Number(x.price),
+        hasCustomization: !!x.has_variants || hasAnyCustomization(x.options),
+      }));
     if (suggestions.length === 0) return;
     setUpsell({ trigger: item.name, suggestions });
   }
