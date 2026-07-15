@@ -575,7 +575,7 @@ function SelfOrderPage() {
 
       {customizing && (
         <CustomizeDialog
-          open onOpenChange={(o) => !o && setCustomizing(null)}
+          open onOpenChange={(o) => { if (!o) { setCustomizing(null); setCustomizingIsUpsell(false); } }}
           itemName={customizing.name} basePrice={Number(customizing.price)}
           options={customizing.options ?? {}}
           variants={customizingVariants}
@@ -584,9 +584,20 @@ function SelfOrderPage() {
           onImageClick={() => customizing.image_url && setImagePreview({ url: customizing.image_url, name: customizing.name })}
           onConfirm={(res) => {
             const it = customizing;
-            addCustom(it, res);
+            const wasUpsell = customizingIsUpsell;
+            addCustom(it, res, wasUpsell);
             setCustomizing(null);
-            maybeOfferUpsell(it, cart);
+            setCustomizingIsUpsell(false);
+            if (wasUpsell) {
+              void (supabase as any).rpc("log_upsell_event", {
+                p_source: "customer",
+                p_suggestions_count: upsell?.suggestions.length ?? 0,
+                p_added_count: 1,
+              });
+              setUpsell(null);
+            } else {
+              maybeOfferUpsell(it, cart);
+            }
           }}
         />
       )}
@@ -597,6 +608,13 @@ function SelfOrderPage() {
           onOpenChange={(o) => !o && setUpsell(null)}
           triggerName={upsell.trigger}
           suggestions={upsell.suggestions}
+          onCustomize={(choice) => {
+            const it = items.find((x) => x.id === choice.id);
+            if (!it) return;
+            setUpsell(null);
+            setCustomizingIsUpsell(true);
+            setCustomizing(it);
+          }}
           onSkip={() => {
             void (supabase as any).rpc("log_upsell_event", {
               p_source: "customer",
