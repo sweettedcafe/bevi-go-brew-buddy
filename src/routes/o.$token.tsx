@@ -53,6 +53,7 @@ function SelfOrderPage() {
   const [activeCat, setActiveCat] = useState<string | "all" | "__bundles__">("all");
   const [cart, setCart] = useState<CartLine[]>([]);
   const [customizing, setCustomizing] = useState<Item | null>(null);
+  const [customizingIsUpsell, setCustomizingIsUpsell] = useState(false);
   const [loading, setLoading] = useState(true);
   const [placing, setPlacing] = useState(false);
   const [done, setDone] = useState<{ order_no: number; order_id: string; total: number } | null>(null);
