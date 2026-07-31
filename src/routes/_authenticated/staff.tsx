@@ -81,6 +81,7 @@ function StaffPage() {
               <SelectTrigger className="sm:w-48"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="barista">Barista</SelectItem>
+                <SelectItem value="accountant">Accountant</SelectItem>
                 <SelectItem value="admin">Admin</SelectItem>
                 {hasRole("developer") && <SelectItem value="developer">Developer</SelectItem>}
               </SelectContent>

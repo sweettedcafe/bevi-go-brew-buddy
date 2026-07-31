@@ -16,7 +16,7 @@ export const Route = createFileRoute("/_authenticated/access-control")({
 const db = supabase as any;
 
 // Non-developer roles that can receive extra grants.
-const GRANTABLE_ROLES: AppRole[] = ["barista", "admin"];
+const GRANTABLE_ROLES: AppRole[] = ["barista", "accountant", "admin"];
 
 type Grant = { role: AppRole; path: string };
 
