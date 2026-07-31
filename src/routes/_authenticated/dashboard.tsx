@@ -45,13 +45,18 @@ function pct(curr: number, prev: number) {
   return ((curr - prev) / prev) * 100;
 }
 
+const isoDay = (d: Date) =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(d);
+
 async function loadOrders(from: Date, to: Date) {
+  // Business date keeps each day's figures separate (no bleed from the day before).
   const { data } = await db.from("orders")
-    .select("id,total,subtotal,discount_total,status,customer_id,customer_name,created_at")
-    .gte("created_at", from.toISOString())
-    .lte("created_at", to.toISOString());
+    .select("id,total,subtotal,discount_total,status,customer_id,customer_name,created_at,business_date")
+    .gte("business_date", isoDay(from))
+    .lte("business_date", isoDay(to));
   return ((data ?? []) as Row[]).filter((o) => o.status !== "voided" && o.status !== "refunded");
 }
+
 
 function Dashboard() {
   const [period, setPeriod] = useState<Period>("day");

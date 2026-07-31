@@ -34,18 +34,25 @@ type BundleItem = {
   id?: string;
   bundle_id?: string;
   menu_item_id: string;
+  variant_id: string | null;
   qty: number;
   discount_type: "percent" | "fixed";
   discount_value: number;
 };
-type MenuItem = { id: string; name: string; price: number; owner_id: string | null };
+type MenuItem = { id: string; name: string; price: number; owner_id: string | null; has_variants?: boolean };
+type Variant = { id: string; menu_item_id: string; name: string; price: number; sort_order: number };
 type Owner = { id: string; name: string };
 
 const db = supabase as any;
 
-function discountedUnit(item: MenuItem | undefined, type: "percent" | "fixed", value: number) {
+function discountedUnit(
+  item: MenuItem | undefined,
+  type: "percent" | "fixed",
+  value: number,
+  variant?: Variant | null,
+) {
   if (!item) return 0;
-  const p = Number(item.price);
+  const p = Number(variant?.price ?? item.price);
   if (type === "percent") return Math.max(0, p - p * (Number(value) || 0) / 100);
   return Math.max(0, p - (Number(value) || 0));
 }
@@ -56,17 +63,20 @@ function BundlesPage() {
   const [bundles, setBundles] = useState<Bundle[]>([]);
   const [items, setItems] = useState<MenuItem[]>([]);
   const [owners, setOwners] = useState<Owner[]>([]);
+  const [variants, setVariants] = useState<Variant[]>([]);
   const [bItems, setBItems] = useState<BundleItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Bundle | null>(null);
 
   async function load() {
     setLoading(true);
-    const [{ data: b }, { data: m }, { data: bi }, { data: o }] = await Promise.all([
+    const [{ data: b }, { data: m }, { data: bi }, { data: o }, { data: v }] = await Promise.all([
       db.from("bundles").select("*").order("created_at", { ascending: false }),
-      db.from("menu_items").select("id,name,price,owner_id").eq("is_active", true).order("name"),
+      db.from("menu_items").select("id,name,price,owner_id,has_variants").eq("is_active", true).order("name"),
       db.from("bundle_items").select("*"),
       db.from("owners").select("id,name").order("name"),
+      db.from("menu_item_variants").select("id,menu_item_id,name,price,sort_order")
+        .eq("is_active", true).order("sort_order"),
     ]);
     setBundles((b ?? []) as Bundle[]);
     setItems((m ?? []) as MenuItem[]);
@@ -74,13 +84,16 @@ function BundlesPage() {
       ...r,
       discount_type: (r.discount_type ?? "percent") as "percent" | "fixed",
       discount_value: Number(r.discount_value ?? 0),
+      variant_id: r.variant_id ?? null,
     })));
     setOwners((o ?? []) as Owner[]);
+    setVariants((v ?? []) as Variant[]);
     setLoading(false);
   }
   useEffect(() => { void load(); }, []);
 
   const itemById = (id: string) => items.find((x) => x.id === id);
+  const variantById = (id: string | null) => (id ? variants.find((x) => x.id === id) ?? null : null);
   const ownerName = (id: string | null) => id ? (owners.find((x) => x.id === id)?.name ?? "—") : "—";
   const bItemsFor = (id: string) => bItems.filter((x) => x.bundle_id === id);
   const isExpired = (b: Bundle) => b.ends_at && new Date(b.ends_at) < new Date();
@@ -140,12 +153,13 @@ function BundlesPage() {
                     <div className="mt-2 space-y-1">
                       {its.map((x) => {
                         const it = itemById(x.menu_item_id);
-                        const unit = discountedUnit(it, x.discount_type, x.discount_value);
-                        const orig = Number(it?.price ?? 0);
+                        const vr = variantById(x.variant_id);
+                        const unit = discountedUnit(it, x.discount_type, x.discount_value, vr);
+                        const orig = Number(vr?.price ?? it?.price ?? 0);
                         return (
                           <div key={x.id} className="flex items-center justify-between text-xs gap-2">
                             <div className="flex items-center gap-1 min-w-0">
-                              <span className="truncate">{it?.name ?? "—"} × {x.qty}</span>
+                              <span className="truncate">{it?.name ?? "—"}{vr ? ` — ${vr.name}` : ""} × {x.qty}</span>
                               <Badge variant="outline" className="text-[10px] shrink-0">{ownerName(it?.owner_id ?? null)}</Badge>
                             </div>
                             <div className="shrink-0 text-muted-foreground">
@@ -193,6 +207,7 @@ function BundlesPage() {
         <EditBundleDialog
           bundle={editing}
           items={items}
+          variants={variants}
           owners={owners}
           initialItems={editing.id ? bItemsFor(editing.id) : []}
           onClose={() => setEditing(null)}
@@ -204,10 +219,11 @@ function BundlesPage() {
 }
 
 function EditBundleDialog({
-  bundle, items, owners, initialItems, onClose, onSaved,
+  bundle, items, variants, owners, initialItems, onClose, onSaved,
 }: {
   bundle: Bundle;
   items: MenuItem[];
+  variants: Variant[];
   owners: Owner[];
   initialItems: BundleItem[];
   onClose: () => void;
@@ -221,11 +237,12 @@ function EditBundleDialog({
     is_active: bundle.is_active,
   });
   const [rows, setRows] = useState<Array<{
-    menu_item_id: string; qty: string;
+    menu_item_id: string; variant_id: string | null; qty: string;
     discount_type: "percent" | "fixed"; discount_value: string;
   }>>(
     initialItems.map((x) => ({
       menu_item_id: x.menu_item_id,
+      variant_id: x.variant_id ?? null,
       qty: String(x.qty),
       discount_type: x.discount_type,
       discount_value: String(x.discount_value),
@@ -234,28 +251,34 @@ function EditBundleDialog({
   const [saving, setSaving] = useState(false);
 
   const ownerName = (id: string | null) => id ? (owners.find((x) => x.id === id)?.name ?? "—") : "—";
+  const variantsFor = (itemId: string) =>
+    variants.filter((v) => v.menu_item_id === itemId).sort((a, b) => a.sort_order - b.sort_order);
+  const variantOf = (id: string | null) => (id ? variants.find((v) => v.id === id) ?? null : null);
 
   const componentTotal = useMemo(() =>
     rows.reduce((s, r) => {
       const it = items.find((x) => x.id === r.menu_item_id);
-      return s + (it ? Number(it.price) * (Number(r.qty) || 0) : 0);
+      const vr = variantOf(r.variant_id);
+      return s + (it ? Number(vr?.price ?? it.price) * (Number(r.qty) || 0) : 0);
     }, 0),
-  [rows, items]);
+  [rows, items, variants]);
 
   // auto-computed bundle price = sum of discounted units * qty
   const computedPrice = useMemo(() =>
     rows.reduce((s, r) => {
       const it = items.find((x) => x.id === r.menu_item_id);
       if (!it) return s;
-      const unit = discountedUnit(it, r.discount_type, Number(r.discount_value) || 0);
+      const unit = discountedUnit(it, r.discount_type, Number(r.discount_value) || 0, variantOf(r.variant_id));
       return s + unit * (Number(r.qty) || 0);
     }, 0),
-  [rows, items]);
+  [rows, items, variants]);
 
   async function save() {
     if (!f.name.trim()) return toast.error("Name required");
     if (rows.length === 0 || rows.some((r) => !r.menu_item_id || Number(r.qty) <= 0))
       return toast.error("Add at least one item with qty > 0");
+    if (rows.some((r) => variantsFor(r.menu_item_id).length > 0 && !r.variant_id))
+      return toast.error("Pick a variant for every item that has variants");
     setSaving(true);
     const payload = {
       name: f.name.trim(),
@@ -278,6 +301,7 @@ function EditBundleDialog({
     const ins = rows.map((r) => ({
       bundle_id: id,
       menu_item_id: r.menu_item_id,
+      variant_id: r.variant_id,
       qty: Number(r.qty),
       discount_type: r.discount_type,
       discount_value: Number(r.discount_value) || 0,
@@ -327,7 +351,7 @@ function EditBundleDialog({
             <h3 className="font-medium text-sm">Items in this bundle</h3>
             <Button size="sm" variant="outline"
               onClick={() => setRows((a) => [...a, {
-                menu_item_id: "", qty: "1", discount_type: "percent", discount_value: "0",
+                menu_item_id: "", variant_id: null, qty: "1", discount_type: "percent", discount_value: "0",
               }])}>
               <Plus className="h-3 w-3 mr-1" /> Add item
             </Button>
@@ -338,19 +362,29 @@ function EditBundleDialog({
             <div className="space-y-2">
               {rows.map((r, i) => {
                 const it = items.find((x) => x.id === r.menu_item_id);
-                const unit = discountedUnit(it, r.discount_type, Number(r.discount_value) || 0);
+                const rowVariants = it ? variantsFor(it.id) : [];
+                const vr = variantOf(r.variant_id);
+                const unit = discountedUnit(it, r.discount_type, Number(r.discount_value) || 0, vr);
                 return (
                   <div key={i} className="border rounded-md p-2 space-y-2">
                     <div className="flex gap-2 items-center">
                       <Select value={r.menu_item_id}
-                        onValueChange={(v) => setRows((arr) => arr.map((x, k) => k === i ? { ...x, menu_item_id: v } : x))}>
+                        onValueChange={(v) => setRows((arr) => arr.map((x, k) => {
+                          if (k !== i) return x;
+                          const firstVariant = variants
+                            .filter((vv) => vv.menu_item_id === v)
+                            .sort((a, b) => a.sort_order - b.sort_order)[0];
+                          return { ...x, menu_item_id: v, variant_id: firstVariant?.id ?? null };
+                        }))}>
                         <SelectTrigger className="flex-1"><SelectValue placeholder="Pick item" /></SelectTrigger>
                         <SelectContent>
-                          {items.map((mi) => (
-                            <SelectItem key={mi.id} value={mi.id}>
-                              {mi.name} ({Number(mi.price).toFixed(2)})
-                            </SelectItem>
-                          ))}
+                          {items.map((mi) => {
+                            const vs = variants.filter((v) => v.menu_item_id === mi.id);
+                            const label = vs.length
+                              ? `${mi.name} (from ${Math.min(...vs.map((v) => Number(v.price))).toFixed(2)})`
+                              : `${mi.name} (${Number(mi.price).toFixed(2)})`;
+                            return <SelectItem key={mi.id} value={mi.id}>{label}</SelectItem>;
+                          })}
                         </SelectContent>
                       </Select>
                       <Input className="w-16" type="number" value={r.qty}
@@ -360,6 +394,22 @@ function EditBundleDialog({
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
+                    {rowVariants.length > 0 && (
+                      <div className="flex gap-2 items-center text-xs">
+                        <span className="text-muted-foreground w-14">Variant</span>
+                        <Select value={r.variant_id ?? ""}
+                          onValueChange={(v) => setRows((arr) => arr.map((x, k) => k === i ? { ...x, variant_id: v } : x))}>
+                          <SelectTrigger className="flex-1"><SelectValue placeholder="Pick variant" /></SelectTrigger>
+                          <SelectContent>
+                            {rowVariants.map((v) => (
+                              <SelectItem key={v.id} value={v.id}>
+                                {v.name} ({Number(v.price).toFixed(2)})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                     <div className="flex gap-2 items-center text-xs">
                       <span className="text-muted-foreground w-14">Discount</span>
                       <Select value={r.discount_type}

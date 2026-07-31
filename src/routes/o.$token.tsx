@@ -27,7 +27,7 @@ type Cat = { id: string; name: string; sort_order: number };
 type Variant = { id: string; menu_item_id: string; name: string; price: number; sort_order: number };
 type Bundle = { id: string; name: string; description: string | null; price: number };
 type BundleItem = {
-  bundle_id: string; menu_item_id: string; qty: number;
+  bundle_id: string; menu_item_id: string; qty: number; variant_id?: string | null;
   discount_type: "percent" | "fixed"; discount_value: number;
 };
 type CartLine = {
@@ -335,7 +335,8 @@ function SelfOrderPage() {
     for (const r of rows) {
       const it = items.find((i) => i.id === r.menu_item_id);
       if (!it) continue;
-      const base = Number(it.price);
+      const bv = r.variant_id ? variants.find((v) => v.id === r.variant_id) : null;
+      const base = Number(bv?.price ?? it.price);
       const unit = r.discount_type === "percent"
         ? Math.max(0, base - base * (Number(r.discount_value) || 0) / 100)
         : Math.max(0, base - (Number(r.discount_value) || 0));
@@ -387,7 +388,7 @@ function SelfOrderPage() {
       p_payload: {
         order_type: "takeout",
         items: cart.filter((l) => l.kind === "item").map((l) => ({
-          menu_item_id: l.menu_item_id, qty: l.qty,
+          menu_item_id: l.menu_item_id, qty: l.qty, variant_id: l.variant_id,
           addon_total: l.addon_total, customization: l.customization, notes: l.notes,
           is_upsell: !!l.is_upsell,
         })),
@@ -434,7 +435,10 @@ function SelfOrderPage() {
           {alerting && (
             <Button className="w-full" size="lg" variant="destructive"
               onClick={() => {
-                if (done) dismissedRef.current.add(done.order_id);
+                if (done) {
+                  dismissedRef.current.add(done.order_id);
+                  void db.rpc("customer_ack_ready", { p_token: token, p_order_id: done.order_id });
+                }
                 setAlerting(false);
               }}>
               <BellRing className="h-4 w-4 mr-2 animate-pulse" /> Stop alert

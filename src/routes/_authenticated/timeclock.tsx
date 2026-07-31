@@ -61,7 +61,6 @@ function TimeclockPage() {
 
   // dialogs
   const [clockInOpen, setClockInOpen] = useState(false);
-  const [startingCash, setStartingCash] = useState("0");
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [leaveDate, setLeaveDate] = useState("");
   const [leaveDuration, setLeaveDuration] = useState<"full" | "half">("full");
@@ -88,9 +87,8 @@ function TimeclockPage() {
   useEffect(() => { void refresh(); }, []);
 
   const onClockIn = async () => {
-    const v = Number(startingCash || "0");
-    if (Number.isNaN(v) || v < 0) { toast.error("Starting cash must be a number ≥ 0"); return; }
-    const { error } = await supabase.rpc("tc_clock_in", { p_starting_cash: v });
+    // Starting cash is no longer captured here — it's set once on End of Shift.
+    const { error } = await supabase.rpc("tc_clock_in", { p_starting_cash: 0 });
     if (error) { toast.error(error.message); return; }
     setClockInOpen(false);
     toast.success("Clocked in");
@@ -167,11 +165,9 @@ function TimeclockPage() {
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader><DialogTitle>Time in</DialogTitle></DialogHeader>
-                  <div className="space-y-2">
-                    <Label htmlFor="cash">Starting cash (₱)</Label>
-                    <Input id="cash" type="number" min="0" step="0.01" value={startingCash}
-                      onChange={(e) => setStartingCash(e.target.value)} autoFocus />
-                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Start your shift now. Starting cash is entered once on the End of Shift page.
+                  </p>
                   <DialogFooter>
                     <Button variant="outline" onClick={() => setClockInOpen(false)}>Cancel</Button>
                     <Button onClick={onClockIn}>Start shift</Button>
