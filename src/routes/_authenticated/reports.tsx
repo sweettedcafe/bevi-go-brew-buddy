@@ -64,14 +64,23 @@ const PER_ITEM_COLS = [
   { key: "time_only", label: "Time" },
   { key: "txn_kind", label: "Type" },
   { key: "name", label: "Item" },
+  { key: "variant", label: "Variant" },
+  { key: "extras", label: "Extras" },
+  { key: "flavors", label: "Flavors" },
+  { key: "other", label: "Other" },
+  { key: "instructions", label: "Special instructions" },
   { key: "category", label: "Category" },
   { key: "owner", label: "Owner" },
   { key: "cashier_email", label: "Cashier" },
   { key: "placed_by", label: "Placed by" },
   { key: "upsell", label: "Upsell" },
+  { key: "status", label: "Status" },
   { key: "qty", label: "Qty" },
+  { key: "unit_price", label: "Unit price" },
+  { key: "addon_total", label: "Add-ons" },
   { key: "revenue", label: "Revenue" },
 ];
+
 const DISCOUNT_COLS = [
   { key: "order_no", label: "Order #" },
   { key: "order_id_short", label: "Order ID" },
