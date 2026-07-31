@@ -522,7 +522,35 @@ function EndOfShiftPage() {
           </Card>
         </>
       )}
+
+      <Dialog open={catDialog} onOpenChange={setCatDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Expense categories</DialogTitle></DialogHeader>
+          <div className="space-y-2 max-h-[50vh] overflow-y-auto">
+            {expCats.length === 0 && (
+              <p className="text-sm text-muted-foreground">No categories yet.</p>
+            )}
+            {expCats.map((c) => (
+              <div key={c.id} className="flex items-center gap-2">
+                <Input defaultValue={c.name}
+                  onBlur={(e) => { if (e.target.value.trim() !== c.name) void renameCategory(c.id, e.target.value); }} />
+                <Button size="icon" variant="ghost" onClick={() => deleteCategory(c.id)}>
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </div>
+            ))}
+          </div>
+          <div className="flex items-center gap-2 border-t pt-3">
+            <Input placeholder="New category" value={newCat} onChange={(e) => setNewCat(e.target.value)} />
+            <Button onClick={addCategory} className="gap-1"><Plus className="h-4 w-4" /> Add</Button>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCatDialog(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
+
   );
 }
 
