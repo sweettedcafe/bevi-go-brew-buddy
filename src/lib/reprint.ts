@@ -4,6 +4,7 @@ import { loadPrintSettings } from "./print-settings";
 import { savePdfFromHTML } from "./print-pdf";
 import { receiptHTML, labelsHTML, type ReceiptData, type DrinkLabel } from "./print-templates";
 import { randomQuote } from "./quotes";
+import { shouldPrintLabel } from "./label-eligibility";
 import type { PrintPreviewDocument } from "@/components/print/PrintPreviewDialog";
 
 const db = supabase as any;
