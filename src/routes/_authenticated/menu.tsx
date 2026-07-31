@@ -14,6 +14,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
+import { StableModal, StableModalFooter } from "@/components/ui/stable-modal";
 import { Pencil, Plus, Trash2, Settings2, Download, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { MenuOptionsEditor } from "@/components/menu/MenuOptionsEditor";
@@ -302,22 +303,22 @@ function MenuPage() {
         />
       )}
       {deleting && (
-        <Dialog open onOpenChange={(o) => !o && setDeleting(null)}>
-          <DialogContent className="max-w-sm">
-            <DialogHeader>
-              <DialogTitle>Delete menu item?</DialogTitle>
-            </DialogHeader>
-            <p className="text-sm text-muted-foreground">
-              Delete <span className="font-medium text-foreground">{deleting.name}</span>?
-              If this item appears in past orders, it will be deactivated instead of removed
-              so reports stay accurate.
-            </p>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setDeleting(null)}>Cancel</Button>
-              <Button variant="destructive" onClick={() => void confirmDelete(deleting)}>Delete</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <StableModal
+          open
+          onOpenChange={(open) => !open && setDeleting(null)}
+          title="Delete menu item?"
+          className="max-w-sm"
+        >
+          <p className="text-sm text-muted-foreground">
+            Delete <span className="font-medium text-foreground">{deleting.name}</span>?
+            If this item appears in past orders, it will be deactivated instead of removed
+            so reports stay accurate.
+          </p>
+          <StableModalFooter>
+            <Button variant="outline" onClick={() => setDeleting(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={() => void confirmDelete(deleting)}>Delete</Button>
+          </StableModalFooter>
+        </StableModal>
       )}
     </div>
   );

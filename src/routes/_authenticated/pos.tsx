@@ -1563,13 +1563,8 @@ function POSPage() {
           onCustomize={(choice) => {
             const it = items.find((x) => x.id === choice.id);
             if (!it) return;
-            // Let Radix fully unmount the upsell focus scope before mounting the
-            // customization dialog. Mounting one modal while the other is
-            // tearing down can loop composed refs under React 19 (error #185).
             setUpsell(null);
-            window.setTimeout(() => {
-              setCustomizing({ item: it, isUpsell: true });
-            }, 0);
+            setCustomizing({ item: it, isUpsell: true });
           }}
           onSkip={() => {
             void (supabase as any).rpc("log_upsell_event", {

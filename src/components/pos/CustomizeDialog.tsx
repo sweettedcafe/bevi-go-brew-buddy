@@ -3,14 +3,26 @@ import { StableModal, StableModalFooter } from "@/components/ui/stable-modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Trash2 } from "lucide-react";
+import { Check, Plus, Trash2 } from "lucide-react";
 import {
   type MenuOptions, type SelectedCustom, type PriceOption,
   addonTotal,
 } from "@/lib/menu-options";
 
 const fmt = (n: number) => n.toFixed(2);
+
+function StableCheckbox({ checked }: { checked: boolean }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`grid h-4 w-4 shrink-0 place-content-center rounded-sm border border-primary ${
+        checked ? "bg-primary text-primary-foreground" : "bg-background"
+      }`}
+    >
+      {checked && <Check className="h-3.5 w-3.5" />}
+    </span>
+  );
+}
 
 export type VariantChoice = {
   id: string;
@@ -235,13 +247,14 @@ export function CustomizeDialog({
                 {exs.map((e) => {
                   const on = extras.some((x) => x.label === e.label);
                   return (
-                    <label key={e.label} className="flex items-center gap-2 rounded border p-2 cursor-pointer hover:bg-accent">
-                      <Checkbox checked={on} onCheckedChange={() => toggleExtra(e)} />
+                     <button type="button" key={e.label} onClick={() => toggleExtra(e)}
+                       className="flex w-full items-center gap-2 rounded border p-2 text-left cursor-pointer hover:bg-accent">
+                       <StableCheckbox checked={on} />
                       <span className="flex-1">{e.label}</span>
                       <span className="text-xs text-muted-foreground">
                         {e.price_delta > 0 ? `+${fmt(e.price_delta)}` : "free"}
                       </span>
-                    </label>
+                     </button>
                   );
                 })}
               </div>
@@ -255,13 +268,14 @@ export function CustomizeDialog({
                 {flvs.map((e) => {
                   const on = flavors.some((x) => x.label === e.label);
                   return (
-                    <label key={e.label} className="flex items-center gap-2 rounded border p-2 cursor-pointer hover:bg-accent">
-                      <Checkbox checked={on} onCheckedChange={() => toggleIn(flavors, setFlavors, e)} />
+                     <button type="button" key={e.label} onClick={() => toggleIn(flavors, setFlavors, e)}
+                       className="flex w-full items-center gap-2 rounded border p-2 text-left cursor-pointer hover:bg-accent">
+                       <StableCheckbox checked={on} />
                       <span className="flex-1">{e.label}</span>
                       <span className="text-xs text-muted-foreground">
                         {e.price_delta > 0 ? `+${fmt(e.price_delta)}` : "free"}
                       </span>
-                    </label>
+                     </button>
                   );
                 })}
               </div>
@@ -275,13 +289,14 @@ export function CustomizeDialog({
                 {oths.map((e) => {
                   const on = others.some((x) => x.label === e.label);
                   return (
-                    <label key={e.label} className="flex items-center gap-2 rounded border p-2 cursor-pointer hover:bg-accent">
-                      <Checkbox checked={on} onCheckedChange={() => toggleIn(others, setOthers, e)} />
+                     <button type="button" key={e.label} onClick={() => toggleIn(others, setOthers, e)}
+                       className="flex w-full items-center gap-2 rounded border p-2 text-left cursor-pointer hover:bg-accent">
+                       <StableCheckbox checked={on} />
                       <span className="flex-1">{e.label}</span>
                       <span className="text-xs text-muted-foreground">
                         {e.price_delta > 0 ? `+${fmt(e.price_delta)}` : "free"}
                       </span>
-                    </label>
+                     </button>
                   );
                 })}
               </div>
@@ -304,14 +319,15 @@ export function CustomizeDialog({
                   {g.options.map((opt) => {
                     const on = list.some((x) => x.label === opt.label);
                     return (
-                      <label key={opt.label}
-                        className={`flex items-center gap-2 rounded border p-2 cursor-pointer hover:bg-accent ${on ? "border-primary bg-primary/10" : ""}`}>
-                        <Checkbox checked={on} onCheckedChange={() => pickGroup(g.name, g.select, opt)} />
+                       <button type="button" key={opt.label}
+                         onClick={() => pickGroup(g.name, g.select, opt)}
+                         className={`flex w-full items-center gap-2 rounded border p-2 text-left cursor-pointer hover:bg-accent ${on ? "border-primary bg-primary/10" : ""}`}>
+                         <StableCheckbox checked={on} />
                         <span className="flex-1">{opt.label}</span>
                         <span className="text-xs text-muted-foreground">
                           {opt.price_delta > 0 ? `+${fmt(opt.price_delta)}` : opt.price_delta < 0 ? fmt(opt.price_delta) : "free"}
                         </span>
-                      </label>
+                       </button>
                     );
                   })}
                 </div>

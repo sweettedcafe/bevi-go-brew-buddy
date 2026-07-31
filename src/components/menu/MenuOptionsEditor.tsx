@@ -2,9 +2,6 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
 import { Plus, Trash2, Star } from "lucide-react";
 import {
   type MenuOptions, type PriceOption, type OptionGroup,
@@ -93,14 +90,15 @@ function GroupEditor({
         <Input className="flex-1 h-8" placeholder="Group name (e.g. Sauce, Topping, Pack)"
           value={group.name}
           onChange={(e) => onChange({ ...group, name: e.target.value })} />
-        <Select value={group.select}
-          onValueChange={(v) => onChange({ ...group, select: v as "single" | "multi" })}>
-          <SelectTrigger className="w-28 h-8"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="single">Pick one</SelectItem>
-            <SelectItem value="multi">Pick any</SelectItem>
-          </SelectContent>
-        </Select>
+        <select
+          aria-label={`${group.name || "Option group"} selection mode`}
+          className="h-8 w-28 rounded-md border bg-background px-2 text-sm text-foreground"
+          value={group.select}
+          onChange={(e) => onChange({ ...group, select: e.target.value as "single" | "multi" })}
+        >
+          <option value="single">Pick one</option>
+          <option value="multi">Pick any</option>
+        </select>
         <label className="flex items-center gap-1 text-xs">
           <Switch checked={!!group.required}
             onCheckedChange={(b) => onChange({ ...group, required: b })} />
