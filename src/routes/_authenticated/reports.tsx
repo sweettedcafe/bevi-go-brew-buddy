@@ -331,7 +331,7 @@ function ReportsPage() {
 
   function exportCurrent() {
     if (tab === "order") {
-      const rows = orders.map((o) => Object.fromEntries(PER_ORDER_COLS.map((c) => [c.key, fmt(o[c.key], c.key, o)])));
+      const rows = filteredOrders.map((o) => Object.fromEntries(PER_ORDER_COLS.map((c) => [c.key, fmt(o[c.key], c.key, o)])));
       downloadCsv(`per-order-${todayIso()}.csv`, toCsv(rows, PER_ORDER_COLS.map((c) => c.label)));
     } else if (tab === "item") {
       const rows = itemRows.map((r) => Object.fromEntries(PER_ITEM_COLS.map((c) => [c.label, (r as any)[c.key]])));
@@ -350,7 +350,7 @@ function ReportsPage() {
       const perOrder = {
         title: "Per order",
         headers: PER_ORDER_COLS.map((c) => c.label),
-        rows: orders.map((o) => PER_ORDER_COLS.map((c) => String(fmt(o[c.key], c.key, o)))),
+        rows: filteredOrders.map((o) => PER_ORDER_COLS.map((c) => String(fmt(o[c.key], c.key, o)))),
       };
       const perItem = {
         title: "Per item",
@@ -483,7 +483,7 @@ function ReportsPage() {
         <TabsContent value="order">
           <DataTable
             cols={PER_ORDER_COLS.filter((c) => colsOrder.includes(c.key))}
-            rows={orders}
+            rows={filteredOrders}
             render={(row, key) => {
               if (key === "status") return <StatusBadge s={row.status} k={row.txn_kind ?? "sale"} />;
               if (key === "txn_kind") return <TxnBadge k={row.txn_kind ?? "sale"} />;
