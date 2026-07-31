@@ -12,7 +12,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Trash2, Plus, Minus, ShoppingCart, Coffee, Search, X, Tag, Pause, PlayCircle, ClipboardList, Star, Printer, ScanLine, UserCircle2, Camera, Sparkles, Bell } from "lucide-react";
+import { Trash2, Plus, Minus, ShoppingCart, Coffee, Search, X, Tag, Pause, PlayCircle, ClipboardList, Star, Printer, ScanLine, UserCircle2, Camera, Sparkles, Bell, Users } from "lucide-react";
 import { toast } from "sonner";
 import { loadPrintSettings } from "@/lib/print-settings";
 import { loadPosSettings } from "@/lib/pos-settings";
@@ -132,6 +132,38 @@ function POSPage() {
   const [redeem, setRedeem] = useState<string>("");
   const [cameraOpen, setCameraOpen] = useState(false);
   const scanRef = useRef<HTMLInputElement>(null);
+
+  // ---- Shared terminal: barista on duty --------------------------------
+  type StaffRow = { user_id: string; email: string; full_name: string; role: string | null };
+  const [staffList, setStaffList] = useState<StaffRow[]>([]);
+  const [baristaOpen, setBaristaOpen] = useState(false);
+  const [activeBarista, setActiveBarista] = useState<{ id: string; name: string } | null>(() => {
+    try {
+      const raw = localStorage.getItem("bevi.pos.barista");
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  });
+
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      const { data } = await db.rpc("pos_staff_list");
+      if (!alive) return;
+      const list = ((data ?? []) as StaffRow[]);
+      setStaffList(list);
+      setActiveBarista((cur) => {
+        if (cur && list.some((s) => s.user_id === cur.id)) return cur;
+        const me = list.find((s) => s.user_id === user?.id);
+        return me ? { id: me.user_id, name: me.full_name } : cur;
+      });
+    })();
+    return () => { alive = false; };
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (activeBarista) localStorage.setItem("bevi.pos.barista", JSON.stringify(activeBarista));
+  }, [activeBarista]);
+
 
   useEffect(() => {
     let alive = true;
@@ -457,14 +489,14 @@ function POSPage() {
       setAppliedPromo(null);
       return;
     }
-    if (appliedPromo && !appliedPromo.applies_to_item_id) return;
+    // A scoped promo is already applied and still valid — never re-apply.
+    if (appliedPromo) return;
     const match = discounts.find((d) => {
       const ids = scopedIds(d);
       return ids.length > 0 && ids.some((i) => itemIds.has(i));
     });
     if (!match) return;
     const matchIds = scopedIds(match);
-    if (appliedPromo && matchIds.includes(appliedPromo.applies_to_item_id ?? "")) return;
     const base = nonBundle
       .filter((l) => matchIds.includes(l.menu_item_id))
       .reduce((s, l) => s + l.unit_price * l.qty, 0);
@@ -479,6 +511,7 @@ function POSPage() {
       applies_to_item_id: matchIds[0],
     });
   }, [cart, discounts, manual, appliedPromo]);
+
 
 
   function addBundle(b: Bundle) {
@@ -624,8 +657,10 @@ function POSPage() {
         customization: (it.customization ?? null) as SelectedCustom | null,
         addon_total: addon,
         notes: it.notes ?? null,
+        is_upsell: !!it.is_upsell,
       } as CartLine;
     }));
+
     setCustomerName(r.customer_name ?? "");
     setOrderType((r.order_type as OrderType) ?? "takeout");
     setResumedOrderId((r.order_id as string) ?? id);
@@ -779,7 +814,18 @@ function POSPage() {
         <header className="px-4 sm:px-6 py-3 sm:py-4 border-b bg-card flex flex-wrap items-center gap-3">
           <Coffee className="h-5 w-5 text-primary" />
           <h1 className="text-lg sm:text-xl font-display">Point of Sale</h1>
-          <Button size="sm" variant="outline" onClick={openTodayList} className="ml-auto">
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => setBaristaOpen(true)}
+            className="ml-auto"
+            title="Switch the barista taking orders"
+          >
+            <Users className="h-3 w-3 mr-1" />
+            {activeBarista?.name ?? "Select barista"}
+          </Button>
+          <Button size="sm" variant="outline" onClick={openTodayList}>
+
             <ClipboardList className="h-3 w-3 mr-1" /> Today
           </Button>
           <Button size="sm" variant="outline" onClick={openHeldList}>
@@ -1266,6 +1312,8 @@ function POSPage() {
             redeem_points: redeemPts,
             notes: null,
             existing_order_id: resumedOrderId,
+            acting_cashier_id: activeBarista?.id ?? null,
+
             items: cart.map((l) => ({
               menu_item_id: l.menu_item_id, variant_id: l.variant_id,
               name: l.name, qty: l.qty,
@@ -1301,7 +1349,34 @@ function POSPage() {
         }}
       />
 
+      {/* Barista switch dialog */}
+      <Dialog open={baristaOpen} onOpenChange={setBaristaOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Barista on duty</DialogTitle></DialogHeader>
+          <p className="text-xs text-muted-foreground -mt-2">
+            One login per terminal. Pick whoever is taking the order — every sale is credited to them.
+          </p>
+          <div className="space-y-1.5 max-h-80 overflow-auto">
+            {staffList.length === 0 && (
+              <div className="text-sm text-muted-foreground py-4 text-center">No staff found.</div>
+            )}
+            {staffList.map((s) => (
+              <button
+                key={s.user_id}
+                type="button"
+                onClick={() => { setActiveBarista({ id: s.user_id, name: s.full_name }); setBaristaOpen(false); toast.success(`${s.full_name} is now taking orders`); }}
+                className={`w-full text-left rounded-md border px-3 py-2 hover:bg-accent/40 ${activeBarista?.id === s.user_id ? "border-primary bg-accent/30" : ""}`}
+              >
+                <div className="font-medium text-sm">{s.full_name}</div>
+                <div className="text-xs text-muted-foreground">{s.email}{s.role ? ` · ${s.role}` : ""}</div>
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Held orders dialog */}
+
       <Dialog open={holdOpen} onOpenChange={setHoldOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Held orders</DialogTitle></DialogHeader>

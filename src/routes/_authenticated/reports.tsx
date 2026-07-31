@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { Card } from "@/components/ui/card";
@@ -16,7 +16,7 @@ import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
 import { toast } from "sonner";
-import { BarChart3, Download, Filter, Settings2, RotateCcw, XCircle, Eye, FileSpreadsheet, Tag } from "lucide-react";
+import { BarChart3, Download, Filter, Settings2, RotateCcw, XCircle, Eye, FileSpreadsheet, Tag, Upload, X } from "lucide-react";
 import { toCsv, downloadCsv } from "@/lib/csv";
 import { useServerFn } from "@tanstack/react-start";
 import { exportToGoogleSheets } from "@/lib/sheets.functions";
@@ -32,7 +32,7 @@ type AnyRow = Record<string, any>;
 type Filters = {
   from: string; to: string;
   customer: string; orderId: string; cashier: string;
-  category: string; item: string; owner: string;
+  category: string; item: string; owner: string; status: string;
 };
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
@@ -64,14 +64,23 @@ const PER_ITEM_COLS = [
   { key: "time_only", label: "Time" },
   { key: "txn_kind", label: "Type" },
   { key: "name", label: "Item" },
+  { key: "variant", label: "Variant" },
+  { key: "extras", label: "Extras" },
+  { key: "flavors", label: "Flavors" },
+  { key: "other", label: "Other" },
+  { key: "instructions", label: "Special instructions" },
   { key: "category", label: "Category" },
   { key: "owner", label: "Owner" },
   { key: "cashier_email", label: "Cashier" },
   { key: "placed_by", label: "Placed by" },
   { key: "upsell", label: "Upsell" },
+  { key: "status", label: "Status" },
   { key: "qty", label: "Qty" },
+  { key: "unit_price", label: "Unit price" },
+  { key: "addon_total", label: "Add-ons" },
   { key: "revenue", label: "Revenue" },
 ];
+
 const DISCOUNT_COLS = [
   { key: "order_no", label: "Order #" },
   { key: "order_id_short", label: "Order ID" },
@@ -86,20 +95,20 @@ const DISCOUNT_COLS = [
 
 function loadCols(tab: string, defaults: string[]): string[] {
   try {
-    const raw = localStorage.getItem(`bevi.reports.cols.${tab}`);
+    const raw = localStorage.getItem(`bevi.reports.cols.v2.${tab}`);
     if (raw) return JSON.parse(raw);
   } catch {}
   return defaults;
 }
 function saveCols(tab: string, cols: string[]) {
-  localStorage.setItem(`bevi.reports.cols.${tab}`, JSON.stringify(cols));
+  localStorage.setItem(`bevi.reports.cols.v2.${tab}`, JSON.stringify(cols));
 }
 
 function ReportsPage() {
   const { hasRole } = useAuth();
   const canRefund = hasRole("admin") || hasRole("developer");
   const [filters, setFilters] = useState<Filters>({
-    from: daysAgoIso(30), to: todayIso(), customer: "", orderId: "", cashier: "", category: "", item: "", owner: "",
+    from: daysAgoIso(30), to: todayIso(), customer: "", orderId: "", cashier: "", category: "", item: "", owner: "", status: "",
   });
   const [tab, setTab] = useState("order");
   const [loading, setLoading] = useState(false);
@@ -153,7 +162,7 @@ function ReportsPage() {
     const ids = list.map((r) => r.id);
     if (ids.length) {
       const [{ data: items }, { data: pays }, { data: pms }] = await Promise.all([
-        db.from("order_items").select("order_id,qty,line_total,menu_item_id,name_snapshot,is_upsell,menu_items(category_id,owner_id,categories(name),owners(name))").in("order_id", ids),
+        db.from("order_items").select("id,order_id,qty,unit_price,addon_total,line_total,menu_item_id,name_snapshot,is_upsell,notes,customization,variant_id,menu_item_variants(name),menu_items(category_id,owner_id,categories(name),owners(name))").in("order_id", ids),
         db.from("order_payments").select("order_id,method,method_code,amount,fee_amount,change_due").in("order_id", ids),
         db.from("payment_methods").select("code,label"),
       ]);
@@ -191,6 +200,17 @@ function ReportsPage() {
       const placedByCustomer = o.source === "self";
       const cashierEmail = placedByCustomer ? "self-order" : (staffEmails[o.cashier_id] ?? "—");
       for (const it of (o._items ?? [])) {
+        const c = (it.customization ?? null) as any;
+        const listOf = (arr: any): string =>
+          Array.isArray(arr) ? arr.map((x: any) => x?.label).filter(Boolean).join(", ") : "";
+        const groups = c?.groups && typeof c.groups === "object"
+          ? Object.entries(c.groups as Record<string, any[]>)
+              .map(([g, v]) => `${g}: ${listOf(v)}`)
+              .filter((s) => !s.endsWith(": "))
+              .join(" | ")
+          : "";
+        const other = [listOf(c?.others), listOf(c?.other), groups, c?.milk?.label ?? ""]
+          .filter(Boolean).join(" | ");
         rows.push({
           id: it.id,
           order_id: o.id,
@@ -198,13 +218,21 @@ function ReportsPage() {
           order_no: o.order_no,
           created_at: o.created_at,
           txn_kind: o.txn_kind ?? "sale",
+          status: o.status,
           name: it.name_snapshot,
+          variant: it.menu_item_variants?.name ?? c?.size?.label ?? "—",
+          extras: listOf(c?.extras) || "—",
+          flavors: listOf(c?.flavors) || "—",
+          other: other || "—",
+          instructions: it.notes ?? "—",
           category: it.menu_items?.categories?.name ?? "—",
           owner: it.menu_items?.owners?.name ?? "—",
           cashier_email: cashierEmail,
           placed_by: placedByCustomer ? "Customer" : "Cashier",
           upsell: it.is_upsell ? "Yes" : "No",
           qty: Number(it.qty || 0),
+          unit_price: Number(it.unit_price || 0),
+          addon_total: Number(it.addon_total || 0),
           revenue: Number(it.line_total || 0),
         });
       }
@@ -224,17 +252,35 @@ function ReportsPage() {
     return [...s].sort();
   }, [itemRowsAll]);
 
+  const statusOf = (o: AnyRow) => {
+    const k = o.txn_kind ?? "sale";
+    if (k === "void") return "voided";
+    if (k === "refund") return "refunded";
+    return o.status;
+  };
+
+  const filteredOrders = useMemo(() => {
+    if (!filters.status) return orders;
+    return orders.filter((o) => statusOf(o) === filters.status);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orders, filters.status]);
+
   const itemRows = useMemo(() => {
     const cat = filters.category.trim().toLowerCase();
     const item = filters.item.trim().toLowerCase();
     const owner = filters.owner.trim().toLowerCase();
+    const st = filters.status;
     return itemRowsAll.filter((r) => {
       if (cat && r.category.toLowerCase() !== cat) return false;
       if (owner && r.owner.toLowerCase() !== owner) return false;
       if (item && !r.name.toLowerCase().includes(item)) return false;
+      if (st) {
+        const eff = r.txn_kind === "void" ? "voided" : r.txn_kind === "refund" ? "refunded" : r.status;
+        if (eff !== st) return false;
+      }
       return true;
     });
-  }, [itemRowsAll, filters.category, filters.item, filters.owner]);
+  }, [itemRowsAll, filters.category, filters.item, filters.owner, filters.status]);
 
   const ownerSubtotals = useMemo(() => {
     const m = new Map<string, { qty: number; revenue: number }>();
@@ -247,19 +293,26 @@ function ReportsPage() {
   }, [itemRows]);
 
   const discountRows = useMemo(
-    () => orders.filter((o) => Number(o.discount_total) > 0),
-    [orders],
+    () => filteredOrders.filter((o) => Number(o.discount_total) > 0),
+    [filteredOrders],
   );
 
   const totals = useMemo(() => {
-    let gross = 0, disc = 0, net = 0, count = 0;
+    let gross = 0, disc = 0, net = 0, count = 0, held = 0, heldCount = 0;
     for (const o of orders) {
-      // Signed totals: sale rows are positive, void/refund mirrors are negative.
+      const st = statusOf(o);
+      if (st === "on_hold" || st === "open") {
+        held += Number(o.total || 0); heldCount++;
+        continue; // unpaid — never part of gross/net
+      }
+      // Signed totals: completed sales are positive, void/refund mirrors negative.
       gross += Number(o.subtotal); disc += Number(o.discount_total); net += Number(o.total);
-      if ((o.txn_kind ?? "sale") === "sale" && o.status !== "voided" && o.status !== "refunded") count++;
+      if ((o.txn_kind ?? "sale") === "sale" && st !== "voided" && st !== "refunded") count++;
     }
-    return { gross, disc, net, count };
+    return { gross, disc, net, count, held, heldCount };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orders]);
+
 
   async function refund(id: string) {
     if (!confirm("Refund this order? A mirror negative transaction will be created and stock restored.")) return;
@@ -278,7 +331,7 @@ function ReportsPage() {
 
   function exportCurrent() {
     if (tab === "order") {
-      const rows = orders.map((o) => Object.fromEntries(PER_ORDER_COLS.map((c) => [c.key, fmt(o[c.key], c.key, o)])));
+      const rows = filteredOrders.map((o) => Object.fromEntries(PER_ORDER_COLS.map((c) => [c.key, fmt(o[c.key], c.key, o)])));
       downloadCsv(`per-order-${todayIso()}.csv`, toCsv(rows, PER_ORDER_COLS.map((c) => c.label)));
     } else if (tab === "item") {
       const rows = itemRows.map((r) => Object.fromEntries(PER_ITEM_COLS.map((c) => [c.label, (r as any)[c.key]])));
@@ -286,6 +339,42 @@ function ReportsPage() {
     } else {
       const rows = discountRows.map((o) => Object.fromEntries(DISCOUNT_COLS.map((c) => [c.label, fmt(o[c.key], c.key, o)])));
       downloadCsv(`discounts-${todayIso()}.csv`, toCsv(rows, DISCOUNT_COLS.map((c) => c.label)));
+    }
+  }
+
+  // ---- CSV import: load an external sheet to review / reconcile in-app ----
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [imported, setImported] = useState<{ headers: string[]; rows: string[][] } | null>(null);
+
+  function parseCsv(text: string): { headers: string[]; rows: string[][] } {
+    const out: string[][] = [];
+    let row: string[] = [], cell = "", q = false;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (q) {
+        if (ch === '"' && text[i + 1] === '"') { cell += '"'; i++; }
+        else if (ch === '"') q = false;
+        else cell += ch;
+      } else if (ch === '"') q = true;
+      else if (ch === ",") { row.push(cell); cell = ""; }
+      else if (ch === "\n") { row.push(cell); out.push(row); row = []; cell = ""; }
+      else if (ch !== "\r") cell += ch;
+    }
+    if (cell.length > 0 || row.length > 0) { row.push(cell); out.push(row); }
+    const clean = out.filter((r) => r.some((c) => c.trim() !== ""));
+    const headers = clean.shift() ?? [];
+    return { headers, rows: clean };
+  }
+
+  async function onImportFile(f: File | null) {
+    if (!f) return;
+    try {
+      const parsed = parseCsv(await f.text());
+      if (parsed.headers.length === 0) { toast.error("That file has no columns"); return; }
+      setImported(parsed);
+      toast.success(`Imported ${parsed.rows.length} rows from ${f.name}`);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Could not read that CSV");
     }
   }
 
@@ -297,7 +386,7 @@ function ReportsPage() {
       const perOrder = {
         title: "Per order",
         headers: PER_ORDER_COLS.map((c) => c.label),
-        rows: orders.map((o) => PER_ORDER_COLS.map((c) => String(fmt(o[c.key], c.key, o)))),
+        rows: filteredOrders.map((o) => PER_ORDER_COLS.map((c) => String(fmt(o[c.key], c.key, o)))),
       };
       const perItem = {
         title: "Per item",
@@ -340,6 +429,16 @@ function ReportsPage() {
         <BarChart3 className="h-5 w-5 text-primary" />
         <h1 className="text-2xl font-display">Reports</h1>
         <div className="ml-auto flex gap-2">
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".csv,text/csv"
+            className="hidden"
+            onChange={(e) => { void onImportFile(e.target.files?.[0] ?? null); e.target.value = ""; }}
+          />
+          <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()}>
+            <Upload className="h-3 w-3 mr-1" /> Import CSV
+          </Button>
           <Button size="sm" variant="outline" onClick={exportCurrent}>
             <Download className="h-3 w-3 mr-1" /> Export CSV
           </Button>
@@ -384,20 +483,63 @@ function ReportsPage() {
               {ownerOptions.map((o) => <option key={o} value={o}>{o}</option>)}
             </select>
           </div>
+          <div>
+            <Label className="text-xs">Status</Label>
+            <select
+              className="h-9 rounded-md border border-input bg-transparent px-2 text-sm"
+              value={filters.status}
+              onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+            >
+              <option value="">All</option>
+              <option value="completed">Completed</option>
+              <option value="on_hold">On hold</option>
+              <option value="voided">Voided</option>
+              <option value="refunded">Refunded</option>
+            </select>
+          </div>
           <div><Label className="text-xs">Item name</Label>
             <Input placeholder="Search item" value={filters.item} onChange={(e) => setFilters({ ...filters, item: e.target.value })} /></div>
           <Button size="sm" onClick={loadAll} disabled={loading}>{loading ? "Loading…" : "Apply"}</Button>
         </div>
       </Card>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <Stat label="Orders" value={totals.count.toString()} />
         <Stat label="Gross" value={`₱${totals.gross.toFixed(2)}`} />
         <Stat label="Discounts" value={`₱${totals.disc.toFixed(2)}`} />
-        <Stat label="Net" value={`₱${totals.net.toFixed(2)}`} />
+        <Stat label="Net (completed)" value={`₱${totals.net.toFixed(2)}`} />
+        <Stat label={`On hold (${totals.heldCount})`} value={`₱${totals.held.toFixed(2)}`} />
       </div>
 
+
+      {imported && (
+        <Card className="p-3 space-y-2">
+          <div className="flex items-center gap-2">
+            <Upload className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium">Imported CSV ({imported.rows.length} rows)</span>
+            <Button size="sm" variant="ghost" className="ml-auto" onClick={() => setImported(null)}>
+              <X className="h-3 w-3 mr-1" /> Close
+            </Button>
+          </div>
+          <div className="overflow-auto max-h-80 rounded-md border">
+            <table className="w-full text-xs">
+              <thead className="bg-muted/50 sticky top-0">
+                <tr>{imported.headers.map((h, i) => <th key={i} className="text-left px-2 py-1 font-medium">{h}</th>)}</tr>
+              </thead>
+              <tbody>
+                {imported.rows.slice(0, 500).map((r, i) => (
+                  <tr key={i} className="border-t">
+                    {imported.headers.map((_, j) => <td key={j} className="px-2 py-1 whitespace-nowrap">{r[j] ?? ""}</td>)}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+
       <Tabs value={tab} onValueChange={setTab}>
+
         <div className="flex items-center gap-2">
           <TabsList>
             <TabsTrigger value="order">Per order</TabsTrigger>
@@ -414,7 +556,7 @@ function ReportsPage() {
         <TabsContent value="order">
           <DataTable
             cols={PER_ORDER_COLS.filter((c) => colsOrder.includes(c.key))}
-            rows={orders}
+            rows={filteredOrders}
             render={(row, key) => {
               if (key === "status") return <StatusBadge s={row.status} k={row.txn_kind ?? "sale"} />;
               if (key === "txn_kind") return <TxnBadge k={row.txn_kind ?? "sale"} />;
