@@ -9,57 +9,51 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as WelcomeRouteImport } from './routes/welcome'
-import { Route as RegisterRouteImport } from './routes/register'
-import { Route as LoginRouteImport } from './routes/login'
-import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
-import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as OTokenRouteImport } from './routes/o.$token'
-import { Route as AuthenticatedTimeclockReportRouteImport } from './routes/_authenticated/timeclock-report'
-import { Route as AuthenticatedTimeclockRouteImport } from './routes/_authenticated/timeclock'
-import { Route as AuthenticatedStaffRouteImport } from './routes/_authenticated/staff'
-import { Route as AuthenticatedSalesSummaryRouteImport } from './routes/_authenticated/sales-summary'
-import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
-import { Route as AuthenticatedPrintSettingsRouteImport } from './routes/_authenticated/print-settings'
-import { Route as AuthenticatedPosRouteImport } from './routes/_authenticated/pos'
-import { Route as AuthenticatedPayslipRouteImport } from './routes/_authenticated/payslip'
-import { Route as AuthenticatedPaymentsRouteImport } from './routes/_authenticated/payments'
-import { Route as AuthenticatedMenuRouteImport } from './routes/_authenticated/menu'
-import { Route as AuthenticatedManualRouteImport } from './routes/_authenticated/manual'
-import { Route as AuthenticatedInventoryRouteImport } from './routes/_authenticated/inventory'
-import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticated/history'
-import { Route as AuthenticatedExpensesReportRouteImport } from './routes/_authenticated/expenses-report'
-import { Route as AuthenticatedEosAdminRouteImport } from './routes/_authenticated/eos-admin'
-import { Route as AuthenticatedEndOfShiftRouteImport } from './routes/_authenticated/end-of-shift'
-import { Route as AuthenticatedDiscountsRouteImport } from './routes/_authenticated/discounts'
-import { Route as AuthenticatedDeveloperRouteImport } from './routes/_authenticated/developer'
-import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
-import { Route as AuthenticatedCustomersRouteImport } from './routes/_authenticated/customers'
-import { Route as AuthenticatedBundlesRouteImport } from './routes/_authenticated/bundles'
-import { Route as AuthenticatedAuditLogRouteImport } from './routes/_authenticated/audit-log'
-import { Route as AuthenticatedAnalyticsRouteImport } from './routes/_authenticated/analytics'
+import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
+import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as RegisterRouteImport } from './routes/register'
+import { Route as WelcomeRouteImport } from './routes/welcome'
 import { Route as AuthenticatedAccessControlRouteImport } from './routes/_authenticated/access-control'
-import { Route as ApiPublicSendWelcomeEmailRouteImport } from './routes/api/public/send-welcome-email'
-import { Route as ApiPublicSendPasswordOtpRouteImport } from './routes/api/public/send-password-otp'
-import { Route as ApiPublicResetPasswordByEmailRouteImport } from './routes/api/public/reset-password-by-email'
-import { Route as ApiPublicMenuImagesRouteImport } from './routes/api/public/menu-images'
-import { Route as ApiPublicDevSetPasswordRouteImport } from './routes/api/public/dev-set-password'
+import { Route as AuthenticatedAnalyticsRouteImport } from './routes/_authenticated/analytics'
+import { Route as AuthenticatedAuditLogRouteImport } from './routes/_authenticated/audit-log'
+import { Route as AuthenticatedBundlesRouteImport } from './routes/_authenticated/bundles'
+import { Route as AuthenticatedCustomersRouteImport } from './routes/_authenticated/customers'
+import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedDeveloperRouteImport } from './routes/_authenticated/developer'
+import { Route as AuthenticatedDiscountsRouteImport } from './routes/_authenticated/discounts'
+import { Route as AuthenticatedEndOfShiftRouteImport } from './routes/_authenticated/end-of-shift'
+import { Route as AuthenticatedEosAdminRouteImport } from './routes/_authenticated/eos-admin'
+import { Route as AuthenticatedExpensesReportRouteImport } from './routes/_authenticated/expenses-report'
+import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticated/history'
+import { Route as AuthenticatedInventoryRouteImport } from './routes/_authenticated/inventory'
+import { Route as AuthenticatedManualRouteImport } from './routes/_authenticated/manual'
+import { Route as AuthenticatedMenuRouteImport } from './routes/_authenticated/menu'
+import { Route as AuthenticatedPaymentsRouteImport } from './routes/_authenticated/payments'
+import { Route as AuthenticatedPayslipRouteImport } from './routes/_authenticated/payslip'
+import { Route as AuthenticatedPosRouteImport } from './routes/_authenticated/pos'
+import { Route as AuthenticatedPrintSettingsRouteImport } from './routes/_authenticated/print-settings'
+import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
+import { Route as AuthenticatedSalesSummaryRouteImport } from './routes/_authenticated/sales-summary'
+import { Route as AuthenticatedStaffRouteImport } from './routes/_authenticated/staff'
+import { Route as AuthenticatedTimeclockRouteImport } from './routes/_authenticated/timeclock'
+import { Route as AuthenticatedTimeclockReportRouteImport } from './routes/_authenticated/timeclock-report'
+import { Route as OTokenRouteImport } from './routes/o.$token'
 import { Route as ApiPublicDevListUsersRouteImport } from './routes/api/public/dev-list-users'
+import { Route as ApiPublicDevSetPasswordRouteImport } from './routes/api/public/dev-set-password'
+import { Route as ApiPublicMenuImagesRouteImport } from './routes/api/public/menu-images'
+import { Route as ApiPublicResetPasswordByEmailRouteImport } from './routes/api/public/reset-password-by-email'
+import { Route as ApiPublicSendPasswordOtpRouteImport } from './routes/api/public/send-password-otp'
+import { Route as ApiPublicSendWelcomeEmailRouteImport } from './routes/api/public/send-welcome-email'
 
-const WelcomeRoute = WelcomeRouteImport.update({
-  id: '/welcome',
-  path: '/welcome',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const RegisterRoute = RegisterRouteImport.update({
-  id: '/register',
-  path: '/register',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
+const AuthenticatedRoute = AuthenticatedRouteImport.update({
+  id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
@@ -67,86 +61,70 @@ const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
   path: '/forgot-password',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedRoute = AuthenticatedRouteImport.update({
-  id: '/_authenticated',
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const RegisterRoute = RegisterRouteImport.update({
+  id: '/register',
+  path: '/register',
   getParentRoute: () => rootRouteImport,
 } as any)
-const OTokenRoute = OTokenRouteImport.update({
-  id: '/o/$token',
-  path: '/o/$token',
+const WelcomeRoute = WelcomeRouteImport.update({
+  id: '/welcome',
+  path: '/welcome',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedTimeclockReportRoute =
-  AuthenticatedTimeclockReportRouteImport.update({
-    id: '/timeclock-report',
-    path: '/timeclock-report',
+const AuthenticatedAccessControlRoute =
+  AuthenticatedAccessControlRouteImport.update({
+    id: '/access-control',
+    path: '/access-control',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedTimeclockRoute = AuthenticatedTimeclockRouteImport.update({
-  id: '/timeclock',
-  path: '/timeclock',
+const AuthenticatedAnalyticsRoute = AuthenticatedAnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedStaffRoute = AuthenticatedStaffRouteImport.update({
-  id: '/staff',
-  path: '/staff',
+const AuthenticatedAuditLogRoute = AuthenticatedAuditLogRouteImport.update({
+  id: '/audit-log',
+  path: '/audit-log',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedSalesSummaryRoute =
-  AuthenticatedSalesSummaryRouteImport.update({
-    id: '/sales-summary',
-    path: '/sales-summary',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedReportsRoute = AuthenticatedReportsRouteImport.update({
-  id: '/reports',
-  path: '/reports',
+const AuthenticatedBundlesRoute = AuthenticatedBundlesRouteImport.update({
+  id: '/bundles',
+  path: '/bundles',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedPrintSettingsRoute =
-  AuthenticatedPrintSettingsRouteImport.update({
-    id: '/print-settings',
-    path: '/print-settings',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedPosRoute = AuthenticatedPosRouteImport.update({
-  id: '/pos',
-  path: '/pos',
+const AuthenticatedCustomersRoute = AuthenticatedCustomersRouteImport.update({
+  id: '/customers',
+  path: '/customers',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedPayslipRoute = AuthenticatedPayslipRouteImport.update({
-  id: '/payslip',
-  path: '/payslip',
+const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedPaymentsRoute = AuthenticatedPaymentsRouteImport.update({
-  id: '/payments',
-  path: '/payments',
+const AuthenticatedDeveloperRoute = AuthenticatedDeveloperRouteImport.update({
+  id: '/developer',
+  path: '/developer',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedMenuRoute = AuthenticatedMenuRouteImport.update({
-  id: '/menu',
-  path: '/menu',
+const AuthenticatedDiscountsRoute = AuthenticatedDiscountsRouteImport.update({
+  id: '/discounts',
+  path: '/discounts',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedManualRoute = AuthenticatedManualRouteImport.update({
-  id: '/manual',
-  path: '/manual',
+const AuthenticatedEndOfShiftRoute = AuthenticatedEndOfShiftRouteImport.update({
+  id: '/end-of-shift',
+  path: '/end-of-shift',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedInventoryRoute = AuthenticatedInventoryRouteImport.update({
-  id: '/inventory',
-  path: '/inventory',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedHistoryRoute = AuthenticatedHistoryRouteImport.update({
-  id: '/history',
-  path: '/history',
+const AuthenticatedEosAdminRoute = AuthenticatedEosAdminRouteImport.update({
+  id: '/eos-admin',
+  path: '/eos-admin',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedExpensesReportRoute =
@@ -155,61 +133,98 @@ const AuthenticatedExpensesReportRoute =
     path: '/expenses-report',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedEosAdminRoute = AuthenticatedEosAdminRouteImport.update({
-  id: '/eos-admin',
-  path: '/eos-admin',
+const AuthenticatedHistoryRoute = AuthenticatedHistoryRouteImport.update({
+  id: '/history',
+  path: '/history',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedEndOfShiftRoute = AuthenticatedEndOfShiftRouteImport.update({
-  id: '/end-of-shift',
-  path: '/end-of-shift',
+const AuthenticatedInventoryRoute = AuthenticatedInventoryRouteImport.update({
+  id: '/inventory',
+  path: '/inventory',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedDiscountsRoute = AuthenticatedDiscountsRouteImport.update({
-  id: '/discounts',
-  path: '/discounts',
+const AuthenticatedManualRoute = AuthenticatedManualRouteImport.update({
+  id: '/manual',
+  path: '/manual',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedDeveloperRoute = AuthenticatedDeveloperRouteImport.update({
-  id: '/developer',
-  path: '/developer',
+const AuthenticatedMenuRoute = AuthenticatedMenuRouteImport.update({
+  id: '/menu',
+  path: '/menu',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
+const AuthenticatedPaymentsRoute = AuthenticatedPaymentsRouteImport.update({
+  id: '/payments',
+  path: '/payments',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedCustomersRoute = AuthenticatedCustomersRouteImport.update({
-  id: '/customers',
-  path: '/customers',
+const AuthenticatedPayslipRoute = AuthenticatedPayslipRouteImport.update({
+  id: '/payslip',
+  path: '/payslip',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedBundlesRoute = AuthenticatedBundlesRouteImport.update({
-  id: '/bundles',
-  path: '/bundles',
+const AuthenticatedPosRoute = AuthenticatedPosRouteImport.update({
+  id: '/pos',
+  path: '/pos',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedAuditLogRoute = AuthenticatedAuditLogRouteImport.update({
-  id: '/audit-log',
-  path: '/audit-log',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedAnalyticsRoute = AuthenticatedAnalyticsRouteImport.update({
-  id: '/analytics',
-  path: '/analytics',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedAccessControlRoute =
-  AuthenticatedAccessControlRouteImport.update({
-    id: '/access-control',
-    path: '/access-control',
+const AuthenticatedPrintSettingsRoute =
+  AuthenticatedPrintSettingsRouteImport.update({
+    id: '/print-settings',
+    path: '/print-settings',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const ApiPublicSendWelcomeEmailRoute =
-  ApiPublicSendWelcomeEmailRouteImport.update({
-    id: '/api/public/send-welcome-email',
-    path: '/api/public/send-welcome-email',
+const AuthenticatedReportsRoute = AuthenticatedReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedSalesSummaryRoute =
+  AuthenticatedSalesSummaryRouteImport.update({
+    id: '/sales-summary',
+    path: '/sales-summary',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedStaffRoute = AuthenticatedStaffRouteImport.update({
+  id: '/staff',
+  path: '/staff',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedTimeclockRoute = AuthenticatedTimeclockRouteImport.update({
+  id: '/timeclock',
+  path: '/timeclock',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedTimeclockReportRoute =
+  AuthenticatedTimeclockReportRouteImport.update({
+    id: '/timeclock-report',
+    path: '/timeclock-report',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const OTokenRoute = OTokenRouteImport.update({
+  id: '/o/$token',
+  path: '/o/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicDevListUsersRoute = ApiPublicDevListUsersRouteImport.update({
+  id: '/api/public/dev-list-users',
+  path: '/api/public/dev-list-users',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicDevSetPasswordRoute = ApiPublicDevSetPasswordRouteImport.update({
+  id: '/api/public/dev-set-password',
+  path: '/api/public/dev-set-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicMenuImagesRoute = ApiPublicMenuImagesRouteImport.update({
+  id: '/api/public/menu-images',
+  path: '/api/public/menu-images',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicResetPasswordByEmailRoute =
+  ApiPublicResetPasswordByEmailRouteImport.update({
+    id: '/api/public/reset-password-by-email',
+    path: '/api/public/reset-password-by-email',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiPublicSendPasswordOtpRoute =
@@ -218,27 +233,12 @@ const ApiPublicSendPasswordOtpRoute =
     path: '/api/public/send-password-otp',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicResetPasswordByEmailRoute =
-  ApiPublicResetPasswordByEmailRouteImport.update({
-    id: '/api/public/reset-password-by-email',
-    path: '/api/public/reset-password-by-email',
+const ApiPublicSendWelcomeEmailRoute =
+  ApiPublicSendWelcomeEmailRouteImport.update({
+    id: '/api/public/send-welcome-email',
+    path: '/api/public/send-welcome-email',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicMenuImagesRoute = ApiPublicMenuImagesRouteImport.update({
-  id: '/api/public/menu-images',
-  path: '/api/public/menu-images',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiPublicDevSetPasswordRoute = ApiPublicDevSetPasswordRouteImport.update({
-  id: '/api/public/dev-set-password',
-  path: '/api/public/dev-set-password',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiPublicDevListUsersRoute = ApiPublicDevListUsersRouteImport.update({
-  id: '/api/public/dev-list-users',
-  path: '/api/public/dev-list-users',
-  getParentRoute: () => rootRouteImport,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -492,32 +492,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/welcome': {
-      id: '/welcome'
-      path: '/welcome'
-      fullPath: '/welcome'
-      preLoaderRoute: typeof WelcomeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/register': {
-      id: '/register'
-      path: '/register'
-      fullPath: '/register'
-      preLoaderRoute: typeof RegisterRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/forgot-password': {
-      id: '/forgot-password'
-      path: '/forgot-password'
-      fullPath: '/forgot-password'
-      preLoaderRoute: typeof ForgotPasswordRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated': {
@@ -527,172 +506,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/forgot-password': {
+      id: '/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof ForgotPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/o/$token': {
-      id: '/o/$token'
-      path: '/o/$token'
-      fullPath: '/o/$token'
-      preLoaderRoute: typeof OTokenRouteImport
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/timeclock-report': {
-      id: '/_authenticated/timeclock-report'
-      path: '/timeclock-report'
-      fullPath: '/timeclock-report'
-      preLoaderRoute: typeof AuthenticatedTimeclockReportRouteImport
-      parentRoute: typeof AuthenticatedRoute
+    '/register': {
+      id: '/register'
+      path: '/register'
+      fullPath: '/register'
+      preLoaderRoute: typeof RegisterRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/timeclock': {
-      id: '/_authenticated/timeclock'
-      path: '/timeclock'
-      fullPath: '/timeclock'
-      preLoaderRoute: typeof AuthenticatedTimeclockRouteImport
-      parentRoute: typeof AuthenticatedRoute
+    '/welcome': {
+      id: '/welcome'
+      path: '/welcome'
+      fullPath: '/welcome'
+      preLoaderRoute: typeof WelcomeRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/staff': {
-      id: '/_authenticated/staff'
-      path: '/staff'
-      fullPath: '/staff'
-      preLoaderRoute: typeof AuthenticatedStaffRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/sales-summary': {
-      id: '/_authenticated/sales-summary'
-      path: '/sales-summary'
-      fullPath: '/sales-summary'
-      preLoaderRoute: typeof AuthenticatedSalesSummaryRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/reports': {
-      id: '/_authenticated/reports'
-      path: '/reports'
-      fullPath: '/reports'
-      preLoaderRoute: typeof AuthenticatedReportsRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/print-settings': {
-      id: '/_authenticated/print-settings'
-      path: '/print-settings'
-      fullPath: '/print-settings'
-      preLoaderRoute: typeof AuthenticatedPrintSettingsRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/pos': {
-      id: '/_authenticated/pos'
-      path: '/pos'
-      fullPath: '/pos'
-      preLoaderRoute: typeof AuthenticatedPosRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/payslip': {
-      id: '/_authenticated/payslip'
-      path: '/payslip'
-      fullPath: '/payslip'
-      preLoaderRoute: typeof AuthenticatedPayslipRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/payments': {
-      id: '/_authenticated/payments'
-      path: '/payments'
-      fullPath: '/payments'
-      preLoaderRoute: typeof AuthenticatedPaymentsRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/menu': {
-      id: '/_authenticated/menu'
-      path: '/menu'
-      fullPath: '/menu'
-      preLoaderRoute: typeof AuthenticatedMenuRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/manual': {
-      id: '/_authenticated/manual'
-      path: '/manual'
-      fullPath: '/manual'
-      preLoaderRoute: typeof AuthenticatedManualRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/inventory': {
-      id: '/_authenticated/inventory'
-      path: '/inventory'
-      fullPath: '/inventory'
-      preLoaderRoute: typeof AuthenticatedInventoryRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/history': {
-      id: '/_authenticated/history'
-      path: '/history'
-      fullPath: '/history'
-      preLoaderRoute: typeof AuthenticatedHistoryRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/expenses-report': {
-      id: '/_authenticated/expenses-report'
-      path: '/expenses-report'
-      fullPath: '/expenses-report'
-      preLoaderRoute: typeof AuthenticatedExpensesReportRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/eos-admin': {
-      id: '/_authenticated/eos-admin'
-      path: '/eos-admin'
-      fullPath: '/eos-admin'
-      preLoaderRoute: typeof AuthenticatedEosAdminRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/end-of-shift': {
-      id: '/_authenticated/end-of-shift'
-      path: '/end-of-shift'
-      fullPath: '/end-of-shift'
-      preLoaderRoute: typeof AuthenticatedEndOfShiftRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/discounts': {
-      id: '/_authenticated/discounts'
-      path: '/discounts'
-      fullPath: '/discounts'
-      preLoaderRoute: typeof AuthenticatedDiscountsRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/developer': {
-      id: '/_authenticated/developer'
-      path: '/developer'
-      fullPath: '/developer'
-      preLoaderRoute: typeof AuthenticatedDeveloperRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/dashboard': {
-      id: '/_authenticated/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/customers': {
-      id: '/_authenticated/customers'
-      path: '/customers'
-      fullPath: '/customers'
-      preLoaderRoute: typeof AuthenticatedCustomersRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/bundles': {
-      id: '/_authenticated/bundles'
-      path: '/bundles'
-      fullPath: '/bundles'
-      preLoaderRoute: typeof AuthenticatedBundlesRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/audit-log': {
-      id: '/_authenticated/audit-log'
-      path: '/audit-log'
-      fullPath: '/audit-log'
-      preLoaderRoute: typeof AuthenticatedAuditLogRouteImport
+    '/_authenticated/access-control': {
+      id: '/_authenticated/access-control'
+      path: '/access-control'
+      fullPath: '/access-control'
+      preLoaderRoute: typeof AuthenticatedAccessControlRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/analytics': {
@@ -702,39 +548,172 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAnalyticsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/access-control': {
-      id: '/_authenticated/access-control'
-      path: '/access-control'
-      fullPath: '/access-control'
-      preLoaderRoute: typeof AuthenticatedAccessControlRouteImport
+    '/_authenticated/audit-log': {
+      id: '/_authenticated/audit-log'
+      path: '/audit-log'
+      fullPath: '/audit-log'
+      preLoaderRoute: typeof AuthenticatedAuditLogRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/api/public/send-welcome-email': {
-      id: '/api/public/send-welcome-email'
-      path: '/api/public/send-welcome-email'
-      fullPath: '/api/public/send-welcome-email'
-      preLoaderRoute: typeof ApiPublicSendWelcomeEmailRouteImport
+    '/_authenticated/bundles': {
+      id: '/_authenticated/bundles'
+      path: '/bundles'
+      fullPath: '/bundles'
+      preLoaderRoute: typeof AuthenticatedBundlesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/customers': {
+      id: '/_authenticated/customers'
+      path: '/customers'
+      fullPath: '/customers'
+      preLoaderRoute: typeof AuthenticatedCustomersRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/dashboard': {
+      id: '/_authenticated/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/developer': {
+      id: '/_authenticated/developer'
+      path: '/developer'
+      fullPath: '/developer'
+      preLoaderRoute: typeof AuthenticatedDeveloperRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/discounts': {
+      id: '/_authenticated/discounts'
+      path: '/discounts'
+      fullPath: '/discounts'
+      preLoaderRoute: typeof AuthenticatedDiscountsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/end-of-shift': {
+      id: '/_authenticated/end-of-shift'
+      path: '/end-of-shift'
+      fullPath: '/end-of-shift'
+      preLoaderRoute: typeof AuthenticatedEndOfShiftRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/eos-admin': {
+      id: '/_authenticated/eos-admin'
+      path: '/eos-admin'
+      fullPath: '/eos-admin'
+      preLoaderRoute: typeof AuthenticatedEosAdminRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/expenses-report': {
+      id: '/_authenticated/expenses-report'
+      path: '/expenses-report'
+      fullPath: '/expenses-report'
+      preLoaderRoute: typeof AuthenticatedExpensesReportRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/history': {
+      id: '/_authenticated/history'
+      path: '/history'
+      fullPath: '/history'
+      preLoaderRoute: typeof AuthenticatedHistoryRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/inventory': {
+      id: '/_authenticated/inventory'
+      path: '/inventory'
+      fullPath: '/inventory'
+      preLoaderRoute: typeof AuthenticatedInventoryRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/manual': {
+      id: '/_authenticated/manual'
+      path: '/manual'
+      fullPath: '/manual'
+      preLoaderRoute: typeof AuthenticatedManualRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/menu': {
+      id: '/_authenticated/menu'
+      path: '/menu'
+      fullPath: '/menu'
+      preLoaderRoute: typeof AuthenticatedMenuRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/payments': {
+      id: '/_authenticated/payments'
+      path: '/payments'
+      fullPath: '/payments'
+      preLoaderRoute: typeof AuthenticatedPaymentsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/payslip': {
+      id: '/_authenticated/payslip'
+      path: '/payslip'
+      fullPath: '/payslip'
+      preLoaderRoute: typeof AuthenticatedPayslipRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/pos': {
+      id: '/_authenticated/pos'
+      path: '/pos'
+      fullPath: '/pos'
+      preLoaderRoute: typeof AuthenticatedPosRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/print-settings': {
+      id: '/_authenticated/print-settings'
+      path: '/print-settings'
+      fullPath: '/print-settings'
+      preLoaderRoute: typeof AuthenticatedPrintSettingsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/reports': {
+      id: '/_authenticated/reports'
+      path: '/reports'
+      fullPath: '/reports'
+      preLoaderRoute: typeof AuthenticatedReportsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/sales-summary': {
+      id: '/_authenticated/sales-summary'
+      path: '/sales-summary'
+      fullPath: '/sales-summary'
+      preLoaderRoute: typeof AuthenticatedSalesSummaryRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/staff': {
+      id: '/_authenticated/staff'
+      path: '/staff'
+      fullPath: '/staff'
+      preLoaderRoute: typeof AuthenticatedStaffRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/timeclock': {
+      id: '/_authenticated/timeclock'
+      path: '/timeclock'
+      fullPath: '/timeclock'
+      preLoaderRoute: typeof AuthenticatedTimeclockRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/timeclock-report': {
+      id: '/_authenticated/timeclock-report'
+      path: '/timeclock-report'
+      fullPath: '/timeclock-report'
+      preLoaderRoute: typeof AuthenticatedTimeclockReportRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/o/$token': {
+      id: '/o/$token'
+      path: '/o/$token'
+      fullPath: '/o/$token'
+      preLoaderRoute: typeof OTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/send-password-otp': {
-      id: '/api/public/send-password-otp'
-      path: '/api/public/send-password-otp'
-      fullPath: '/api/public/send-password-otp'
-      preLoaderRoute: typeof ApiPublicSendPasswordOtpRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/reset-password-by-email': {
-      id: '/api/public/reset-password-by-email'
-      path: '/api/public/reset-password-by-email'
-      fullPath: '/api/public/reset-password-by-email'
-      preLoaderRoute: typeof ApiPublicResetPasswordByEmailRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/menu-images': {
-      id: '/api/public/menu-images'
-      path: '/api/public/menu-images'
-      fullPath: '/api/public/menu-images'
-      preLoaderRoute: typeof ApiPublicMenuImagesRouteImport
+    '/api/public/dev-list-users': {
+      id: '/api/public/dev-list-users'
+      path: '/api/public/dev-list-users'
+      fullPath: '/api/public/dev-list-users'
+      preLoaderRoute: typeof ApiPublicDevListUsersRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/dev-set-password': {
@@ -744,11 +723,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicDevSetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/dev-list-users': {
-      id: '/api/public/dev-list-users'
-      path: '/api/public/dev-list-users'
-      fullPath: '/api/public/dev-list-users'
-      preLoaderRoute: typeof ApiPublicDevListUsersRouteImport
+    '/api/public/menu-images': {
+      id: '/api/public/menu-images'
+      path: '/api/public/menu-images'
+      fullPath: '/api/public/menu-images'
+      preLoaderRoute: typeof ApiPublicMenuImagesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/reset-password-by-email': {
+      id: '/api/public/reset-password-by-email'
+      path: '/api/public/reset-password-by-email'
+      fullPath: '/api/public/reset-password-by-email'
+      preLoaderRoute: typeof ApiPublicResetPasswordByEmailRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/send-password-otp': {
+      id: '/api/public/send-password-otp'
+      path: '/api/public/send-password-otp'
+      fullPath: '/api/public/send-password-otp'
+      preLoaderRoute: typeof ApiPublicSendPasswordOtpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/send-welcome-email': {
+      id: '/api/public/send-welcome-email'
+      path: '/api/public/send-welcome-email'
+      fullPath: '/api/public/send-welcome-email'
+      preLoaderRoute: typeof ApiPublicSendWelcomeEmailRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
