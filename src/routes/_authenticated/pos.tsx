@@ -71,7 +71,7 @@ type Bundle = {
   starts_at: string | null; ends_at: string | null; is_active: boolean;
 };
 type BundleItem = {
-  bundle_id: string; menu_item_id: string; qty: number;
+  bundle_id: string; menu_item_id: string; variant_id?: string | null; qty: number;
   discount_type: "percent" | "fixed"; discount_value: number;
 };
 type DiscountRow = {
