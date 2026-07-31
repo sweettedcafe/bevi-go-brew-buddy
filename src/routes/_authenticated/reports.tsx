@@ -342,6 +342,42 @@ function ReportsPage() {
     }
   }
 
+  // ---- CSV import: load an external sheet to review / reconcile in-app ----
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [imported, setImported] = useState<{ headers: string[]; rows: string[][] } | null>(null);
+
+  function parseCsv(text: string): { headers: string[]; rows: string[][] } {
+    const out: string[][] = [];
+    let row: string[] = [], cell = "", q = false;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (q) {
+        if (ch === '"' && text[i + 1] === '"') { cell += '"'; i++; }
+        else if (ch === '"') q = false;
+        else cell += ch;
+      } else if (ch === '"') q = true;
+      else if (ch === ",") { row.push(cell); cell = ""; }
+      else if (ch === "\n") { row.push(cell); out.push(row); row = []; cell = ""; }
+      else if (ch !== "\r") cell += ch;
+    }
+    if (cell.length > 0 || row.length > 0) { row.push(cell); out.push(row); }
+    const clean = out.filter((r) => r.some((c) => c.trim() !== ""));
+    const headers = clean.shift() ?? [];
+    return { headers, rows: clean };
+  }
+
+  async function onImportFile(f: File | null) {
+    if (!f) return;
+    try {
+      const parsed = parseCsv(await f.text());
+      if (parsed.headers.length === 0) { toast.error("That file has no columns"); return; }
+      setImported(parsed);
+      toast.success(`Imported ${parsed.rows.length} rows from ${f.name}`);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Could not read that CSV");
+    }
+  }
+
   const exportSheets = useServerFn(exportToGoogleSheets);
   const [sheetsBusy, setSheetsBusy] = useState(false);
   async function openSheetsImport() {
@@ -393,6 +429,16 @@ function ReportsPage() {
         <BarChart3 className="h-5 w-5 text-primary" />
         <h1 className="text-2xl font-display">Reports</h1>
         <div className="ml-auto flex gap-2">
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".csv,text/csv"
+            className="hidden"
+            onChange={(e) => { void onImportFile(e.target.files?.[0] ?? null); e.target.value = ""; }}
+          />
+          <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()}>
+            <Upload className="h-3 w-3 mr-1" /> Import CSV
+          </Button>
           <Button size="sm" variant="outline" onClick={exportCurrent}>
             <Download className="h-3 w-3 mr-1" /> Export CSV
           </Button>
