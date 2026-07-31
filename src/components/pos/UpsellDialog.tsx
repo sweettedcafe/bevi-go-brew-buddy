@@ -1,7 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
-} from "@/components/ui/dialog";
+import { StableModal, StableModalFooter } from "@/components/ui/stable-modal";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Settings2 } from "lucide-react";
 
@@ -43,16 +41,13 @@ export function UpsellDialog({
   const selected = suggestions.filter((s) => picked[s.id]);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-primary" /> Would you like to add anything?
-          </DialogTitle>
-          <DialogDescription>
-            Great pairings with <span className="font-medium">{triggerName}</span>. Tap to add — or skip.
-          </DialogDescription>
-        </DialogHeader>
+    <StableModal
+      open={open}
+      onOpenChange={onOpenChange}
+      className="max-w-md"
+      title={<span className="flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> Would you like to add anything?</span>}
+      description={<>Great pairings with <span className="font-medium">{triggerName}</span>. Tap to add — or skip.</>}
+    >
 
         <div className="space-y-2 max-h-[50vh] overflow-y-auto">
           {suggestions.length === 0 ? (
@@ -96,13 +91,12 @@ export function UpsellDialog({
           )}
         </div>
 
-        <DialogFooter className="gap-2">
+        <StableModalFooter>
           <Button variant="outline" onClick={onSkip}>Skip</Button>
           <Button onClick={() => onAdd(selected)} disabled={selected.length === 0}>
             Add {selected.length > 0 ? `(${selected.length})` : ""}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </StableModalFooter>
+    </StableModal>
   );
 }
