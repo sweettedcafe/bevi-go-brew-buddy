@@ -89,3 +89,21 @@ grant execute on function public.inventory_add_packs(uuid, numeric) to authentic
 grant execute on function public.inventory_remove_packs(uuid, numeric, text) to authenticated;
 
 notify pgrst, 'reload schema';
+
+-- ---------- 3. ACCOUNTANT READ ACCESS --------------------------------
+-- Uses role::text so it works even in the same transaction that added the
+-- enum value above.
+create or replace function public.is_accountant(_user_id uuid)
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1 from public.user_roles
+    where user_id = _user_id and role::text = 'accountant'
+  );
+$$;
+grant execute on function public.is_accountant(uuid) to authenticated;
+
+drop policy if exists "exp accountant read" on public.shift_expenses;
+create policy "exp accountant read" on public.shift_expenses
+  for select to authenticated using (public.is_accountant(auth.uid()));
+
+notify pgrst, 'reload schema';
