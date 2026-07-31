@@ -657,8 +657,10 @@ function POSPage() {
         customization: (it.customization ?? null) as SelectedCustom | null,
         addon_total: addon,
         notes: it.notes ?? null,
+        is_upsell: !!it.is_upsell,
       } as CartLine;
     }));
+
     setCustomerName(r.customer_name ?? "");
     setOrderType((r.order_type as OrderType) ?? "takeout");
     setResumedOrderId((r.order_id as string) ?? id);
