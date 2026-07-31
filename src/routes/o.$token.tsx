@@ -616,13 +616,9 @@ function SelfOrderPage() {
           onCustomize={(choice) => {
             const it = items.find((x) => x.id === choice.id);
             if (!it) return;
-            // Close the current modal first so its focus scope is completely
-            // removed before the next Radix dialog mounts under React 19.
             setUpsell(null);
-            window.setTimeout(() => {
-              setCustomizingIsUpsell(true);
-              setCustomizing(it);
-            }, 0);
+            setCustomizingIsUpsell(true);
+            setCustomizing(it);
           }}
           onSkip={() => {
             void (supabase as any).rpc("log_upsell_event", {
