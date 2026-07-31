@@ -34,6 +34,7 @@ function SalesSummaryPage() {
   const [pms, setPms] = useState<any[]>([]);
   const [expenses, setExpenses] = useState<any[]>([]);
   const [prevTotal, setPrevTotal] = useState(0);
+  const [ownerFilter, setOwnerFilter] = useState("");
 
   const range = useMemo(() => {
     if (mode === "day") return { from: day, to: day };
@@ -55,7 +56,7 @@ function SalesSummaryPage() {
     const ids = list.map((r) => r.id);
     if (ids.length) {
       const [{ data: its }, { data: ps }] = await Promise.all([
-        db.from("order_items").select("order_id,qty,line_total,name_snapshot,menu_items(category_id,categories(name))").in("order_id", ids),
+        db.from("order_items").select("order_id,qty,line_total,name_snapshot,menu_items(category_id,owner_id,categories(name),owners(name))").in("order_id", ids),
         db.from("order_payments").select("order_id,method_code,amount").in("order_id", ids),
       ]);
       setItems((its ?? []) as any[]);
@@ -92,13 +93,34 @@ function SalesSummaryPage() {
 
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, []);
 
-  const live = useMemo(() => orders.filter((o) => o.status !== "voided" && o.status !== "refunded"), [orders]);
+  // Net sales counts completed transactions only — held/open tickets are unpaid.
+  const live = useMemo(
+    () => orders.filter((o) =>
+      o.status !== "voided" && o.status !== "refunded" &&
+      o.status !== "on_hold" && o.status !== "open"),
+    [orders],
+  );
+
+  const ownerOptions = useMemo(() => {
+    const s = new Set<string>();
+    items.forEach((it) => { const n = it.menu_items?.owners?.name; if (n) s.add(n); });
+    return [...s].sort();
+  }, [items]);
+
   const totals = useMemo(() => {
+    if (ownerFilter) {
+      // Owner view: revenue attributable to that owner's items only.
+      const ids = new Set(live.map((o) => o.id));
+      const own = items.filter((it) => ids.has(it.order_id) && (it.menu_items?.owners?.name ?? "") === ownerFilter);
+      const net = own.reduce((s, it) => s + Number(it.line_total || 0), 0);
+      const orderCount = new Set(own.map((it) => it.order_id)).size;
+      return { gross: net, disc: 0, net, count: orderCount, avg: orderCount ? net / orderCount : 0 };
+    }
     const gross = live.reduce((s, o) => s + Number(o.subtotal || 0), 0);
     const disc = live.reduce((s, o) => s + Number(o.discount_total || 0), 0);
     const net = live.reduce((s, o) => s + Number(o.total || 0), 0);
     return { gross, disc, net, count: live.length, avg: live.length ? net / live.length : 0 };
-  }, [live]);
+  }, [live, items, ownerFilter]);
 
   const delta = useMemo(() => {
     if (prevTotal <= 0) return null;
@@ -126,6 +148,7 @@ function SalesSummaryPage() {
     const m = new Map<string, { name: string; category: string; qty: number; revenue: number }>();
     items.forEach((it) => {
       if (!liveIds.has(it.order_id)) return;
+      if (ownerFilter && (it.menu_items?.owners?.name ?? "") !== ownerFilter) return;
       const k = it.name_snapshot;
       const cur = m.get(k) ?? { name: k, category: it.menu_items?.categories?.name ?? "—", qty: 0, revenue: 0 };
       cur.qty += Number(it.qty || 0);
@@ -133,7 +156,7 @@ function SalesSummaryPage() {
       m.set(k, cur);
     });
     return [...m.values()];
-  }, [items, liveIds]);
+  }, [items, liveIds, ownerFilter]);
 
   const top5 = useMemo(() => [...itemAgg].sort((a, b) => b.qty - a.qty).slice(0, 5), [itemAgg]);
   const bot5 = useMemo(() => [...itemAgg].sort((a, b) => a.qty - b.qty).slice(0, 5), [itemAgg]);
