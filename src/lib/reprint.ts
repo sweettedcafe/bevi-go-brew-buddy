@@ -88,16 +88,21 @@ export async function reprintLabelsById(orderId: string): Promise<PrintPreviewDo
   const [{ data: items }, { data: cats }] = await Promise.all([
     db
       .from("order_items")
-      .select("menu_item_id, name_snapshot, qty, notes, menu_items(category_id, categories(prints_label))")
+      .select("menu_item_id, name_snapshot, qty, notes, menu_items(category_id, categories(name, prints_label))")
       .eq("order_id", orderId),
     db.from("categories").select("prints_label").eq("is_active", true),
   ]);
-  // If no category is explicitly flagged for labels, print a label for every item
-  // (coffee shops that haven't toggled prints_label per category yet).
+  // Labels are for coffee only: use prints_label when any category is flagged,
+  // otherwise fall back to a coffee keyword match on category / item name.
   const anyFlagged = ((cats ?? []) as any[]).some((c) => c.prints_label === true);
   const labels: DrinkLabel[] = [];
   for (const it of (items ?? []) as any[]) {
-    if (anyFlagged && it.menu_items?.categories?.prints_label !== true) continue;
+    if (!shouldPrintLabel({
+      printsLabel: it.menu_items?.categories?.prints_label ?? false,
+      anyFlagged,
+      categoryName: it.menu_items?.categories?.name,
+      itemName: it.name_snapshot,
+    })) continue;
     const total = Number(it.qty);
     for (let i = 1; i <= total; i++) {
       labels.push({
