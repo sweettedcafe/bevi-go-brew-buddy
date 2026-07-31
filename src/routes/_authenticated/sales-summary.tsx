@@ -42,11 +42,10 @@ function SalesSummaryPage() {
 
   async function load() {
     setLoading(true);
-    const fromTs = `${range.from}T00:00:00`;
-    const toTs = `${range.to}T23:59:59`;
+    // Filter on business_date so a day never bleeds into the next one.
     const [{ data: o }, { data: pmList }] = await Promise.all([
-      db.from("orders").select("id,total,subtotal,discount_total,status,created_at")
-        .gte("created_at", fromTs).lte("created_at", toTs),
+      db.from("orders").select("id,total,subtotal,discount_total,status,created_at,business_date,txn_kind")
+        .gte("business_date", range.from).lte("business_date", range.to),
       db.from("payment_methods").select("code,label"),
     ]);
     const list = (o ?? []) as any[];
@@ -83,7 +82,7 @@ function SalesSummaryPage() {
     const pf = new Date(new Date(range.from).getTime() - days * 86400000).toISOString().slice(0, 10);
     const pt = new Date(new Date(range.from).getTime() - 86400000).toISOString().slice(0, 10);
     const { data: po } = await db.from("orders").select("total,status")
-      .gte("created_at", `${pf}T00:00:00`).lte("created_at", `${pt}T23:59:59`);
+      .gte("business_date", pf).lte("business_date", pt);
     setPrevTotal(((po ?? []) as any[])
       .filter((r) => r.status !== "voided" && r.status !== "refunded")
       .reduce((s, r) => s + Number(r.total || 0), 0));
