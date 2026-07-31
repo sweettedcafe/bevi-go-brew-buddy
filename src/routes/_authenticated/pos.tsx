@@ -728,7 +728,13 @@ function POSPage() {
       const anyFlagged = labelCatIds.size > 0;
       for (const line of cart) {
         const item = items.find((x) => x.id === line.menu_item_id);
-        if (anyFlagged && (!item || !item.category_id || !labelCatIds.has(item.category_id))) continue;
+        const cat = cats.find((c) => c.id === item?.category_id);
+        if (!shouldPrintLabel({
+          printsLabel: cat?.prints_label ?? false,
+          anyFlagged,
+          categoryName: cat?.name,
+          itemName: line.name,
+        })) continue;
         for (let i = 1; i <= line.qty; i++) {
           labels.push({
             orderNo: args.orderNo,
