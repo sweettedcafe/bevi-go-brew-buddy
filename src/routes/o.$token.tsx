@@ -579,6 +579,7 @@ function SelfOrderPage() {
 
       {customizing && (
         <CustomizeDialog
+          key={customizing.id}
           open onOpenChange={(o) => { if (!o) { setCustomizing(null); setCustomizingIsUpsell(false); } }}
           itemName={customizing.name} basePrice={Number(customizing.price)}
           options={customizing.options ?? {}}
