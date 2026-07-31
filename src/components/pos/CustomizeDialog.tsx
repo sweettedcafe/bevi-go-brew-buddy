@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from "@/components/ui/dialog";
+import { StableModal, StableModalFooter } from "@/components/ui/stable-modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -154,11 +152,7 @@ export function CustomizeDialog({
     (sizeRequired && !size) || (hasVariants && !selectedVariant) || groupMissing;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[92vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{itemName}</DialogTitle>
-        </DialogHeader>
+    <StableModal open={open} onOpenChange={onOpenChange} title={itemName} className="max-w-lg max-h-[92vh] overflow-y-auto">
 
         {imageUrl && (
           <button
@@ -375,13 +369,12 @@ export function CustomizeDialog({
           </section>
         </div>
 
-        <DialogFooter>
+        <StableModalFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={confirm} disabled={disabled}>
             Add — {fmt(unit * Math.max(1, qty))}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </StableModalFooter>
+    </StableModal>
   );
 }
