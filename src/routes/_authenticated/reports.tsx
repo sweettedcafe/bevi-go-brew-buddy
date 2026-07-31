@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { Card } from "@/components/ui/card";
@@ -16,7 +16,7 @@ import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
 import { toast } from "sonner";
-import { BarChart3, Download, Filter, Settings2, RotateCcw, XCircle, Eye, FileSpreadsheet, Tag } from "lucide-react";
+import { BarChart3, Download, Filter, Settings2, RotateCcw, XCircle, Eye, FileSpreadsheet, Tag, Upload, X } from "lucide-react";
 import { toCsv, downloadCsv } from "@/lib/csv";
 import { useServerFn } from "@tanstack/react-start";
 import { exportToGoogleSheets } from "@/lib/sheets.functions";
