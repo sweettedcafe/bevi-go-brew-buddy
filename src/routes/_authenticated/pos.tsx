@@ -489,14 +489,14 @@ function POSPage() {
       setAppliedPromo(null);
       return;
     }
-    if (appliedPromo && !appliedPromo.applies_to_item_id) return;
+    // A scoped promo is already applied and still valid — never re-apply.
+    if (appliedPromo) return;
     const match = discounts.find((d) => {
       const ids = scopedIds(d);
       return ids.length > 0 && ids.some((i) => itemIds.has(i));
     });
     if (!match) return;
     const matchIds = scopedIds(match);
-    if (appliedPromo && matchIds.includes(appliedPromo.applies_to_item_id ?? "")) return;
     const base = nonBundle
       .filter((l) => matchIds.includes(l.menu_item_id))
       .reduce((s, l) => s + l.unit_price * l.qty, 0);
@@ -511,6 +511,7 @@ function POSPage() {
       applies_to_item_id: matchIds[0],
     });
   }, [cart, discounts, manual, appliedPromo]);
+
 
 
   function addBundle(b: Bundle) {
