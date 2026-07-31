@@ -40,7 +40,7 @@ export const GROUPS: NavGroup[] = [
     id: "catalog", label: "Catalog", icon: BookOpen, items: [
       { to: "/menu", label: "Menu & Recipes", icon: BookOpen, roles: ["developer", "admin"] },
       { to: "/bundles", label: "Bundles", icon: Gift, roles: ["developer", "admin"] },
-      { to: "/inventory", label: "Inventory", icon: Package, roles: ["developer", "admin"] },
+      { to: "/inventory", label: "Inventory", icon: Package, roles: ["developer", "admin", "barista"] },
     ],
   },
   {
