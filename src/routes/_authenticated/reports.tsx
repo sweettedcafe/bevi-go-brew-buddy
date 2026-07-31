@@ -32,7 +32,7 @@ type AnyRow = Record<string, any>;
 type Filters = {
   from: string; to: string;
   customer: string; orderId: string; cashier: string;
-  category: string; item: string; owner: string;
+  category: string; item: string; owner: string; status: string;
 };
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
@@ -95,20 +95,20 @@ const DISCOUNT_COLS = [
 
 function loadCols(tab: string, defaults: string[]): string[] {
   try {
-    const raw = localStorage.getItem(`bevi.reports.cols.${tab}`);
+    const raw = localStorage.getItem(`bevi.reports.cols.v2.${tab}`);
     if (raw) return JSON.parse(raw);
   } catch {}
   return defaults;
 }
 function saveCols(tab: string, cols: string[]) {
-  localStorage.setItem(`bevi.reports.cols.${tab}`, JSON.stringify(cols));
+  localStorage.setItem(`bevi.reports.cols.v2.${tab}`, JSON.stringify(cols));
 }
 
 function ReportsPage() {
   const { hasRole } = useAuth();
   const canRefund = hasRole("admin") || hasRole("developer");
   const [filters, setFilters] = useState<Filters>({
-    from: daysAgoIso(30), to: todayIso(), customer: "", orderId: "", cashier: "", category: "", item: "", owner: "",
+    from: daysAgoIso(30), to: todayIso(), customer: "", orderId: "", cashier: "", category: "", item: "", owner: "", status: "",
   });
   const [tab, setTab] = useState("order");
   const [loading, setLoading] = useState(false);
@@ -162,7 +162,7 @@ function ReportsPage() {
     const ids = list.map((r) => r.id);
     if (ids.length) {
       const [{ data: items }, { data: pays }, { data: pms }] = await Promise.all([
-        db.from("order_items").select("order_id,qty,line_total,menu_item_id,name_snapshot,is_upsell,menu_items(category_id,owner_id,categories(name),owners(name))").in("order_id", ids),
+        db.from("order_items").select("id,order_id,qty,unit_price,addon_total,line_total,menu_item_id,name_snapshot,is_upsell,notes,customization,variant_id,menu_item_variants(name),menu_items(category_id,owner_id,categories(name),owners(name))").in("order_id", ids),
         db.from("order_payments").select("order_id,method,method_code,amount,fee_amount,change_due").in("order_id", ids),
         db.from("payment_methods").select("code,label"),
       ]);
