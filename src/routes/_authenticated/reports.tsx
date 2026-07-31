@@ -512,7 +512,34 @@ function ReportsPage() {
       </div>
 
 
+      {imported && (
+        <Card className="p-3 space-y-2">
+          <div className="flex items-center gap-2">
+            <Upload className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium">Imported CSV ({imported.rows.length} rows)</span>
+            <Button size="sm" variant="ghost" className="ml-auto" onClick={() => setImported(null)}>
+              <X className="h-3 w-3 mr-1" /> Close
+            </Button>
+          </div>
+          <div className="overflow-auto max-h-80 rounded-md border">
+            <table className="w-full text-xs">
+              <thead className="bg-muted/50 sticky top-0">
+                <tr>{imported.headers.map((h, i) => <th key={i} className="text-left px-2 py-1 font-medium">{h}</th>)}</tr>
+              </thead>
+              <tbody>
+                {imported.rows.slice(0, 500).map((r, i) => (
+                  <tr key={i} className="border-t">
+                    {imported.headers.map((_, j) => <td key={j} className="px-2 py-1 whitespace-nowrap">{r[j] ?? ""}</td>)}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+
       <Tabs value={tab} onValueChange={setTab}>
+
         <div className="flex items-center gap-2">
           <TabsList>
             <TabsTrigger value="order">Per order</TabsTrigger>
