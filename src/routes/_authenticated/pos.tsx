@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { loadPrintSettings } from "@/lib/print-settings";
 import { loadPosSettings } from "@/lib/pos-settings";
 import { receiptHTML, labelsHTML, type DrinkLabel } from "@/lib/print-templates";
+import { shouldPrintLabel } from "@/lib/label-eligibility";
 import { buildReceiptPreviewById, reprintLabelsById } from "@/lib/reprint";
 import { randomQuote } from "@/lib/quotes";
 import { CustomizeDialog } from "@/components/pos/CustomizeDialog";
