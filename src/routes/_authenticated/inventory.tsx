@@ -12,7 +12,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { AlertTriangle, Upload, Download, Plus, Pencil, PackagePlus } from "lucide-react";
+import { AlertTriangle, Upload, Download, Plus, Pencil, PackagePlus, PackageMinus } from "lucide-react";
 import { toast } from "sonner";
 import { toCsv, downloadCsv } from "@/lib/csv";
 import { fetchPublicCsv } from "@/lib/fetch-csv.functions";
@@ -50,13 +50,17 @@ function stateOf(it: Inv): "ok" | "low" | "critical" {
 }
 
 function InventoryPage() {
-  const { primaryRole } = useAuth();
-  const isAdmin = primaryRole === "admin" || primaryRole === "developer";
+  const { roles, primaryRole } = useAuth();
+  const isAdmin = roles.includes("admin") || roles.includes("developer")
+    || primaryRole === "admin" || primaryRole === "developer";
+  // Baristas may adjust pack counts, but not edit/create items.
+  const canAdjustPacks = isAdmin || roles.includes("barista") || primaryRole === "barista";
   const [rows, setRows] = useState<Inv[]>([]);
   const [loading, setLoading] = useState(true);
   const [showInactive, setShowInactive] = useState(false);
   const [editing, setEditing] = useState<Inv | null>(null);
   const [restock, setRestock] = useState<Inv | null>(null);
+  const [deduct, setDeduct] = useState<Inv | null>(null);
   const [importOpen, setImportOpen] = useState(false);
 
   async function load() {
@@ -191,15 +195,26 @@ function InventoryPage() {
                       {remainder > 0 && wholePacks > 0 && ` (+${remainder.toLocaleString()} ${r.unit})`}
                     </div>
                   </div>
-                  {isAdmin && (
+                  {(canAdjustPacks || isAdmin) && (
                     <div className="flex items-center gap-1">
-                      <Button size="sm" variant="outline" onClick={() => setRestock(r)}>
-                        <PackagePlus className="h-3.5 w-3.5 mr-1" /> Add packs
-                      </Button>
-                      <Switch checked={r.is_active} onCheckedChange={() => toggleActive(r)} />
-                      <Button size="icon" variant="ghost" onClick={() => setEditing(r)}>
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
+                      {canAdjustPacks && (
+                        <>
+                          <Button size="sm" variant="outline" onClick={() => setRestock(r)}>
+                            <PackagePlus className="h-3.5 w-3.5 mr-1" /> Add packs
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => setDeduct(r)}>
+                            <PackageMinus className="h-3.5 w-3.5 mr-1" /> Deduct packs
+                          </Button>
+                        </>
+                      )}
+                      {isAdmin && (
+                        <>
+                          <Switch checked={r.is_active} onCheckedChange={() => toggleActive(r)} />
+                          <Button size="icon" variant="ghost" onClick={() => setEditing(r)}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
@@ -230,6 +245,13 @@ function InventoryPage() {
           item={restock}
           onClose={() => setRestock(null)}
           onDone={() => { setRestock(null); void load(); }}
+        />
+      )}
+      {deduct && (
+        <DeductPacksDialog
+          item={deduct}
+          onClose={() => setDeduct(null)}
+          onDone={() => { setDeduct(null); void load(); }}
         />
       )}
       {importOpen && (
@@ -276,6 +298,56 @@ function AddPacksDialog({ item, onClose, onDone }: { item: Inv; onClose: () => v
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
           <Button onClick={go} disabled={busy}>{busy ? "Adding…" : "Add to stock"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DeductPacksDialog({ item, onClose, onDone }: { item: Inv; onClose: () => void; onDone: () => void }) {
+  const [packs, setPacks] = useState("1");
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const packSize = Number(item.pack_size) || 0;
+  const n = Number(packs) || 0;
+  const units = n * packSize;
+  const stock = Number(item.stock_qty) || 0;
+  async function go() {
+    if (packSize <= 0) return toast.error("Pack size not configured for this item");
+    if (n <= 0) return toast.error("Enter a positive number of packs");
+    if (units > stock) return toast.error(`Only ${stock.toLocaleString()} ${item.unit} in stock`);
+    setBusy(true);
+    const { error } = await db.rpc("inventory_remove_packs", {
+      p_item_id: item.id, p_packs: n, p_reason: reason.trim() || "adjustment",
+    });
+    setBusy(false);
+    if (error) return toast.error(error.message);
+    toast.success(`Deducted ${n} ${item.pack_label || "pack"}${n === 1 ? "" : "s"} (${units} ${item.unit})`);
+    onDone();
+  }
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Deduct stock — {item.name}</DialogTitle>
+          <DialogDescription>
+            1 {item.pack_label || "pack"} = {packSize.toLocaleString()} {item.unit} · in stock {stock.toLocaleString()} {item.unit}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2">
+          <label className="text-xs text-muted-foreground">Number of {item.pack_label || "pack"}s to deduct</label>
+          <Input type="number" min={1} step={1} value={packs} onChange={(e) => setPacks(e.target.value)} autoFocus />
+          <label className="text-xs text-muted-foreground">Reason (optional)</label>
+          <Input placeholder="spoilage, spillage, transfer…" value={reason} onChange={(e) => setReason(e.target.value)} />
+          {n > 0 && packSize > 0 && (
+            <div className="text-xs text-muted-foreground">
+              Removes <b>{units.toLocaleString()} {item.unit}</b> from current stock.
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button variant="destructive" onClick={go} disabled={busy}>{busy ? "Deducting…" : "Deduct stock"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

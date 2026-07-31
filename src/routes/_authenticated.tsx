@@ -40,7 +40,7 @@ export const GROUPS: NavGroup[] = [
     id: "catalog", label: "Catalog", icon: BookOpen, items: [
       { to: "/menu", label: "Menu & Recipes", icon: BookOpen, roles: ["developer", "admin"] },
       { to: "/bundles", label: "Bundles", icon: Gift, roles: ["developer", "admin"] },
-      { to: "/inventory", label: "Inventory", icon: Package, roles: ["developer", "admin"] },
+      { to: "/inventory", label: "Inventory", icon: Package, roles: ["developer", "admin", "barista"] },
     ],
   },
   {
@@ -58,10 +58,10 @@ export const GROUPS: NavGroup[] = [
   },
   {
     id: "reports", label: "Reports", icon: BarChart3, items: [
-      { to: "/reports", label: "Reports", icon: BarChart3, roles: ["developer", "admin"] },
+      { to: "/reports", label: "Reports", icon: BarChart3, roles: ["developer", "admin", "accountant"] },
       { to: "/sales-summary", label: "Sales Summary", icon: FileText, roles: ["developer", "admin"] },
       { to: "/analytics", label: "Analytics", icon: BarChart3, roles: ["developer", "admin"] },
-      { to: "/expenses-report", label: "Expenses Report", icon: Wallet, roles: ["developer", "admin"] },
+      { to: "/expenses-report", label: "Expenses Report", icon: Wallet, roles: ["developer", "admin", "accountant"] },
     ],
   },
   {
