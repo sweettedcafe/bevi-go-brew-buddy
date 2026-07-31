@@ -437,18 +437,34 @@ function ReportsPage() {
               {ownerOptions.map((o) => <option key={o} value={o}>{o}</option>)}
             </select>
           </div>
+          <div>
+            <Label className="text-xs">Status</Label>
+            <select
+              className="h-9 rounded-md border border-input bg-transparent px-2 text-sm"
+              value={filters.status}
+              onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+            >
+              <option value="">All</option>
+              <option value="completed">Completed</option>
+              <option value="on_hold">On hold</option>
+              <option value="voided">Voided</option>
+              <option value="refunded">Refunded</option>
+            </select>
+          </div>
           <div><Label className="text-xs">Item name</Label>
             <Input placeholder="Search item" value={filters.item} onChange={(e) => setFilters({ ...filters, item: e.target.value })} /></div>
           <Button size="sm" onClick={loadAll} disabled={loading}>{loading ? "Loading…" : "Apply"}</Button>
         </div>
       </Card>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <Stat label="Orders" value={totals.count.toString()} />
         <Stat label="Gross" value={`₱${totals.gross.toFixed(2)}`} />
         <Stat label="Discounts" value={`₱${totals.disc.toFixed(2)}`} />
-        <Stat label="Net" value={`₱${totals.net.toFixed(2)}`} />
+        <Stat label="Net (completed)" value={`₱${totals.net.toFixed(2)}`} />
+        <Stat label={`On hold (${totals.heldCount})`} value={`₱${totals.held.toFixed(2)}`} />
       </div>
+
 
       <Tabs value={tab} onValueChange={setTab}>
         <div className="flex items-center gap-2">
