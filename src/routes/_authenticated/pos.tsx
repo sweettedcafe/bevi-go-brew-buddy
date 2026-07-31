@@ -1504,6 +1504,7 @@ function POSPage() {
 
       {customizing && (
         <CustomizeDialog
+          key={customizing.item.id}
           open
           onOpenChange={(o) => !o && setCustomizing(null)}
           itemName={customizing.item.name}
