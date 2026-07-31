@@ -1309,6 +1309,8 @@ function POSPage() {
             redeem_points: redeemPts,
             notes: null,
             existing_order_id: resumedOrderId,
+            acting_cashier_id: activeBarista?.id ?? null,
+
             items: cart.map((l) => ({
               menu_item_id: l.menu_item_id, variant_id: l.variant_id,
               name: l.name, qty: l.qty,
