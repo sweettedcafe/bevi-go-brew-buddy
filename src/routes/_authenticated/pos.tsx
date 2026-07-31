@@ -1344,7 +1344,34 @@ function POSPage() {
         }}
       />
 
+      {/* Barista switch dialog */}
+      <Dialog open={baristaOpen} onOpenChange={setBaristaOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Barista on duty</DialogTitle></DialogHeader>
+          <p className="text-xs text-muted-foreground -mt-2">
+            One login per terminal. Pick whoever is taking the order — every sale is credited to them.
+          </p>
+          <div className="space-y-1.5 max-h-80 overflow-auto">
+            {staffList.length === 0 && (
+              <div className="text-sm text-muted-foreground py-4 text-center">No staff found.</div>
+            )}
+            {staffList.map((s) => (
+              <button
+                key={s.user_id}
+                type="button"
+                onClick={() => { setActiveBarista({ id: s.user_id, name: s.full_name }); setBaristaOpen(false); toast.success(`${s.full_name} is now taking orders`); }}
+                className={`w-full text-left rounded-md border px-3 py-2 hover:bg-accent/40 ${activeBarista?.id === s.user_id ? "border-primary bg-accent/30" : ""}`}
+              >
+                <div className="font-medium text-sm">{s.full_name}</div>
+                <div className="text-xs text-muted-foreground">{s.email}{s.role ? ` · ${s.role}` : ""}</div>
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Held orders dialog */}
+
       <Dialog open={holdOpen} onOpenChange={setHoldOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Held orders</DialogTitle></DialogHeader>
