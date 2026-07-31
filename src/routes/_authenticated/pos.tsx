@@ -133,6 +133,38 @@ function POSPage() {
   const [cameraOpen, setCameraOpen] = useState(false);
   const scanRef = useRef<HTMLInputElement>(null);
 
+  // ---- Shared terminal: barista on duty --------------------------------
+  type StaffRow = { user_id: string; email: string; full_name: string; role: string | null };
+  const [staffList, setStaffList] = useState<StaffRow[]>([]);
+  const [baristaOpen, setBaristaOpen] = useState(false);
+  const [activeBarista, setActiveBarista] = useState<{ id: string; name: string } | null>(() => {
+    try {
+      const raw = localStorage.getItem("bevi.pos.barista");
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  });
+
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      const { data } = await db.rpc("pos_staff_list");
+      if (!alive) return;
+      const list = ((data ?? []) as StaffRow[]);
+      setStaffList(list);
+      setActiveBarista((cur) => {
+        if (cur && list.some((s) => s.user_id === cur.id)) return cur;
+        const me = list.find((s) => s.user_id === user?.id);
+        return me ? { id: me.user_id, name: me.full_name } : cur;
+      });
+    })();
+    return () => { alive = false; };
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (activeBarista) localStorage.setItem("bevi.pos.barista", JSON.stringify(activeBarista));
+  }, [activeBarista]);
+
+
   useEffect(() => {
     let alive = true;
     (async () => {
