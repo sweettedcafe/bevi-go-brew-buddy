@@ -206,7 +206,19 @@ function SalesSummaryPage() {
                 <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></div>
             </>
           )}
+          <div>
+            <Label className="text-xs">Owner</Label>
+            <select
+              className="h-9 rounded-md border border-input bg-transparent px-2 text-sm block"
+              value={ownerFilter}
+              onChange={(e) => setOwnerFilter(e.target.value)}
+            >
+              <option value="">All owners</option>
+              {ownerOptions.map((o) => <option key={o} value={o}>{o}</option>)}
+            </select>
+          </div>
           <Button size="sm" onClick={load} disabled={loading}>Apply</Button>
+
         </div>
       </Card>
 
