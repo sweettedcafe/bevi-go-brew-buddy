@@ -65,20 +65,31 @@ export function CustomizeDialog({
   const [qty, setQty] = useState(1);
   const [notes, setNotes] = useState("");
 
+  // Keep latest values without making them effect dependencies — callers often
+  // pass freshly-built arrays/objects, which would otherwise re-run this reset
+  // on every render and cause an infinite update loop.
+  const latest = useRef({ initial, defSize, sortedVariants });
+  latest.current = { initial, defSize, sortedVariants };
+  const wasOpen = useRef(false);
+
   useEffect(() => {
-    if (!open) return;
-    setVariantId(initial?.variantId ?? sortedVariants[0]?.id ?? null);
-    setSize(initial?.custom?.size ?? defSize);
-    setMilk(initial?.custom?.milk ?? null);
-    setExtras(initial?.custom?.extras ?? []);
-    setFlavors(initial?.custom?.flavors ?? []);
-    setOthers(initial?.custom?.others ?? []);
-    setOther(initial?.custom?.other ?? []);
-    setGroupSel(initial?.custom?.groups ?? {});
+    if (!open) { wasOpen.current = false; return; }
+    if (wasOpen.current) return;
+    wasOpen.current = true;
+    const { initial: init, defSize: ds, sortedVariants: sv } = latest.current;
+    setVariantId(init?.variantId ?? sv[0]?.id ?? null);
+    setSize(init?.custom?.size ?? ds);
+    setMilk(init?.custom?.milk ?? null);
+    setExtras(init?.custom?.extras ?? []);
+    setFlavors(init?.custom?.flavors ?? []);
+    setOthers(init?.custom?.others ?? []);
+    setOther(init?.custom?.other ?? []);
+    setGroupSel(init?.custom?.groups ?? {});
     setOtherLabel(""); setOtherPrice("");
-    setQty(initial?.qty ?? 1);
-    setNotes(initial?.notes ?? "");
-  }, [open, initial, defSize, sortedVariants]);
+    setQty(init?.qty ?? 1);
+    setNotes(init?.notes ?? "");
+  }, [open]);
+
 
   const selectedVariant = hasVariants
     ? (sortedVariants.find((v) => v.id === variantId) ?? null)
