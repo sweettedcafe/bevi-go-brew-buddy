@@ -811,7 +811,18 @@ function POSPage() {
         <header className="px-4 sm:px-6 py-3 sm:py-4 border-b bg-card flex flex-wrap items-center gap-3">
           <Coffee className="h-5 w-5 text-primary" />
           <h1 className="text-lg sm:text-xl font-display">Point of Sale</h1>
-          <Button size="sm" variant="outline" onClick={openTodayList} className="ml-auto">
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => setBaristaOpen(true)}
+            className="ml-auto"
+            title="Switch the barista taking orders"
+          >
+            <Users className="h-3 w-3 mr-1" />
+            {activeBarista?.name ?? "Select barista"}
+          </Button>
+          <Button size="sm" variant="outline" onClick={openTodayList}>
+
             <ClipboardList className="h-3 w-3 mr-1" /> Today
           </Button>
           <Button size="sm" variant="outline" onClick={openHeldList}>
