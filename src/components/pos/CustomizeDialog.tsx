@@ -247,13 +247,14 @@ export function CustomizeDialog({
                 {exs.map((e) => {
                   const on = extras.some((x) => x.label === e.label);
                   return (
-                    <label key={e.label} className="flex items-center gap-2 rounded border p-2 cursor-pointer hover:bg-accent">
+                     <button type="button" key={e.label} onClick={() => toggleExtra(e)}
+                       className="flex w-full items-center gap-2 rounded border p-2 text-left cursor-pointer hover:bg-accent">
                        <StableCheckbox checked={on} />
                       <span className="flex-1">{e.label}</span>
                       <span className="text-xs text-muted-foreground">
                         {e.price_delta > 0 ? `+${fmt(e.price_delta)}` : "free"}
                       </span>
-                    </label>
+                     </button>
                   );
                 })}
               </div>
@@ -267,13 +268,14 @@ export function CustomizeDialog({
                 {flvs.map((e) => {
                   const on = flavors.some((x) => x.label === e.label);
                   return (
-                    <label key={e.label} className="flex items-center gap-2 rounded border p-2 cursor-pointer hover:bg-accent">
+                     <button type="button" key={e.label} onClick={() => toggleIn(flavors, setFlavors, e)}
+                       className="flex w-full items-center gap-2 rounded border p-2 text-left cursor-pointer hover:bg-accent">
                        <StableCheckbox checked={on} />
                       <span className="flex-1">{e.label}</span>
                       <span className="text-xs text-muted-foreground">
                         {e.price_delta > 0 ? `+${fmt(e.price_delta)}` : "free"}
                       </span>
-                    </label>
+                     </button>
                   );
                 })}
               </div>
@@ -287,13 +289,14 @@ export function CustomizeDialog({
                 {oths.map((e) => {
                   const on = others.some((x) => x.label === e.label);
                   return (
-                    <label key={e.label} className="flex items-center gap-2 rounded border p-2 cursor-pointer hover:bg-accent">
+                     <button type="button" key={e.label} onClick={() => toggleIn(others, setOthers, e)}
+                       className="flex w-full items-center gap-2 rounded border p-2 text-left cursor-pointer hover:bg-accent">
                        <StableCheckbox checked={on} />
                       <span className="flex-1">{e.label}</span>
                       <span className="text-xs text-muted-foreground">
                         {e.price_delta > 0 ? `+${fmt(e.price_delta)}` : "free"}
                       </span>
-                    </label>
+                     </button>
                   );
                 })}
               </div>
@@ -316,14 +319,15 @@ export function CustomizeDialog({
                   {g.options.map((opt) => {
                     const on = list.some((x) => x.label === opt.label);
                     return (
-                      <label key={opt.label}
-                        className={`flex items-center gap-2 rounded border p-2 cursor-pointer hover:bg-accent ${on ? "border-primary bg-primary/10" : ""}`}>
+                       <button type="button" key={opt.label}
+                         onClick={() => pickGroup(g.name, g.select, opt)}
+                         className={`flex w-full items-center gap-2 rounded border p-2 text-left cursor-pointer hover:bg-accent ${on ? "border-primary bg-primary/10" : ""}`}>
                          <StableCheckbox checked={on} />
                         <span className="flex-1">{opt.label}</span>
                         <span className="text-xs text-muted-foreground">
                           {opt.price_delta > 0 ? `+${fmt(opt.price_delta)}` : opt.price_delta < 0 ? fmt(opt.price_delta) : "free"}
                         </span>
-                      </label>
+                       </button>
                     );
                   })}
                 </div>
