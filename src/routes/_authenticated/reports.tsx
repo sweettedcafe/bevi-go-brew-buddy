@@ -200,6 +200,17 @@ function ReportsPage() {
       const placedByCustomer = o.source === "self";
       const cashierEmail = placedByCustomer ? "self-order" : (staffEmails[o.cashier_id] ?? "—");
       for (const it of (o._items ?? [])) {
+        const c = (it.customization ?? null) as any;
+        const listOf = (arr: any): string =>
+          Array.isArray(arr) ? arr.map((x: any) => x?.label).filter(Boolean).join(", ") : "";
+        const groups = c?.groups && typeof c.groups === "object"
+          ? Object.entries(c.groups as Record<string, any[]>)
+              .map(([g, v]) => `${g}: ${listOf(v)}`)
+              .filter((s) => !s.endsWith(": "))
+              .join(" | ")
+          : "";
+        const other = [listOf(c?.others), listOf(c?.other), groups, c?.milk?.label ?? ""]
+          .filter(Boolean).join(" | ");
         rows.push({
           id: it.id,
           order_id: o.id,
@@ -207,13 +218,21 @@ function ReportsPage() {
           order_no: o.order_no,
           created_at: o.created_at,
           txn_kind: o.txn_kind ?? "sale",
+          status: o.status,
           name: it.name_snapshot,
+          variant: it.menu_item_variants?.name ?? c?.size?.label ?? "—",
+          extras: listOf(c?.extras) || "—",
+          flavors: listOf(c?.flavors) || "—",
+          other: other || "—",
+          instructions: it.notes ?? "—",
           category: it.menu_items?.categories?.name ?? "—",
           owner: it.menu_items?.owners?.name ?? "—",
           cashier_email: cashierEmail,
           placed_by: placedByCustomer ? "Customer" : "Cashier",
           upsell: it.is_upsell ? "Yes" : "No",
           qty: Number(it.qty || 0),
+          unit_price: Number(it.unit_price || 0),
+          addon_total: Number(it.addon_total || 0),
           revenue: Number(it.line_total || 0),
         });
       }
@@ -233,17 +252,35 @@ function ReportsPage() {
     return [...s].sort();
   }, [itemRowsAll]);
 
+  const statusOf = (o: AnyRow) => {
+    const k = o.txn_kind ?? "sale";
+    if (k === "void") return "voided";
+    if (k === "refund") return "refunded";
+    return o.status;
+  };
+
+  const filteredOrders = useMemo(() => {
+    if (!filters.status) return orders;
+    return orders.filter((o) => statusOf(o) === filters.status);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orders, filters.status]);
+
   const itemRows = useMemo(() => {
     const cat = filters.category.trim().toLowerCase();
     const item = filters.item.trim().toLowerCase();
     const owner = filters.owner.trim().toLowerCase();
+    const st = filters.status;
     return itemRowsAll.filter((r) => {
       if (cat && r.category.toLowerCase() !== cat) return false;
       if (owner && r.owner.toLowerCase() !== owner) return false;
       if (item && !r.name.toLowerCase().includes(item)) return false;
+      if (st) {
+        const eff = r.txn_kind === "void" ? "voided" : r.txn_kind === "refund" ? "refunded" : r.status;
+        if (eff !== st) return false;
+      }
       return true;
     });
-  }, [itemRowsAll, filters.category, filters.item, filters.owner]);
+  }, [itemRowsAll, filters.category, filters.item, filters.owner, filters.status]);
 
   const ownerSubtotals = useMemo(() => {
     const m = new Map<string, { qty: number; revenue: number }>();
@@ -256,19 +293,26 @@ function ReportsPage() {
   }, [itemRows]);
 
   const discountRows = useMemo(
-    () => orders.filter((o) => Number(o.discount_total) > 0),
-    [orders],
+    () => filteredOrders.filter((o) => Number(o.discount_total) > 0),
+    [filteredOrders],
   );
 
   const totals = useMemo(() => {
-    let gross = 0, disc = 0, net = 0, count = 0;
+    let gross = 0, disc = 0, net = 0, count = 0, held = 0, heldCount = 0;
     for (const o of orders) {
-      // Signed totals: sale rows are positive, void/refund mirrors are negative.
+      const st = statusOf(o);
+      if (st === "on_hold" || st === "open") {
+        held += Number(o.total || 0); heldCount++;
+        continue; // unpaid — never part of gross/net
+      }
+      // Signed totals: completed sales are positive, void/refund mirrors negative.
       gross += Number(o.subtotal); disc += Number(o.discount_total); net += Number(o.total);
-      if ((o.txn_kind ?? "sale") === "sale" && o.status !== "voided" && o.status !== "refunded") count++;
+      if ((o.txn_kind ?? "sale") === "sale" && st !== "voided" && st !== "refunded") count++;
     }
-    return { gross, disc, net, count };
+    return { gross, disc, net, count, held, heldCount };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orders]);
+
 
   async function refund(id: string) {
     if (!confirm("Refund this order? A mirror negative transaction will be created and stock restored.")) return;
