@@ -104,7 +104,7 @@ function POSPage() {
   const [holdOpen, setHoldOpen] = useState(false);
   const [heldOrders, setHeldOrders] = useState<Array<{ id: string; order_no: number; customer_name: string | null; held_at: string; total: number; held_by: string | null; source: string | null }>>([]);
   const [todayOpen, setTodayOpen] = useState(false);
-  const [todayOrders, setTodayOrders] = useState<Array<{ id: string; order_no: number; customer_name: string | null; created_at: string; total: number; order_type: string; source: string | null }>>([]);
+  const [todayOrders, setTodayOrders] = useState<Array<{ id: string; order_no: number; customer_name: string | null; created_at: string; total: number; order_type: string; source: string | null; claimed_at?: string | null }>>([]);
   const [printOpen, setPrintOpen] = useState(false);
   const [printDocs, setPrintDocs] = useState<PrintPreviewDocument[]>([]);
 
@@ -161,6 +161,7 @@ function POSPage() {
       setBundleItems(((bi ?? []) as any[]).map((r) => ({
         bundle_id: r.bundle_id,
         menu_item_id: r.menu_item_id,
+        variant_id: r.variant_id ?? null,
         qty: Number(r.qty),
         discount_type: (r.discount_type ?? "percent") as "percent" | "fixed",
         discount_value: Number(r.discount_value ?? 0),
@@ -485,7 +486,10 @@ function POSPage() {
     for (const r of rows) {
       const it = items.find((x) => x.id === r.menu_item_id);
       if (!it) continue;
-      const base = Number(it.price);
+      const bv = (r as any).variant_id
+        ? variants.find((v) => v.id === (r as any).variant_id) ?? null
+        : null;
+      const base = Number(bv?.price ?? it.price);
       const unit = r.discount_type === "percent"
         ? Math.max(0, base - base * (Number(r.discount_value) || 0) / 100)
         : Math.max(0, base - (Number(r.discount_value) || 0));
@@ -493,9 +497,9 @@ function POSPage() {
         lineId: newLineId(),
         bundle_id: b.id,
         menu_item_id: it.id,
-        variant_id: null,
-        variant_name: null,
-        name: it.name,
+        variant_id: bv?.id ?? null,
+        variant_name: bv?.name ?? null,
+        name: bv ? `${it.name} — ${bv.name}` : it.name,
         base_price: base, unit_price: Number(unit.toFixed(2)), qty: r.qty,
         customization: null, addon_total: 0,
         notes: `Bundle: ${b.name}`,
@@ -525,7 +529,23 @@ function POSPage() {
     clearAll();
   }
 
+  async function deleteHeld(id: string) {
+    if (!confirm("Delete this held order?")) return;
+    const { error } = await db.rpc("pos_delete_held", { p_order_id: id });
+    if (error) { toast.error(error.message); return; }
+    setHeldOrders((cur) => cur.filter((h) => h.id !== id));
+    toast.success("Held order deleted");
+  }
+
+  async function setClaimed(id: string, value: boolean) {
+    setTodayOrders((cur) => cur.map((o) => o.id === id
+      ? { ...o, claimed_at: value ? new Date().toISOString() : null } : o));
+    const { error } = await db.rpc("pos_set_claimed", { p_order_id: id, p_value: value });
+    if (error) toast.error(error.message);
+  }
+
   async function openHeldList() {
+    await db.rpc("pos_purge_stale_holds");
     const { data, error } = await db
       .from("orders")
       .select("id, order_no, customer_name, held_at, total, held_by, source")
@@ -545,7 +565,7 @@ function POSPage() {
     end.setDate(end.getDate() + 1);
     const { data, error } = await db
       .from("orders")
-      .select("id, order_no, customer_name, created_at, total, order_type, status, source")
+      .select("id, order_no, customer_name, created_at, total, order_type, status, source, claimed_at")
       .gte("created_at", start.toISOString())
       .lt("created_at", end.toISOString())
       .eq("status", "completed")
@@ -1290,9 +1310,10 @@ function POSPage() {
               {heldOrders.map((h) => {
                 const placedByCustomer = h.source === "self" || (!h.held_by && h.source !== "barista");
                 return (
-                  <button key={h.id}
+                  <div key={h.id} className="flex items-center gap-1">
+                  <button
                     onClick={() => resumeHeld(h.id)}
-                    className="w-full text-left rounded-md border p-3 hover:bg-accent transition-colors">
+                    className="flex-1 text-left rounded-md border p-3 hover:bg-accent transition-colors">
                     <div className="flex items-center gap-2">
                       <div className="font-display text-lg">#{String(h.order_no).padStart(3, "0")}</div>
                       <div className="flex-1 min-w-0">
@@ -1309,6 +1330,10 @@ function POSPage() {
                       <PlayCircle className="h-4 w-4 text-primary" />
                     </div>
                   </button>
+                  <Button size="icon" variant="ghost" onClick={() => deleteHeld(h.id)} title="Delete held order">
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                  </div>
                 );
               })}
             </div>
@@ -1335,6 +1360,9 @@ function POSPage() {
                       ) : (
                         <Badge className="text-[10px]">Barista</Badge>
                       )}
+                      {o.claimed_at && (
+                        <Badge variant="outline" className="text-[10px] border-green-600 text-green-700">Claimed</Badge>
+                      )}
                     </div>
                     <div className="text-xs text-muted-foreground">
                       {new Date(o.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · {o.order_type}
@@ -1342,6 +1370,11 @@ function POSPage() {
                   </div>
                   <div className="font-medium">{fmt(Number(o.total))}</div>
                   <div className="flex flex-wrap gap-1">
+                    <label className="flex items-center gap-1 text-xs px-2 rounded border cursor-pointer">
+                      <input type="checkbox" checked={!!o.claimed_at}
+                        onChange={(e) => setClaimed(o.id, e.target.checked)} />
+                      Claimed
+                    </label>
                     <Button size="sm" onClick={() => notifyOrderReady(o)}>
                       <Bell className="h-3 w-3 mr-1" /> Notify ready
                     </Button>
