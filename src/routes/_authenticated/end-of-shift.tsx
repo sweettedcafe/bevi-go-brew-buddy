@@ -10,6 +10,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { useAuth } from "@/lib/auth-context";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { ClipboardList, Plus, Trash2, RefreshCw, Share2, Copy, Camera } from "lucide-react";
 import { toPng } from "html-to-image";
 
@@ -45,7 +49,11 @@ type EOS = {
   breaks: Array<{ id: string; type: "break" | "lunch"; started_at: string; ended_at: string | null }>;
 };
 
+type ExpenseCategory = { id: string; name: string; sort_order: number; is_active: boolean };
+
 function EndOfShiftPage() {
+  const { primaryRole } = useAuth();
+  const isAdmin = primaryRole === "admin" || primaryRole === "developer";
   const [report, setReport] = useState<EOS | null>(null);
   const [loading, setLoading] = useState(true);
   const [upsellStats, setUpsellStats] = useState<{ offers: number; added: number; skipped: number } | null>(null);
@@ -59,6 +67,57 @@ function EndOfShiftPage() {
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [uploadingReceipt, setUploadingReceipt] = useState(false);
 
+  // starting cash (set once per shift, carried from yesterday's closing)
+  const [cashInput, setCashInput] = useState("");
+  const [prevClosing, setPrevClosing] = useState<number | null>(null);
+  const [savingCash, setSavingCash] = useState(false);
+
+  // admin-managed expense categories
+  const [expCats, setExpCats] = useState<ExpenseCategory[]>([]);
+  const [catDialog, setCatDialog] = useState(false);
+  const [newCat, setNewCat] = useState("");
+
+  const loadCats = async () => {
+    const { data } = await (supabase as any)
+      .from("expense_categories").select("*").eq("is_active", true).order("sort_order");
+    setExpCats((data ?? []) as ExpenseCategory[]);
+  };
+  useEffect(() => { void loadCats(); }, []);
+
+  const addCategory = async () => {
+    const name = newCat.trim();
+    if (!name) return;
+    const { error } = await (supabase as any).from("expense_categories")
+      .insert({ name, sort_order: expCats.length + 1 });
+    if (error) { toast.error(error.message); return; }
+    setNewCat(""); await loadCats();
+  };
+  const renameCategory = async (id: string, name: string) => {
+    const v = name.trim();
+    if (!v) return;
+    const { error } = await (supabase as any).from("expense_categories").update({ name: v }).eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    await loadCats();
+  };
+  const deleteCategory = async (id: string) => {
+    if (!confirm("Delete this category?")) return;
+    const { error } = await (supabase as any).from("expense_categories").delete().eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    await loadCats();
+  };
+
+  const saveStartingCash = async () => {
+    const v = Number(cashInput);
+    if (!Number.isFinite(v) || v < 0) { toast.error("Enter a valid amount"); return; }
+    setSavingCash(true);
+    const { error } = await (supabase as any).rpc("tc_set_starting_cash", { p_amount: v });
+    setSavingCash(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Starting cash saved");
+    setCashInput("");
+    await refresh();
+  };
+
   const refresh = async () => {
     setLoading(true);
     const { data, error } = await supabase.rpc("tc_eos_report", { p_shift_id: null });
@@ -70,6 +129,8 @@ function EndOfShiftPage() {
       setReport(data as EOS);
       const shiftId = (data as EOS | null)?.shift?.id ?? null;
       const { data: us } = await (supabase as any).rpc("shift_upsell_stats", { p_shift_id: shiftId });
+      const { data: prev } = await (supabase as any).rpc("tc_prev_closing_cash");
+      setPrevClosing(prev == null ? null : Number(prev));
       if (us) setUpsellStats({
         offers: Number(us.offers ?? 0),
         added: Number(us.added ?? 0),
@@ -249,6 +310,26 @@ function EndOfShiftPage() {
                   }
                 />
               </div>
+              {!report.shift.clock_out && Number(report.shift.starting_cash) === 0 && (
+                <div className="mt-4 rounded-md border p-3 space-y-2">
+                  <Label htmlFor="start-cash">Set starting cash for this shift (once)</Label>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Input id="start-cash" type="number" min="0" step="0.01" className="w-40"
+                      placeholder={prevClosing != null ? prevClosing.toFixed(2) : "0.00"}
+                      value={cashInput} onChange={(e) => setCashInput(e.target.value)} />
+                    {prevClosing != null && (
+                      <Button size="sm" variant="outline" onClick={() => setCashInput(prevClosing.toFixed(2))}>
+                        Use yesterday's closing ({peso(prevClosing)})
+                      </Button>
+                    )}
+                    <Button size="sm" onClick={saveStartingCash} disabled={savingCash}>Save</Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Yesterday's cash on hand becomes today's starting cash. This can only be set once per shift.
+                  </p>
+                </div>
+              )}
+
               {report.breaks.length > 0 && (
                 <div className="mt-4">
                   <div className="text-xs text-muted-foreground mb-1">Breaks</div>
@@ -303,7 +384,14 @@ function EndOfShiftPage() {
           </Card>
 
           <Card>
-            <CardHeader><CardTitle>Expenses</CardTitle></CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Expenses</CardTitle>
+              {isAdmin && (
+                <Button size="sm" variant="outline" onClick={() => setCatDialog(true)}>
+                  Manage categories
+                </Button>
+              )}
+            </CardHeader>
             <CardContent className="space-y-4">
               {report.shift.clock_out ? (
                 <p className="text-xs text-muted-foreground">Shift is closed — expenses are read-only.</p>
@@ -333,7 +421,14 @@ function EndOfShiftPage() {
                   </div>
                   <div className="md:col-span-1">
                     <Label htmlFor="exp-cat">Category</Label>
-                    <Input id="exp-cat" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="optional" />
+                    <Select value={category} onValueChange={setCategory}>
+                      <SelectTrigger id="exp-cat"><SelectValue placeholder="Pick" /></SelectTrigger>
+                      <SelectContent>
+                        {expCats.map((c) => (
+                          <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="md:col-span-1">
                     <Label htmlFor="exp-img" className="text-xs">Receipt</Label>
