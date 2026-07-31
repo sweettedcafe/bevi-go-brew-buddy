@@ -174,6 +174,8 @@ function POSPage() {
       );
       setDiscounts(okDiscounts);
       setLoading(false);
+      // Yesterday's held orders never carry over to a new day.
+      void db.rpc("pos_purge_stale_holds");
     })();
     return () => { alive = false; };
   }, []);
