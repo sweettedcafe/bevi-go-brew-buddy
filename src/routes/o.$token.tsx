@@ -224,9 +224,33 @@ function SelfOrderPage() {
     } catch { /* ignore */ }
   }
 
+  function requestAlertPermission() {
+    if (typeof Notification === "undefined" || Notification.permission !== "default") return;
+    void Notification.requestPermission().catch(() => { /* visual/audio alert still works */ });
+  }
+
   // Ready alert: HTMLAudio loop (iOS + Android) + Web Audio beep + vibrate + flash
   useEffect(() => {
     if (!alerting) return;
+
+    const previousTitle = document.title;
+    let titleOn = false;
+    const titleTimer = window.setInterval(() => {
+      titleOn = !titleOn;
+      document.title = titleOn ? "ORDER READY — Bevi & Go" : previousTitle;
+    }, 700);
+    let notification: Notification | null = null;
+    if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+      try {
+        notification = new Notification("Your Bevi & Go order is ready", {
+          body: done ? `Order #${String(done.order_no).padStart(3, "0")} is ready at the counter.` : "Please proceed to the counter.",
+          tag: done ? `bevi-order-${done.order_id}` : "bevi-order-ready",
+          requireInteraction: true,
+          vibrate: [400, 150, 400, 150, 400],
+        } as NotificationOptions);
+        notification.onclick = () => { window.focus(); notification?.close(); };
+      } catch { /* notification support varies by browser */ }
+    }
 
     const vibrate = () => {
       if (typeof navigator !== "undefined" && "vibrate" in navigator) {
@@ -277,6 +301,9 @@ function SelfOrderPage() {
     } catch { /* ignore */ }
 
     return () => {
+      window.clearInterval(titleTimer);
+      document.title = previousTitle;
+      notification?.close();
       window.clearInterval(vTimer);
       if (aTimer) window.clearInterval(aTimer);
       if (typeof navigator !== "undefined" && "vibrate" in navigator) {
@@ -391,6 +418,7 @@ function SelfOrderPage() {
   async function place() {
     if (cart.length === 0) return;
     unlockAudio(); // iOS: unlock Web Audio inside this user gesture
+    requestAlertPermission();
     setPlacing(true);
     const { data, error } = await db.rpc("customer_self_order", {
       p_token: token,
