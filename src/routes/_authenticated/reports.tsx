@@ -182,8 +182,11 @@ function ReportsPage() {
         const items_count = its.reduce((s, x) => s + Number(x.qty || 0), 0);
         const fee_amount = ps.reduce((s, x) => s + Number(x.fee_amount || 0), 0);
         const payment_label = ps.map((p) => pmLabel.get(p.method_code) ?? p.method_code ?? p.method).join(", ");
+        const ownerNames = [...new Set(its.map((x: any) => x.menu_items?.owners?.name).filter(Boolean))] as string[];
         return { ...r, items_count, fee_amount, payment_label,
           order_id_short: shortId(r.id),
+          owners: ownerNames.join(", ") || "—",
+          _owners: ownerNames,
           cashier_email: emailMap[r.cashier_id] ?? (r.cashier_id ? "—" : "self-order"),
           _items: its, _payments: ps };
       });
