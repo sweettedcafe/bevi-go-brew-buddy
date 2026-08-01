@@ -4,15 +4,20 @@ import { Button } from "@/components/ui/button";
 
 type Theme = "light" | "dark";
 
-function initialTheme(): Theme {
-  if (typeof window === "undefined") return "light";
+function savedTheme(): Theme {
   const saved = window.localStorage.getItem("bevi.theme");
   if (saved === "light" || saved === "dark") return saved;
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
 export function ThemeToggle() {
-  const [theme, setTheme] = useState<Theme>(initialTheme);
+  // Keep the server and first client render identical, then hydrate the saved
+  // preference. This avoids a light/dark icon hydration mismatch.
+  const [theme, setTheme] = useState<Theme>("light");
+
+  useEffect(() => {
+    setTheme(savedTheme());
+  }, []);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
