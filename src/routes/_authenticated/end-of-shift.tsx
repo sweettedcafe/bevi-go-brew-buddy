@@ -315,9 +315,9 @@ function EndOfShiftPage() {
                   }
                 />
               </div>
-              {!report.shift.clock_out && Number(report.shift.starting_cash) === 0 && (
+              {canSetCash && !report.shift.clock_out && Number(report.shift.starting_cash) === 0 && (
                 <div className="mt-4 rounded-md border p-3 space-y-2">
-                  <Label htmlFor="start-cash">Set starting cash for this shift (once)</Label>
+                  <Label htmlFor="start-cash">Set starting cash for today (first shift only)</Label>
                   <div className="flex flex-wrap items-center gap-2">
                     <Input id="start-cash" type="number" min="0" step="0.01" className="w-40"
                       placeholder={prevClosing != null ? prevClosing.toFixed(2) : "0.00"}
@@ -330,10 +330,12 @@ function EndOfShiftPage() {
                     <Button size="sm" onClick={saveStartingCash} disabled={savingCash}>Save</Button>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Yesterday's cash on hand becomes today's starting cash. This can only be set once per shift.
+                    Yesterday's closing cash (starting cash + cash payments − expenses) carries over as today's
+                    starting cash. Only the first shift of the day declares it; later shifts continue the same drawer.
                   </p>
                 </div>
               )}
+
 
               {report.breaks.length > 0 && (
                 <div className="mt-4">
