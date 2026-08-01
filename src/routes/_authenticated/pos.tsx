@@ -571,12 +571,16 @@ function POSPage() {
       (d.applies_to_item_ids && d.applies_to_item_ids.length > 0)
         ? d.applies_to_item_ids
         : (d.applies_to_item_id ? [d.applies_to_item_id] : []);
-    if (appliedPromo?.applies_to_item_id && !itemIds.has(appliedPromo.applies_to_item_id)) {
-      setAppliedPromo(null);
+    // Drop a scoped promo as soon as none of its items remain in the cart.
+    if (appliedPromo) {
+      const active = appliedPromo.applies_to_item_ids?.length
+        ? appliedPromo.applies_to_item_ids
+        : (appliedPromo.applies_to_item_id ? [appliedPromo.applies_to_item_id] : []);
+      if (active.length > 0 && !active.some((i) => itemIds.has(i))) {
+        setAppliedPromo(null);
+      }
       return;
     }
-    // A scoped promo is already applied and still valid — never re-apply.
-    if (appliedPromo) return;
     const match = discounts.find((d) => {
       const ids = scopedIds(d);
       return ids.length > 0 && ids.some((i) => itemIds.has(i));
@@ -590,11 +594,15 @@ function POSPage() {
     const amt = match.type === "percent"
       ? Math.round(base * Number(match.value)) / 100
       : Math.min(Number(match.value), base);
+    if (amt <= 0) return;
     setAppliedPromo({
       code: match.code ?? null,
       label: match.name,
       amount: amt,
       applies_to_item_id: matchIds[0],
+      applies_to_item_ids: matchIds,
+      type: match.type,
+      value: Number(match.value),
     });
   }, [cart, discounts, manual, appliedPromo]);
 
