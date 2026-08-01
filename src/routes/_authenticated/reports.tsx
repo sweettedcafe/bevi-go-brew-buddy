@@ -46,6 +46,7 @@ const PER_ORDER_COLS = [
   { key: "time_only", label: "Time" },
   { key: "txn_kind", label: "Type" },
   { key: "customer_name", label: "Customer" },
+  { key: "owners", label: "Owner" },
   { key: "cashier_email", label: "Cashier" },
   { key: "items_count", label: "Items" },
   { key: "subtotal", label: "Subtotal" },
