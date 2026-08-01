@@ -338,21 +338,33 @@ function POSPage() {
 
   const subtotal = cart.reduce((s, l) => s + l.unit_price * l.qty, 0);
 
+  // Ids an item-scoped promo covers (supports multi-item scoping).
+  const promoScopeIds = useMemo(() => {
+    if (!appliedPromo) return [] as string[];
+    const many = appliedPromo.applies_to_item_ids ?? [];
+    if (many.length > 0) return many;
+    return appliedPromo.applies_to_item_id ? [appliedPromo.applies_to_item_id] : [];
+  }, [appliedPromo]);
+
   // Item-scoped promo amount (stacks with whole-order discounts).
   const itemPromoAmount = useMemo(() => {
-    const scopedId = appliedPromo?.applies_to_item_id ?? null;
-    if (!scopedId) return 0;
+    if (promoScopeIds.length === 0) return 0;
     const base = cart
-      .filter((l) => !l.bundle_id && l.menu_item_id === scopedId)
+      .filter((l) => !l.bundle_id && promoScopeIds.includes(l.menu_item_id))
       .reduce((s, l) => s + l.unit_price * l.qty, 0);
+    if (base <= 0) return 0;
+    // Recompute live so qty changes keep the discount accurate.
+    if (appliedPromo?.type === "percent" && appliedPromo.value != null) {
+      return Math.round(base * Number(appliedPromo.value)) / 100;
+    }
     return Math.min(appliedPromo!.amount, base);
-  }, [appliedPromo, cart]);
+  }, [appliedPromo, cart, promoScopeIds]);
 
   // Whole-order discount (manual OR non-item-scoped promo), computed on subtotal
   // after item-scoped discount so totals can't go negative.
   const orderDiscountAmount = useMemo(() => {
     const baseAfter = Math.max(0, subtotal - itemPromoAmount);
-    if (appliedPromo && !appliedPromo.applies_to_item_id) {
+    if (appliedPromo && promoScopeIds.length === 0) {
       return Math.min(appliedPromo.amount, baseAfter);
     }
     if (manual) {
@@ -362,7 +374,7 @@ function POSPage() {
       return Math.min(Math.max(0, raw), baseAfter);
     }
     return 0;
-  }, [appliedPromo, manual, subtotal, itemPromoAmount]);
+  }, [appliedPromo, manual, subtotal, itemPromoAmount, promoScopeIds]);
 
   const discountAmount = itemPromoAmount + orderDiscountAmount;
   const total = Math.max(0, subtotal - discountAmount);
@@ -370,11 +382,9 @@ function POSPage() {
   // Per-line discount allocation — ONLY for item-scoped promos.
   const lineDiscounts = useMemo(() => {
     const map: Record<string, number> = {};
-    if (itemPromoAmount <= 0) return map;
-    const scopedId = appliedPromo?.applies_to_item_id ?? null;
-    if (!scopedId) return map;
+    if (itemPromoAmount <= 0 || promoScopeIds.length === 0) return map;
     const eligible = cart.filter(
-      (l) => !l.bundle_id && l.menu_item_id === scopedId,
+      (l) => !l.bundle_id && promoScopeIds.includes(l.menu_item_id),
     );
     const base = eligible.reduce((s, l) => s + l.unit_price * l.qty, 0);
     if (base <= 0) return map;
@@ -389,7 +399,7 @@ function POSPage() {
       allocated += share;
     });
     return map;
-  }, [cart, itemPromoAmount, appliedPromo]);
+  }, [cart, itemPromoAmount, promoScopeIds]);
 
   // Customize dialog state
   const [customizing, setCustomizing] = useState<{
