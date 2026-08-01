@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { StableModal, StableModalFooter } from "@/components/ui/stable-modal";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Settings2 } from "lucide-react";
@@ -31,8 +31,6 @@ export function UpsellDialog({
   onCustomize?: (choice: UpsellChoice) => void;
 }) {
   const [picked, setPicked] = useState<Record<string, boolean>>({});
-
-  useEffect(() => { if (open) setPicked({}); }, [open]);
 
   function toggle(id: string) {
     setPicked((cur) => ({ ...cur, [id]: !cur[id] }));

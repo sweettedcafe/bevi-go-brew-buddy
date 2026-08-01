@@ -1,4 +1,4 @@
-import { useEffect, useId, type MouseEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, type MouseEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -27,20 +27,22 @@ export function StableModal({
 }) {
   const titleId = useId();
   const descriptionId = useId();
+  const onOpenChangeRef = useRef(onOpenChange);
+  onOpenChangeRef.current = onOpenChange;
 
   useEffect(() => {
     if (!open) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onOpenChange(false);
+      if (event.key === "Escape") onOpenChangeRef.current(false);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => {
       window.removeEventListener("keydown", onKeyDown);
       document.body.style.overflow = previousOverflow;
     };
-  }, [open, onOpenChange]);
+  }, [open]);
 
   if (!open || typeof document === "undefined") return null;
 
