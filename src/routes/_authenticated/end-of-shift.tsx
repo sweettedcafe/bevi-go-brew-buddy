@@ -133,6 +133,9 @@ function EndOfShiftPage() {
       const { data: us } = await (supabase as any).rpc("shift_upsell_stats", { p_shift_id: shiftId });
       const { data: prev } = await (supabase as any).rpc("tc_prev_closing_cash");
       setPrevClosing(prev == null ? null : Number(prev));
+      const { data: st } = await (supabase as any).rpc("tc_starting_cash_state");
+      setCanSetCash(Boolean(st?.can_set));
+
       if (us) setUpsellStats({
         offers: Number(us.offers ?? 0),
         added: Number(us.added ?? 0),
