@@ -32,7 +32,7 @@ begin
              when coalesce(o.subtotal,0) = 0 then 1
              else coalesce(o.total,0) / o.subtotal
            end as line_net,
-           coalesce(o.txn_kind,'sale') as kind,
+           coalesce(o.txn_kind,'sale') as kind, o.status,
            mi.owner_id, mi.category_id, oi.menu_item_id, oi.name_snapshot
       from public.orders o
       join public.order_items oi on oi.order_id = o.id
@@ -84,7 +84,8 @@ begin
                limit 10) t), '[]'::jsonb),
     jsonb_build_object(
       'orders', coalesce((select count(distinct id) from signed
-                           where kind not in ('void','refund')), 0),
+                           where kind not in ('void','refund')
+                             and coalesce(status,'') not in ('voided','refunded')), 0),
       'qty',    coalesce((select sum(sqty)::numeric from signed), 0),
       'revenue', round(coalesce((select sum(srev)::numeric from signed), 0), 2),
       'tz', v_tz, 'from', p_from, 'to', p_to)
