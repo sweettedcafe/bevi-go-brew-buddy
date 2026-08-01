@@ -84,8 +84,10 @@ function SalesSummaryPage() {
     const pt = new Date(new Date(range.from).getTime() - 86400000).toISOString().slice(0, 10);
     const { data: po } = await db.from("orders").select("total,status")
       .gte("business_date", pf).lte("business_date", pt);
+    // Voided/refunded parents stay counted; their negative mirror rows
+    // subtract the amount back out, so the net tallies with the reports.
     setPrevTotal(((po ?? []) as any[])
-      .filter((r) => r.status !== "voided" && r.status !== "refunded")
+      .filter((r) => r.status !== "on_hold" && r.status !== "open")
       .reduce((s, r) => s + Number(r.total || 0), 0));
 
     setLoading(false);
@@ -93,13 +95,13 @@ function SalesSummaryPage() {
 
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, []);
 
-  // Net sales counts completed transactions only — held/open tickets are unpaid.
+  // Net sales counts every paid transaction — the sale is added first and the
+  // void/refund mirror (negative total) subtracts it. Held/open tickets are unpaid.
   const live = useMemo(
-    () => orders.filter((o) =>
-      o.status !== "voided" && o.status !== "refunded" &&
-      o.status !== "on_hold" && o.status !== "open"),
+    () => orders.filter((o) => o.status !== "on_hold" && o.status !== "open"),
     [orders],
   );
+
 
   const ownerOptions = useMemo(() => {
     const s = new Set<string>();
