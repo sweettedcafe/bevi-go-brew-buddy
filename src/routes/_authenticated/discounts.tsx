@@ -39,9 +39,8 @@ type MenuItemLite = { id: string; name: string };
 
 const db = supabase as any;
 
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Check, ChevronsUpDown } from "lucide-react";
+import { Check } from "lucide-react";
 
 function DiscountsPage() {
   const { primaryRole } = useAuth();
