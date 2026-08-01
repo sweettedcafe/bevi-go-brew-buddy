@@ -875,15 +875,17 @@ function POSPage() {
     if (data.starts_at && new Date(data.starts_at) > new Date()) { toast.error("Promo not started"); return; }
     if (data.max_uses != null && data.uses_count >= data.max_uses) { toast.error("Promo usage limit reached"); return; }
 
-    const itemId: string | null = data.applies_to_item_id ?? null;
+    const ids: string[] = (data.applies_to_item_ids && data.applies_to_item_ids.length > 0)
+      ? data.applies_to_item_ids
+      : (data.applies_to_item_id ? [data.applies_to_item_id] : []);
     // Compute base the discount applies to
     let base = subtotal;
-    if (itemId) {
+    if (ids.length > 0) {
       base = cart
-        .filter((l) => l.menu_item_id === itemId)
+        .filter((l) => !l.bundle_id && ids.includes(l.menu_item_id))
         .reduce((s, l) => s + l.unit_price * l.qty, 0);
       if (base <= 0) {
-        toast.error(`This promo only applies to a specific item not in cart`);
+        toast.error(`This promo only applies to specific items not in the cart`);
         return;
       }
     }
@@ -892,9 +894,12 @@ function POSPage() {
       : Math.min(Number(data.value), base);
     setAppliedPromo({
       code: data.code, label: data.name, amount: amt,
-      applies_to_item_id: itemId,
+      applies_to_item_id: ids[0] ?? null,
+      applies_to_item_ids: ids,
+      type: data.type,
+      value: Number(data.value),
     });
-    if (!itemId) setManual(null);
+    if (ids.length === 0) setManual(null);
     toast.success(`Promo "${data.name}" applied`);
   }
 
