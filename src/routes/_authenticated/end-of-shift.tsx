@@ -67,10 +67,12 @@ function EndOfShiftPage() {
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [uploadingReceipt, setUploadingReceipt] = useState(false);
 
-  // starting cash (set once per shift, carried from yesterday's closing)
+  // starting cash — declared once a day by the FIRST shifter only
   const [cashInput, setCashInput] = useState("");
   const [prevClosing, setPrevClosing] = useState<number | null>(null);
   const [savingCash, setSavingCash] = useState(false);
+  const [canSetCash, setCanSetCash] = useState(false);
+
 
   // admin-managed expense categories
   const [expCats, setExpCats] = useState<ExpenseCategory[]>([]);
