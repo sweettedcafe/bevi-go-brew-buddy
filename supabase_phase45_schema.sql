@@ -1,12 +1,9 @@
 -- =====================================================================
 -- BEVI & GO — Phase 45
--- Make Analytics match Reports exactly:
---   1. Exclude unpaid orders (on_hold / open) — Reports never counts them.
---   2. Apply order-level discounts proportionally so revenue = net (o.total),
---      not the raw line subtotal.
---   3. Keep signing by txn_kind only (sale positive, void/refund mirror
---      negative) so a voided sale counts first and the mirror cancels it —
---      identical to the Reports "signed totals" logic.
+-- Fix: "invalid input value for enum order_status: ''" in Analytics.
+-- coalesce(o.status, '') forced Postgres to cast the empty string to the
+-- order_status enum. Compare on ::text instead. Same for txn_kind.
+-- Otherwise identical to Phase 44.
 -- =====================================================================
 
 create or replace function public.pos_analytics(
