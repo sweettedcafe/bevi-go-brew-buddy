@@ -131,8 +131,17 @@ function SelfOrderPage() {
       }
     }
     void check();
-    const t = window.setInterval(check, 5000);
-    return () => { cancelled = true; window.clearInterval(t); };
+    const t = window.setInterval(check, 2000);
+    const onVisibility = () => void check();
+    const onFocus = () => void check();
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      cancelled = true;
+      window.clearInterval(t);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("focus", onFocus);
+    };
   }, [done, token]);
 
   // Pre-unlocked AudioContext + HTMLAudio fallback. iOS Safari blocks any
@@ -434,10 +443,15 @@ function SelfOrderPage() {
           )}
           {alerting && (
             <Button className="w-full" size="lg" variant="destructive"
-              onClick={() => {
+              onClick={async () => {
                 if (done) {
                   dismissedRef.current.add(done.order_id);
-                  void db.rpc("customer_ack_ready", { p_token: token, p_order_id: done.order_id });
+                  const { error } = await db.rpc("customer_ack_ready", { p_token: token, p_order_id: done.order_id });
+                  if (error) {
+                    dismissedRef.current.delete(done.order_id);
+                    toast.error("Could not mark the order as claimed. Please try again.");
+                    return;
+                  }
                 }
                 setAlerting(false);
               }}>

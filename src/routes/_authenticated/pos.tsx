@@ -20,6 +20,7 @@ import { receiptHTML, labelsHTML, type DrinkLabel } from "@/lib/print-templates"
 import { shouldPrintLabel } from "@/lib/label-eligibility";
 import { buildReceiptPreviewById, reprintLabelsById } from "@/lib/reprint";
 import { randomQuote } from "@/lib/quotes";
+import { playAttentionSound, unlockAttentionSound } from "@/lib/attention-sound";
 import { CustomizeDialog } from "@/components/pos/CustomizeDialog";
 import { CameraScannerDialog } from "@/components/pos/CameraScannerDialog";
 import { PrintPreviewDialog, type PrintPreviewDocument } from "@/components/print/PrintPreviewDialog";
@@ -106,6 +107,7 @@ function POSPage() {
   const [heldOrders, setHeldOrders] = useState<Array<{ id: string; order_no: number; customer_name: string | null; held_at: string; total: number; held_by: string | null; source: string | null }>>([]);
   const [todayOpen, setTodayOpen] = useState(false);
   const [todayOrders, setTodayOrders] = useState<Array<{ id: string; order_no: number; customer_name: string | null; created_at: string; total: number; order_type: string; source: string | null; claimed_at?: string | null }>>([]);
+  const [newCustomerOrders, setNewCustomerOrders] = useState(0);
   const [printOpen, setPrintOpen] = useState(false);
   const [printDocs, setPrintDocs] = useState<PrintPreviewDocument[]>([]);
 
@@ -211,6 +213,64 @@ function POSPage() {
       void db.rpc("pos_purge_stale_holds");
     })();
     return () => { alive = false; };
+  }, []);
+
+  // Browsers require one user interaction before they allow notification
+  // audio. Arm it on the first interaction anywhere in the POS.
+  useEffect(() => {
+    const unlock = () => unlockAttentionSound();
+    window.addEventListener("pointerdown", unlock, { once: true });
+    window.addEventListener("keydown", unlock, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+    };
+  }, []);
+
+  // Alert staff when a new customer self-order enters Held. Realtime gives an
+  // immediate signal, while polling covers reconnects and installations where
+  // the table is not in the realtime publication.
+  useEffect(() => {
+    const seen = new Set<string>();
+    const startedAt = new Date().toISOString();
+    let cancelled = false;
+
+    const announce = (order: any) => {
+      if (!order?.id || order.source !== "self" || order.status !== "on_hold" || seen.has(order.id)) return;
+      seen.add(order.id);
+      setNewCustomerOrders((count) => count + 1);
+      playAttentionSound();
+      toast.info(`New customer order #${String(order.order_no).padStart(3, "0")} is waiting in Held.`, {
+        duration: 10000,
+      });
+    };
+
+    const check = async () => {
+      const { data } = await db.from("orders")
+        .select("id,order_no,source,status,created_at")
+        .eq("source", "self")
+        .eq("status", "on_hold")
+        .gte("created_at", startedAt)
+        .order("created_at", { ascending: true });
+      if (!cancelled) (data ?? []).forEach(announce);
+    };
+
+    const channel = supabase.channel("pos-customer-order-alerts")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "orders" }, (event) => announce(event.new))
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "orders" }, (event) => {
+        const order = event.new as any;
+        setTodayOrders((current) => current.map((row) => row.id === order.id
+          ? { ...row, claimed_at: order.claimed_at ?? null }
+          : row));
+      })
+      .subscribe();
+    void check();
+    const timer = window.setInterval(check, 4000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      void supabase.removeChannel(channel);
+    };
   }, []);
 
   const filtered = useMemo(() => {
@@ -589,6 +649,7 @@ function POSPage() {
       .order("held_at", { ascending: false });
     if (error) { toast.error(error.message); return; }
     setHeldOrders((data ?? []) as any);
+    setNewCustomerOrders(0);
     setHoldOpen(true);
   }
 
@@ -837,6 +898,7 @@ function POSPage() {
           </Button>
           <Button size="sm" variant="outline" onClick={openHeldList}>
             <PlayCircle className="h-3 w-3 mr-1" /> Held
+            {newCustomerOrders > 0 && <Badge className="ml-1 h-5 min-w-5 px-1">{newCustomerOrders}</Badge>}
           </Button>
           <div className="relative w-full sm:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
