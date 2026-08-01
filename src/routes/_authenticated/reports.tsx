@@ -46,6 +46,7 @@ const PER_ORDER_COLS = [
   { key: "time_only", label: "Time" },
   { key: "txn_kind", label: "Type" },
   { key: "customer_name", label: "Customer" },
+  { key: "owners", label: "Owner" },
   { key: "cashier_email", label: "Cashier" },
   { key: "items_count", label: "Items" },
   { key: "subtotal", label: "Subtotal" },
@@ -181,8 +182,11 @@ function ReportsPage() {
         const items_count = its.reduce((s, x) => s + Number(x.qty || 0), 0);
         const fee_amount = ps.reduce((s, x) => s + Number(x.fee_amount || 0), 0);
         const payment_label = ps.map((p) => pmLabel.get(p.method_code) ?? p.method_code ?? p.method).join(", ");
+        const ownerNames = [...new Set(its.map((x: any) => x.menu_items?.owners?.name).filter(Boolean))] as string[];
         return { ...r, items_count, fee_amount, payment_label,
           order_id_short: shortId(r.id),
+          owners: ownerNames.join(", ") || "—",
+          _owners: ownerNames,
           cashier_email: emailMap[r.cashier_id] ?? (r.cashier_id ? "—" : "self-order"),
           _items: its, _payments: ps };
       });
@@ -260,10 +264,14 @@ function ReportsPage() {
   };
 
   const filteredOrders = useMemo(() => {
-    if (!filters.status) return orders;
-    return orders.filter((o) => statusOf(o) === filters.status);
+    const owner = filters.owner.trim().toLowerCase();
+    return orders.filter((o) => {
+      if (filters.status && statusOf(o) !== filters.status) return false;
+      if (owner && !((o._owners ?? []) as string[]).some((n) => n.toLowerCase() === owner)) return false;
+      return true;
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orders, filters.status]);
+  }, [orders, filters.status, filters.owner]);
 
   const itemRows = useMemo(() => {
     const cat = filters.category.trim().toLowerCase();
@@ -298,20 +306,30 @@ function ReportsPage() {
   );
 
   const totals = useMemo(() => {
+    const owner = filters.owner.trim().toLowerCase();
     let gross = 0, disc = 0, net = 0, count = 0, held = 0, heldCount = 0;
-    for (const o of orders) {
+    for (const o of filteredOrders) {
       const st = statusOf(o);
+      const ownerRevenue = owner
+        ? ((o._items ?? []) as any[])
+            .filter((it) => (it.menu_items?.owners?.name ?? "").toLowerCase() === owner)
+            .reduce((s, it) => s + Number(it.line_total || 0), 0)
+        : 0;
       if (st === "on_hold" || st === "open") {
-        held += Number(o.total || 0); heldCount++;
+        held += owner ? ownerRevenue : Number(o.total || 0); heldCount++;
         continue; // unpaid — never part of gross/net
       }
       // Signed totals: completed sales are positive, void/refund mirrors negative.
-      gross += Number(o.subtotal); disc += Number(o.discount_total); net += Number(o.total);
+      if (owner) {
+        gross += ownerRevenue; net += ownerRevenue;
+      } else {
+        gross += Number(o.subtotal); disc += Number(o.discount_total); net += Number(o.total);
+      }
       if ((o.txn_kind ?? "sale") === "sale" && st !== "voided" && st !== "refunded") count++;
     }
     return { gross, disc, net, count, held, heldCount };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orders]);
+  }, [filteredOrders, filters.owner]);
 
 
   async function refund(id: string) {
