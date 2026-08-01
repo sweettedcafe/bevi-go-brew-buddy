@@ -389,6 +389,7 @@ function POSPage() {
     initial?: { custom: SelectedCustom | null; qty: number; notes: string };
     editingLineId?: string;
     isUpsell?: boolean;
+    sessionId: number;
   } | null>(null);
 
   // Upsell state — offer complementary items after adding a line
@@ -420,11 +421,13 @@ function POSPage() {
     if (it.has_variants) {
       const hasAny = variants.some((v) => v.menu_item_id === it.id && v.is_active !== false);
       if (!hasAny) { toast.error(`${it.name} has no variants configured`); return; }
-      setCustomizing({ item: it });
+      setUpsell(null);
+      setCustomizing({ item: it, sessionId: Date.now() });
       return;
     }
     if (hasAnyCustomization(it.options)) {
-      setCustomizing({ item: it });
+      setUpsell(null);
+      setCustomizing({ item: it, sessionId: Date.now() });
       return;
     }
     addPlainLine(it, null);
@@ -1214,11 +1217,15 @@ function POSPage() {
                       <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => changeQty(l.lineId, 1)}><Plus className="h-3 w-3" /></Button>
                       {editable && itemRef && (
                         <Button size="sm" variant="ghost" className="h-7 px-2 text-[11px]"
-                          onClick={() => setCustomizing({
-                            item: itemRef,
-                            initial: { custom: l.customization, qty: l.qty, notes: l.notes ?? "" },
-                            editingLineId: l.lineId,
-                          })}>
+                          onClick={() => {
+                            setUpsell(null);
+                            setCustomizing({
+                              item: itemRef,
+                              initial: { custom: l.customization, qty: l.qty, notes: l.notes ?? "" },
+                              editingLineId: l.lineId,
+                              sessionId: Date.now(),
+                            });
+                          }}>
                           Edit
                         </Button>
                       )}
@@ -1571,9 +1578,9 @@ function POSPage() {
 
 
 
-      {customizing && (
+      {customizing ? (
         <CustomizeDialog
-          key={customizing.item.id}
+          key={`${customizing.item.id}:${customizing.sessionId}`}
           open
           onOpenChange={(o) => !o && setCustomizing(null)}
           itemName={customizing.item.name}
@@ -1614,10 +1621,9 @@ function POSPage() {
             }
           }}
         />
-      )}
-
-      {upsell && (
+      ) : upsell ? (
         <UpsellDialog
+          key={`${upsell.trigger}:${upsell.suggestions.map((item) => item.id).join(",")}`}
           open
           onOpenChange={(o) => !o && setUpsell(null)}
           triggerName={upsell.trigger}
@@ -1626,7 +1632,7 @@ function POSPage() {
             const it = items.find((x) => x.id === choice.id);
             if (!it) return;
             setUpsell(null);
-            setCustomizing({ item: it, isUpsell: true });
+            setCustomizing({ item: it, isUpsell: true, sessionId: Date.now() });
           }}
           onSkip={() => {
             void (supabase as any).rpc("log_upsell_event", {
@@ -1649,7 +1655,7 @@ function POSPage() {
             setUpsell(null);
           }}
         />
-      )}
+      ) : null}
 
 
     </div>

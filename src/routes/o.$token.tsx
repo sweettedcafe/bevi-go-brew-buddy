@@ -52,8 +52,11 @@ function SelfOrderPage() {
   const [bundleItems, setBundleItems] = useState<BundleItem[]>([]);
   const [activeCat, setActiveCat] = useState<string | "all" | "__bundles__">("all");
   const [cart, setCart] = useState<CartLine[]>([]);
-  const [customizing, setCustomizing] = useState<Item | null>(null);
-  const [customizingIsUpsell, setCustomizingIsUpsell] = useState(false);
+  const [customizing, setCustomizing] = useState<{
+    item: Item;
+    isUpsell: boolean;
+    sessionId: number;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [placing, setPlacing] = useState(false);
   const [done, setDone] = useState<{ order_no: number; order_id: string; total: number } | null>(null);
@@ -347,7 +350,11 @@ function SelfOrderPage() {
   function tap(it: Item) {
     const vs = itemVariants(it.id);
     const needsDialog = vs.length > 0 || hasAnyCustomization(it.options);
-    if (needsDialog) { setCustomizing(it); return; }
+    if (needsDialog) {
+      setUpsell(null);
+      setCustomizing({ item: it, isUpsell: false, sessionId: Date.now() });
+      return;
+    }
     setCart((c) => {
       const f = c.find((l) =>
         l.kind === "item" &&
@@ -498,7 +505,7 @@ function SelfOrderPage() {
     );
   }
 
-  const customizingVariants = customizing ? itemVariants(customizing.id) : [];
+  const customizingVariants = customizing ? itemVariants(customizing.item.id) : [];
 
   return (
     <div className="min-h-screen bg-background">
@@ -619,22 +626,21 @@ function SelfOrderPage() {
         </div>
       )}
 
-      {customizing && (
+      {customizing ? (
         <CustomizeDialog
-          key={customizing.id}
-          open onOpenChange={(o) => { if (!o) { setCustomizing(null); setCustomizingIsUpsell(false); } }}
-          itemName={customizing.name} basePrice={Number(customizing.price)}
-          options={customizing.options ?? {}}
+          key={`${customizing.item.id}:${customizing.sessionId}`}
+          open onOpenChange={(o) => { if (!o) setCustomizing(null); }}
+          itemName={customizing.item.name} basePrice={Number(customizing.item.price)}
+          options={customizing.item.options ?? {}}
           variants={customizingVariants}
           hideOther
-          imageUrl={customizing.image_url}
-          onImageClick={() => customizing.image_url && setImagePreview({ url: customizing.image_url, name: customizing.name })}
+          imageUrl={customizing.item.image_url}
+          onImageClick={() => customizing.item.image_url && setImagePreview({ url: customizing.item.image_url, name: customizing.item.name })}
           onConfirm={(res) => {
-            const it = customizing;
-            const wasUpsell = customizingIsUpsell;
+            const it = customizing.item;
+            const wasUpsell = customizing.isUpsell;
             addCustom(it, res, wasUpsell);
             setCustomizing(null);
-            setCustomizingIsUpsell(false);
             if (wasUpsell) {
               void (supabase as any).rpc("log_upsell_event", {
                 p_source: "customer",
@@ -647,10 +653,9 @@ function SelfOrderPage() {
             }
           }}
         />
-      )}
-
-      {upsell && (
+      ) : upsell ? (
         <UpsellDialog
+          key={`${upsell.trigger}:${upsell.suggestions.map((item) => item.id).join(",")}`}
           open
           onOpenChange={(o) => !o && setUpsell(null)}
           triggerName={upsell.trigger}
@@ -659,8 +664,7 @@ function SelfOrderPage() {
             const it = items.find((x) => x.id === choice.id);
             if (!it) return;
             setUpsell(null);
-            setCustomizingIsUpsell(true);
-            setCustomizing(it);
+            setCustomizing({ item: it, isUpsell: true, sessionId: Date.now() });
           }}
           onSkip={() => {
             void (supabase as any).rpc("log_upsell_event", {
@@ -698,7 +702,7 @@ function SelfOrderPage() {
             setUpsell(null);
           }}
         />
-      )}
+      ) : null}
 
       {imagePreview && (
         <div
