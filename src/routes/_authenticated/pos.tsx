@@ -1275,12 +1275,12 @@ function POSPage() {
 
         {/* Promo + manual discount */}
         <div className="px-4 pt-3 pb-2 border-t space-y-2">
-          {appliedPromo && (
+          {appliedPromo && (promoScopeIds.length > 0 ? itemPromoAmount : orderDiscountAmount) > 0 && (
             <div className="flex items-center gap-2 bg-primary/10 rounded px-3 py-2 text-sm">
               <Tag className="h-3 w-3 text-primary" />
               <span className="font-medium">{appliedPromo.code ?? appliedPromo.label}</span>
               <span className="text-muted-foreground">
-                −{fmt(appliedPromo.applies_to_item_id ? itemPromoAmount : orderDiscountAmount)}
+                −{fmt(promoScopeIds.length > 0 ? itemPromoAmount : orderDiscountAmount)}
               </span>
               <Button size="icon" variant="ghost" className="ml-auto h-6 w-6"
                 onClick={() => { setAppliedPromo(null); setPromoCode(""); }}>
