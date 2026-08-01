@@ -114,7 +114,15 @@ function POSPage() {
   // discount state
   const [promoCode, setPromoCode] = useState("");
   const [appliedPromo, setAppliedPromo] = useState<
-    { code: string | null; label: string; amount: number; applies_to_item_id: string | null } | null
+    {
+      code: string | null;
+      label: string;
+      amount: number;
+      applies_to_item_id: string | null;
+      applies_to_item_ids?: string[] | null;
+      type?: "percent" | "fixed";
+      value?: number;
+    } | null
   >(null);
   const [manual, setManual] = useState<ManualDiscount>(null);
   const [topSellers, setTopSellers] = useState<Set<string>>(new Set());
