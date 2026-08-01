@@ -39,9 +39,8 @@ type MenuItemLite = { id: string; name: string };
 
 const db = supabase as any;
 
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Check, ChevronsUpDown } from "lucide-react";
+import { Check } from "lucide-react";
 
 function DiscountsPage() {
   const { primaryRole } = useAuth();
@@ -204,7 +203,7 @@ function DiscountDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{d.id ? "Edit discount" : "New discount"}</DialogTitle>
         </DialogHeader>
@@ -318,6 +317,7 @@ function MultiItemPicker({
   selected: string[];
   onChange: (ids: string[]) => void;
 }) {
+  const [q, setQ] = useState("");
   const selectedSet = new Set(selected);
   const label = selected.length === 0
     ? "Whole order (subtotal)"
@@ -329,35 +329,56 @@ function MultiItemPicker({
     if (next.has(id)) next.delete(id); else next.add(id);
     onChange([...next]);
   }
+  const term = q.trim().toLowerCase();
+  const filtered = menuItems.filter((m) => !term || m.name.toLowerCase().includes(term));
+  // Selected items always float to the top for easy review.
+  const ordered = [
+    ...filtered.filter((m) => selectedSet.has(m.id)),
+    ...filtered.filter((m) => !selectedSet.has(m.id)),
+  ];
+  const firstUnselected = ordered.findIndex((m) => !selectedSet.has(m.id));
+
   return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button variant="outline" className="w-full justify-between font-normal">
-          <span className="truncate">{label}</span>
-          <ChevronsUpDown className="h-3 w-3 ml-2 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[320px] p-0 max-h-[300px] overflow-y-auto">
-        <button
-          type="button"
-          className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-accent border-b"
-          onClick={() => onChange([])}
-        >
-          {selected.length === 0 ? <Check className="h-3 w-3" /> : <span className="w-3" />}
-          Whole order (clear selection)
-        </button>
-        {menuItems.map((m) => (
-          <button
-            key={m.id}
-            type="button"
-            className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-accent text-left"
-            onClick={() => toggle(m.id)}
-          >
-            <Checkbox checked={selectedSet.has(m.id)} className="pointer-events-none" />
-            <span className="truncate">{m.name}</span>
-          </button>
+    <div className="rounded-md border">
+      <div className="flex items-center gap-2 px-3 py-2 border-b bg-muted/40">
+        <span className="text-sm truncate flex-1">{label}</span>
+        {selected.length > 0 && (
+          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => onChange([])}>
+            Clear
+          </Button>
+        )}
+      </div>
+      <div className="p-2 border-b">
+        <Input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search items…"
+          className="h-8"
+        />
+      </div>
+      <div className="max-h-[220px] overflow-y-auto overscroll-contain">
+        {ordered.length === 0 && (
+          <div className="px-3 py-3 text-sm text-muted-foreground">No items match.</div>
+        )}
+        {ordered.map((m, i) => (
+          <div key={m.id}>
+            {selected.length > 0 && i === firstUnselected && firstUnselected > 0 && (
+              <div className="px-3 py-1 text-[10px] uppercase tracking-wide text-muted-foreground bg-muted/50">
+                All items
+              </div>
+            )}
+            <button
+              type="button"
+              className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-accent text-left"
+              onClick={() => toggle(m.id)}
+            >
+              <Checkbox checked={selectedSet.has(m.id)} className="pointer-events-none" />
+              <span className="truncate">{m.name}</span>
+              {selectedSet.has(m.id) && <Check className="h-3 w-3 ml-auto text-primary shrink-0" />}
+            </button>
+          </div>
         ))}
-      </PopoverContent>
-    </Popover>
+      </div>
+    </div>
   );
 }

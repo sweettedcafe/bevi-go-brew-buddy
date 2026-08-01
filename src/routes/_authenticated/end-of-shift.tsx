@@ -67,10 +67,12 @@ function EndOfShiftPage() {
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [uploadingReceipt, setUploadingReceipt] = useState(false);
 
-  // starting cash (set once per shift, carried from yesterday's closing)
+  // starting cash — declared once a day by the FIRST shifter only
   const [cashInput, setCashInput] = useState("");
   const [prevClosing, setPrevClosing] = useState<number | null>(null);
   const [savingCash, setSavingCash] = useState(false);
+  const [canSetCash, setCanSetCash] = useState(false);
+
 
   // admin-managed expense categories
   const [expCats, setExpCats] = useState<ExpenseCategory[]>([]);
@@ -131,6 +133,9 @@ function EndOfShiftPage() {
       const { data: us } = await (supabase as any).rpc("shift_upsell_stats", { p_shift_id: shiftId });
       const { data: prev } = await (supabase as any).rpc("tc_prev_closing_cash");
       setPrevClosing(prev == null ? null : Number(prev));
+      const { data: st } = await (supabase as any).rpc("tc_starting_cash_state");
+      setCanSetCash(Boolean(st?.can_set));
+
       if (us) setUpsellStats({
         offers: Number(us.offers ?? 0),
         added: Number(us.added ?? 0),
@@ -310,9 +315,9 @@ function EndOfShiftPage() {
                   }
                 />
               </div>
-              {!report.shift.clock_out && Number(report.shift.starting_cash) === 0 && (
+              {canSetCash && !report.shift.clock_out && Number(report.shift.starting_cash) === 0 && (
                 <div className="mt-4 rounded-md border p-3 space-y-2">
-                  <Label htmlFor="start-cash">Set starting cash for this shift (once)</Label>
+                  <Label htmlFor="start-cash">Set starting cash for today (first shift only)</Label>
                   <div className="flex flex-wrap items-center gap-2">
                     <Input id="start-cash" type="number" min="0" step="0.01" className="w-40"
                       placeholder={prevClosing != null ? prevClosing.toFixed(2) : "0.00"}
@@ -325,10 +330,12 @@ function EndOfShiftPage() {
                     <Button size="sm" onClick={saveStartingCash} disabled={savingCash}>Save</Button>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Yesterday's cash on hand becomes today's starting cash. This can only be set once per shift.
+                    Yesterday's closing cash (starting cash + cash payments − expenses) carries over as today's
+                    starting cash. Only the first shift of the day declares it; later shifts continue the same drawer.
                   </p>
                 </div>
               )}
+
 
               {report.breaks.length > 0 && (
                 <div className="mt-4">
