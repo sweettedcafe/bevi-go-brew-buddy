@@ -55,6 +55,7 @@ function SelfOrderPage() {
   const [customizing, setCustomizing] = useState<{
     item: Item;
     isUpsell: boolean;
+    upsellSuggestionCount?: number;
     sessionId: number;
   } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -644,7 +645,7 @@ function SelfOrderPage() {
             if (wasUpsell) {
               void (supabase as any).rpc("log_upsell_event", {
                 p_source: "customer",
-                p_suggestions_count: upsell?.suggestions.length ?? 0,
+                p_suggestions_count: customizing.upsellSuggestionCount ?? 0,
                 p_added_count: 1,
               });
               setUpsell(null);
@@ -664,7 +665,12 @@ function SelfOrderPage() {
             const it = items.find((x) => x.id === choice.id);
             if (!it) return;
             setUpsell(null);
-            setCustomizing({ item: it, isUpsell: true, sessionId: Date.now() });
+            setCustomizing({
+              item: it,
+              isUpsell: true,
+              upsellSuggestionCount: upsell.suggestions.length,
+              sessionId: Date.now(),
+            });
           }}
           onSkip={() => {
             void (supabase as any).rpc("log_upsell_event", {
