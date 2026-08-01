@@ -262,8 +262,6 @@ begin
 end $$;
 revoke all on function public.pos_create_order(jsonb) from public, anon;
 grant execute on function public.pos_create_order(jsonb) to authenticated;
-revoke all on function public.pos_create_order(jsonb) from public, anon;
-grant execute on function public.pos_create_order(jsonb) to authenticated;
 
 -- Re-sync today's counter with reality so the very next sale is clean.
 insert into public.daily_order_counter(business_date, last_seq)
