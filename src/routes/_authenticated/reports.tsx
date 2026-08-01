@@ -264,10 +264,14 @@ function ReportsPage() {
   };
 
   const filteredOrders = useMemo(() => {
-    if (!filters.status) return orders;
-    return orders.filter((o) => statusOf(o) === filters.status);
+    const owner = filters.owner.trim().toLowerCase();
+    return orders.filter((o) => {
+      if (filters.status && statusOf(o) !== filters.status) return false;
+      if (owner && !((o._owners ?? []) as string[]).some((n) => n.toLowerCase() === owner)) return false;
+      return true;
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orders, filters.status]);
+  }, [orders, filters.status, filters.owner]);
 
   const itemRows = useMemo(() => {
     const cat = filters.category.trim().toLowerCase();
