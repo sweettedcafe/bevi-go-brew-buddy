@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { StableModal, StableModalFooter } from "@/components/ui/stable-modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,43 +62,23 @@ export function CustomizeDialog({
   const variantHeading = (options.variant_group_label?.trim() || "Variant");
   const dynGroups = options.groups ?? [];
 
-  const [variantId, setVariantId] = useState<string | null>(null);
-  const [size, setSize] = useState<PriceOption | null>(null);
-  const [milk, setMilk] = useState<PriceOption | null>(null);
-  const [extras, setExtras] = useState<PriceOption[]>([]);
-  const [flavors, setFlavors] = useState<PriceOption[]>([]);
-  const [others, setOthers] = useState<PriceOption[]>([]);
-  const [other, setOther] = useState<PriceOption[]>([]);
-  const [groupSel, setGroupSel] = useState<Record<string, PriceOption[]>>({});
+  // This component is keyed and mounted fresh for each item. Initialize directly
+  // instead of resetting state in an effect; effect-driven resets were the last
+  // remaining source of React's maximum-update-depth crash during upsell handoff.
+  const [variantId, setVariantId] = useState<string | null>(() =>
+    initial?.variantId ?? sortedVariants[0]?.id ?? null,
+  );
+  const [size, setSize] = useState<PriceOption | null>(() => initial?.custom?.size ?? defSize);
+  const [milk, setMilk] = useState<PriceOption | null>(() => initial?.custom?.milk ?? null);
+  const [extras, setExtras] = useState<PriceOption[]>(() => initial?.custom?.extras ?? []);
+  const [flavors, setFlavors] = useState<PriceOption[]>(() => initial?.custom?.flavors ?? []);
+  const [others, setOthers] = useState<PriceOption[]>(() => initial?.custom?.others ?? []);
+  const [other, setOther] = useState<PriceOption[]>(() => initial?.custom?.other ?? []);
+  const [groupSel, setGroupSel] = useState<Record<string, PriceOption[]>>(() => initial?.custom?.groups ?? {});
   const [otherLabel, setOtherLabel] = useState("");
   const [otherPrice, setOtherPrice] = useState("");
-  const [qty, setQty] = useState(1);
-  const [notes, setNotes] = useState("");
-
-  // Keep latest values without making them effect dependencies — callers often
-  // pass freshly-built arrays/objects, which would otherwise re-run this reset
-  // on every render and cause an infinite update loop.
-  const latest = useRef({ initial, defSize, sortedVariants });
-  latest.current = { initial, defSize, sortedVariants };
-  const wasOpen = useRef(false);
-
-  useEffect(() => {
-    if (!open) { wasOpen.current = false; return; }
-    if (wasOpen.current) return;
-    wasOpen.current = true;
-    const { initial: init, defSize: ds, sortedVariants: sv } = latest.current;
-    setVariantId(init?.variantId ?? sv[0]?.id ?? null);
-    setSize(init?.custom?.size ?? ds);
-    setMilk(init?.custom?.milk ?? null);
-    setExtras(init?.custom?.extras ?? []);
-    setFlavors(init?.custom?.flavors ?? []);
-    setOthers(init?.custom?.others ?? []);
-    setOther(init?.custom?.other ?? []);
-    setGroupSel(init?.custom?.groups ?? {});
-    setOtherLabel(""); setOtherPrice("");
-    setQty(init?.qty ?? 1);
-    setNotes(init?.notes ?? "");
-  }, [open]);
+  const [qty, setQty] = useState(() => initial?.qty ?? 1);
+  const [notes, setNotes] = useState(() => initial?.notes ?? "");
 
 
   const selectedVariant = hasVariants
