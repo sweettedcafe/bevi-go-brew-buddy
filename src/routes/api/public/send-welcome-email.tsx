@@ -38,6 +38,7 @@ export const Route = createFileRoute("/api/public/send-welcome-email")({
         // Build RFC 2822 MIME message. Subject is encoded (RFC 2047) to allow non-ASCII.
         const encodedSubject = `=?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`;
         const mime = [
+          `From: Bevi & Go <beviandgo@gmail.com>`,
           `To: ${email}`,
           `Subject: ${encodedSubject}`,
           "MIME-Version: 1.0",
