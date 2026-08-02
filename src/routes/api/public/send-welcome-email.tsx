@@ -37,21 +37,26 @@ export const Route = createFileRoute("/api/public/send-welcome-email")({
 
         // Build RFC 2822 MIME message. Subject is encoded (RFC 2047) to allow non-ASCII.
         const encodedSubject = `=?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`;
-        const mime = [
-          `From: Bevi & Go <beviandgo@gmail.com>`,
-          `To: ${email}`,
-          `Subject: ${encodedSubject}`,
-          "MIME-Version: 1.0",
-          'Content-Type: text/html; charset="UTF-8"',
-          "Content-Transfer-Encoding: base64",
-          "",
-          chunk(btoa(unescape(encodeURIComponent(html))), 76),
-        ].join("\r\n");
+        const FROM_ADDRESS = "beviandgo@gmail.com";
+        const buildMime = (withFrom: boolean) =>
+          [
+            ...(withFrom ? [`From: Bevi & Go <${FROM_ADDRESS}>`] : []),
+            `To: ${email}`,
+            `Reply-To: Bevi & Go <${FROM_ADDRESS}>`,
+            `Subject: ${encodedSubject}`,
+            "MIME-Version: 1.0",
+            'Content-Type: text/html; charset="UTF-8"',
+            "Content-Transfer-Encoding: base64",
+            "",
+            chunk(btoa(unescape(encodeURIComponent(html))), 76),
+          ].join("\r\n");
 
-        const raw = base64url(mime);
+        const raw = base64url(buildMime(true));
 
-        try {
-          const res = await fetch(
+
+
+        const send = (rawMsg: string) =>
+          fetch(
             "https://connector-gateway.lovable.dev/google_mail/gmail/v1/users/me/messages/send",
             {
               method: "POST",
@@ -60,12 +65,22 @@ export const Route = createFileRoute("/api/public/send-welcome-email")({
                 "X-Connection-Api-Key": gmailKey,
                 "Content-Type": "application/json",
               },
-              body: JSON.stringify({ raw }),
+              body: JSON.stringify({ raw: rawMsg }),
             },
           );
+
+        try {
+          let res = await send(raw);
           if (!res.ok) {
             const errBody = await res.text();
             console.error(`[welcome-email] Gmail send failed [${res.status}]: ${errBody}`);
+            // The connected Gmail account may not have beviandgo@gmail.com as a
+            // verified "Send as" alias — retry using the account's own address.
+            if (res.status === 400 || res.status === 403) {
+              res = await send(base64url(buildMime(false)));
+              if (res.ok) return json({ ok: true, fallback_from: true }, 200);
+              console.error(`[welcome-email] fallback send failed [${res.status}]`);
+            }
             return json({ ok: false, error: "provider_error", status: res.status }, 200);
           }
           return json({ ok: true }, 200);
@@ -73,6 +88,7 @@ export const Route = createFileRoute("/api/public/send-welcome-email")({
           console.error("[welcome-email] send error", e?.message);
           return json({ ok: false, error: "send_failed" }, 200);
         }
+
       },
     },
   },
