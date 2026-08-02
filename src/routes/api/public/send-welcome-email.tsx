@@ -55,8 +55,8 @@ export const Route = createFileRoute("/api/public/send-welcome-email")({
 
 
 
-        try {
-          const res = await fetch(
+        const send = (rawMsg: string) =>
+          fetch(
             "https://connector-gateway.lovable.dev/google_mail/gmail/v1/users/me/messages/send",
             {
               method: "POST",
@@ -65,12 +65,22 @@ export const Route = createFileRoute("/api/public/send-welcome-email")({
                 "X-Connection-Api-Key": gmailKey,
                 "Content-Type": "application/json",
               },
-              body: JSON.stringify({ raw }),
+              body: JSON.stringify({ raw: rawMsg }),
             },
           );
+
+        try {
+          let res = await send(raw);
           if (!res.ok) {
             const errBody = await res.text();
             console.error(`[welcome-email] Gmail send failed [${res.status}]: ${errBody}`);
+            // The connected Gmail account may not have beviandgo@gmail.com as a
+            // verified "Send as" alias — retry using the account's own address.
+            if (res.status === 400 || res.status === 403) {
+              res = await send(base64url(buildMime(false)));
+              if (res.ok) return json({ ok: true, fallback_from: true }, 200);
+              console.error(`[welcome-email] fallback send failed [${res.status}]`);
+            }
             return json({ ok: false, error: "provider_error", status: res.status }, 200);
           }
           return json({ ok: true }, 200);
@@ -78,6 +88,7 @@ export const Route = createFileRoute("/api/public/send-welcome-email")({
           console.error("[welcome-email] send error", e?.message);
           return json({ ok: false, error: "send_failed" }, 200);
         }
+
       },
     },
   },
