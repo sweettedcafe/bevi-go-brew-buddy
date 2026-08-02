@@ -430,10 +430,20 @@ function ReportsPage() {
           sheets: [perOrder, perItem, discounts],
         },
       });
-      toast.success("Exported to Google Sheets", {
-        action: { label: "Open", onClick: () => window.open(res.url, "_blank") },
-        duration: 10000,
-      });
+      toast.success(
+        res.shared
+          ? "Exported to Google Sheets — anyone with the link can edit"
+          : "Exported to Google Sheets (sharing not enabled on the connection)",
+        {
+          description: "Use Download to save an Excel copy.",
+          action: { label: "Open", onClick: () => window.open(res.url, "_blank") },
+          cancel: {
+            label: "Download",
+            onClick: () => window.open(res.downloadXlsx, "_blank"),
+          },
+          duration: 15000,
+        },
+      );
     } catch (e: any) {
       toast.error(e?.message ?? "Google Sheets export failed");
     } finally {

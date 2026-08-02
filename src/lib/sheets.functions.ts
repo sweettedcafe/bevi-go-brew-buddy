@@ -64,5 +64,32 @@ export const exportToGoogleSheets = createServerFn({ method: "POST" })
       throw new Error(`Sheets write failed (${updateRes.status}): ${t}`);
     }
 
-    return { url: created.spreadsheetUrl, id: created.spreadsheetId };
+    // 3. Make the file editable by anyone with the link (best effort — needs
+    // Drive scope on the connection; export still succeeds without it).
+    let shared = false;
+    let shareError: string | null = null;
+    try {
+      const permRes = await fetch(
+        `https://connector-gateway.lovable.dev/google_sheets/drive/v3/files/${created.spreadsheetId}/permissions?supportsAllDrives=true`,
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ role: "writer", type: "anyone" }),
+        },
+      );
+      if (permRes.ok) shared = true;
+      else shareError = `${permRes.status}: ${await permRes.text()}`;
+    } catch (e: any) {
+      shareError = e?.message ?? "share failed";
+    }
+    if (shareError) console.error("Sheets share failed", shareError);
+
+    return {
+      url: created.spreadsheetUrl,
+      id: created.spreadsheetId,
+      shared,
+      // Direct downloads (no Drive UI needed)
+      downloadXlsx: `https://docs.google.com/spreadsheets/d/${created.spreadsheetId}/export?format=xlsx`,
+      downloadCsv: `https://docs.google.com/spreadsheets/d/${created.spreadsheetId}/export?format=csv`,
+    };
   });
