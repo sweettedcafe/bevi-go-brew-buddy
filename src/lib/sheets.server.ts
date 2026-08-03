@@ -36,21 +36,36 @@ const IDENTITY_HEADERS: Record<string, string[]> = {
   ],
 };
 
+// Secondary identity that never relies on the raw Order ID. Google Sheets can
+// coerce ID-looking text (e.g. "139e300…") into scientific notation, which
+// would make an already-synced row look brand new on the next read.
+const FALLBACK_HEADERS: Record<string, string[]> = {
+  "Per order": ["Order #", "Date", "Time", "Type", "Total"],
+  Discounts: ["Order #", "Date", "Time", "Promotion / discount", "Amount"],
+  "Per item": ["Order #", "Date", "Time", "Type", "Item", "Variant", "Qty"],
+};
+
 type KeyBuilder = (row: Cell[]) => string;
+
+function buildKey(labels: string[], wanted: string[] | undefined): KeyBuilder | null {
+  if (!wanted) return null;
+  const indexes = wanted
+    .map((label) => labels.indexOf(label.toLowerCase()))
+    .filter((index) => index >= 0);
+  if (indexes.length === 0) return null;
+  return (row) => indexes.map((index) => canonicalCell(row[index] ?? "")).join("\u0001");
+}
 
 function makeKeyBuilder(tab: string, headerRow: Cell[]): KeyBuilder {
   const labels = headerRow.map((cell) => String(cell ?? "").trim().toLowerCase());
-  const wanted = IDENTITY_HEADERS[tab];
-  if (wanted) {
-    const indexes = wanted
-      .map((label) => labels.indexOf(label.toLowerCase()))
-      .filter((index) => index >= 0);
-    if (indexes.length > 0) {
-      return (row) => indexes.map((index) => canonicalCell(row[index] ?? "")).join("\u0001");
-    }
-  }
-  return (row) => row.map(canonicalCell).join("\u0001");
+  return buildKey(labels, IDENTITY_HEADERS[tab]) ?? ((row) => row.map(canonicalCell).join("\u0001"));
 }
+
+function makeFallbackBuilder(tab: string, headerRow: Cell[]): KeyBuilder | null {
+  const labels = headerRow.map((cell) => String(cell ?? "").trim().toLowerCase());
+  return buildKey(labels, FALLBACK_HEADERS[tab]);
+}
+
 
 
 function columnName(count: number): string {
