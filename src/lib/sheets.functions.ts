@@ -1,11 +1,19 @@
-// Export tabular data to a brand new Google Sheets spreadsheet via the
-// Lovable connector gateway. Returns the spreadsheet URL.
+// Append rows to the single shared Bevi & Go Google Sheet via the Lovable
+// connector gateway. Rows already present are skipped, so exporting repeatedly
+// keeps the sheet in sync instead of creating new files.
 import { createServerFn } from "@tanstack/react-start";
 
 const GATEWAY_URL = "https://connector-gateway.lovable.dev/google_sheets/v4";
 
+// The one workbook everything syncs into.
+export const MASTER_SPREADSHEET_ID = "1eqhqSz9MQ2xPkwHcWSTBcpvuoCh84peQcxFpCJv3jvQ";
+export const MASTER_SPREADSHEET_URL = `https://docs.google.com/spreadsheets/d/${MASTER_SPREADSHEET_ID}/edit`;
+
 type Sheet = { title: string; headers: string[]; rows: (string | number | null)[][] };
-type ExportInput = { title: string; sheets: Sheet[] };
+type ExportInput = { title?: string; sheets: Sheet[] };
+
+const norm = (row: (string | number | null)[]) =>
+  row.map((c) => String(c ?? "").trim()).join("\u0001");
 
 export const exportToGoogleSheets = createServerFn({ method: "POST" })
   .inputValidator((input: ExportInput) => input)
@@ -23,73 +31,68 @@ export const exportToGoogleSheets = createServerFn({ method: "POST" })
       Authorization: `Bearer ${lovableKey}`,
       "X-Connection-Api-Key": sheetsKey,
     };
+    const id = MASTER_SPREADSHEET_ID;
 
-    // 1. Create the spreadsheet with one tab per sheet.
-    const createBody = {
-      properties: { title: data.title },
-      sheets: data.sheets.map((s, i) => ({
-        properties: { sheetId: i, title: s.title.slice(0, 90) || `Sheet${i + 1}` },
-      })),
-    };
-    const createRes = await fetch(`${GATEWAY_URL}/spreadsheets`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(createBody),
-    });
-    if (!createRes.ok) {
-      const t = await createRes.text();
-      throw new Error(`Sheets create failed (${createRes.status}): ${t}`);
-    }
-    const created = (await createRes.json()) as {
-      spreadsheetId: string;
-      spreadsheetUrl: string;
+    const call = async (path: string, init?: RequestInit) => {
+      const res = await fetch(`${GATEWAY_URL}${path}`, { ...init, headers });
+      if (!res.ok) {
+        const t = await res.text();
+        throw new Error(`Google Sheets error (${res.status}): ${t}`);
+      }
+      return res.json() as Promise<any>;
     };
 
-    // 2. Push values into each tab.
-    const batchData = data.sheets.map((s) => ({
-      range: `${s.title.slice(0, 90) || "Sheet1"}!A1`,
-      majorDimension: "ROWS",
-      values: [s.headers, ...s.rows],
-    }));
-    const updateRes = await fetch(
-      `${GATEWAY_URL}/spreadsheets/${created.spreadsheetId}/values:batchUpdate`,
-      {
+    // Which tabs already exist?
+    const meta = await call(`/spreadsheets/${id}?fields=sheets.properties.title`);
+    const existingTabs: string[] = (meta.sheets ?? []).map((s: any) => s.properties.title);
+
+    const missing = data.sheets
+      .map((s) => s.title.slice(0, 90))
+      .filter((t) => !existingTabs.includes(t));
+    if (missing.length) {
+      await call(`/spreadsheets/${id}:batchUpdate`, {
         method: "POST",
-        headers,
-        body: JSON.stringify({ valueInputOption: "USER_ENTERED", data: batchData }),
-      },
-    );
-    if (!updateRes.ok) {
-      const t = await updateRes.text();
-      throw new Error(`Sheets write failed (${updateRes.status}): ${t}`);
+        body: JSON.stringify({
+          requests: missing.map((title) => ({ addSheet: { properties: { title } } })),
+        }),
+      });
     }
 
-    // 3. Make the file editable by anyone with the link (best effort — needs
-    // Drive scope on the connection; export still succeeds without it).
-    let shared = false;
-    let shareError: string | null = null;
-    try {
-      const permRes = await fetch(
-        `https://connector-gateway.lovable.dev/google_sheets/drive/v3/files/${created.spreadsheetId}/permissions?supportsAllDrives=true`,
-        {
-          method: "POST",
-          headers,
-          body: JSON.stringify({ role: "writer", type: "anyone" }),
-        },
-      );
-      if (permRes.ok) shared = true;
-      else shareError = `${permRes.status}: ${await permRes.text()}`;
-    } catch (e: any) {
-      shareError = e?.message ?? "share failed";
+    let appended = 0;
+    let skipped = 0;
+
+    for (const sheet of data.sheets) {
+      const tab = sheet.title.slice(0, 90);
+      const quoted = `'${tab.replace(/'/g, "''")}'`;
+
+      const current = await call(`/spreadsheets/${id}/values/${quoted}!A1:ZZ100000`);
+      const values: string[][] = current.values ?? [];
+
+      const toWrite: (string | number | null)[][] = [];
+      if (values.length === 0) toWrite.push(sheet.headers);
+
+      const seen = new Set(values.slice(1).map((r) => norm(r)));
+      for (const row of sheet.rows) {
+        const key = norm(row);
+        if (seen.has(key)) { skipped++; continue; }
+        seen.add(key);
+        toWrite.push(row);
+        appended++;
+      }
+
+      if (toWrite.length) {
+        await call(
+          `/spreadsheets/${id}/values/${quoted}!A1:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
+          { method: "POST", body: JSON.stringify({ majorDimension: "ROWS", values: toWrite }) },
+        );
+      }
     }
-    if (shareError) console.error("Sheets share failed", shareError);
 
     return {
-      url: created.spreadsheetUrl,
-      id: created.spreadsheetId,
-      shared,
-      // Direct downloads (no Drive UI needed)
-      downloadXlsx: `https://docs.google.com/spreadsheets/d/${created.spreadsheetId}/export?format=xlsx`,
-      downloadCsv: `https://docs.google.com/spreadsheets/d/${created.spreadsheetId}/export?format=csv`,
+      url: MASTER_SPREADSHEET_URL,
+      id,
+      appended,
+      skipped,
+      downloadXlsx: `https://docs.google.com/spreadsheets/d/${id}/export?format=xlsx`,
     };
   });
