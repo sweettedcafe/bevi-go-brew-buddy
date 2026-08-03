@@ -477,7 +477,7 @@ function SelfOrderPage() {
           is_upsell: !!l.is_upsell,
         })),
         bundles: cart.filter((l) => l.kind === "bundle").map((l) => ({
-          bundle_id: l.bundle_id, qty: l.qty,
+          bundle_id: l.bundle_id, qty: l.qty, choices: l.bundle_choices ?? [],
         })),
       },
     });
