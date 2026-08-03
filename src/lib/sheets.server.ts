@@ -19,6 +19,21 @@ function canonicalCell(value: Cell): string {
   return text;
 }
 
+function canonicalIdentityCell(value: Cell, label: string): string {
+  const text = String(value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+  if (label === "time") {
+    const match = text.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(am|pm)?$/);
+    if (match) {
+      let hour = Number(match[1]);
+      const meridiem = match[4];
+      if (meridiem === "am" && hour === 12) hour = 0;
+      if (meridiem === "pm" && hour < 12) hour += 12;
+      return `${String(hour).padStart(2, "0")}:${match[2]}:${match[3] ?? "00"}`;
+    }
+  }
+  return canonicalCell(value);
+}
+
 // Identity fields per tab, expressed as header labels so the key stays correct
 // even if the sheet's columns are reordered or the app's column set changes.
 const IDENTITY_HEADERS: Record<string, string[]> = {
@@ -49,11 +64,13 @@ type KeyBuilder = (row: Cell[]) => string;
 
 function buildKey(labels: string[], wanted: string[] | undefined): KeyBuilder | null {
   if (!wanted) return null;
-  const indexes = wanted
-    .map((label) => labels.indexOf(label.toLowerCase()))
-    .filter((index) => index >= 0);
-  if (indexes.length === 0) return null;
-  return (row) => indexes.map((index) => canonicalCell(row[index] ?? "")).join("\u0001");
+  const fields = wanted
+    .map((label) => ({ index: labels.indexOf(label.toLowerCase()), label: label.toLowerCase() }))
+    .filter((field) => field.index >= 0);
+  if (fields.length === 0) return null;
+  return (row) => fields
+    .map((field) => canonicalIdentityCell(row[field.index] ?? "", field.label))
+    .join("\u0001");
 }
 
 function makeKeyBuilder(tab: string, headerRow: Cell[]): KeyBuilder {
