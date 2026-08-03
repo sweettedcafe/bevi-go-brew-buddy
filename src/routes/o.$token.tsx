@@ -55,6 +55,7 @@ function SelfOrderPage() {
   const [variants, setVariants] = useState<Variant[]>([]);
   const [bundles, setBundles] = useState<Bundle[]>([]);
   const [bundleItems, setBundleItems] = useState<BundleItem[]>([]);
+  const [bundleChoice, setBundleChoice] = useState<{ bundle: Bundle; rows: BundleChoiceRow[] } | null>(null);
   const [activeCat, setActiveCat] = useState<string | "all" | "__bundles__">("all");
   const [cart, setCart] = useState<CartLine[]>([]);
   const [customizing, setCustomizing] = useState<{
@@ -376,15 +377,43 @@ function SelfOrderPage() {
     maybeOfferUpsell(it, cart);
   }
 
+  function bundleChoiceRows(b: Bundle): BundleChoiceRow[] {
+    return bundleItems
+      .filter((x) => x.bundle_id === b.id && (x.variant_ids?.length ?? 0) > 1)
+      .map((x) => ({
+        bundle_item_id: x.id ?? `${x.bundle_id}:${x.menu_item_id}`,
+        item_name: items.find((i) => i.id === x.menu_item_id)?.name ?? "Item",
+        qty: x.qty,
+        choices: (x.variant_ids ?? [])
+          .map((vid) => variants.find((v) => v.id === vid))
+          .filter(Boolean)
+          .map((v: any) => ({ id: v.id, menu_item_id: v.menu_item_id, name: v.name, price: Number(v.price) })),
+      }))
+      .filter((r) => r.choices.length > 1);
+  }
+
   function addBundle(b: Bundle) {
     const rows = bundleItems.filter((x) => x.bundle_id === b.id);
     if (rows.length === 0) { toast.error("Bundle is empty"); return; }
+    const choiceRows = bundleChoiceRows(b);
+    if (choiceRows.length > 0) { setBundleChoice({ bundle: b, rows: choiceRows }); return; }
+    commitBundle(b, {});
+  }
+
+  function commitBundle(b: Bundle, picked: Record<string, string>) {
+    const rows = bundleItems.filter((x) => x.bundle_id === b.id);
     // compute effective bundle price from its component discounts
     let price = 0;
+    const labels: string[] = [];
+    const choices: { bundle_item_id: string; variant_id: string }[] = [];
     for (const r of rows) {
       const it = items.find((i) => i.id === r.menu_item_id);
       if (!it) continue;
-      const bv = r.variant_id ? variants.find((v) => v.id === r.variant_id) : null;
+      const key = r.id ?? `${r.bundle_id}:${r.menu_item_id}`;
+      const vid = picked[key] ?? r.variant_id ?? null;
+      const bv = vid ? variants.find((v) => v.id === vid) : null;
+      if (bv && r.id && picked[key]) choices.push({ bundle_item_id: r.id, variant_id: bv.id });
+      if (bv) labels.push(`${it.name} — ${bv.name}`);
       const base = Number(bv?.price ?? it.price);
       const unit = r.discount_type === "percent"
         ? Math.max(0, base - base * (Number(r.discount_value) || 0) / 100)
@@ -392,16 +421,21 @@ function SelfOrderPage() {
       price += unit * r.qty;
     }
     price = Math.round(price * 100) / 100;
+    const sig = choices.map((c) => `${c.bundle_item_id}:${c.variant_id}`).sort().join("|");
     setCart((c) => {
-      const f = c.find((l) => l.kind === "bundle" && l.bundle_id === b.id);
+      const f = c.find((l) => l.kind === "bundle" && l.bundle_id === b.id
+        && (l.bundle_choices ?? []).map((x) => `${x.bundle_item_id}:${x.variant_id}`).sort().join("|") === sig);
       if (f) return c.map((l) => l.lineId === f.lineId ? { ...l, qty: l.qty + 1 } : l);
       return [...c, {
         lineId: newId(), kind: "bundle",
         menu_item_id: null, bundle_id: b.id, name: b.name,
         unit_price: price, qty: 1, addon_total: 0,
         customization: null, notes: null, variant_id: null,
+        bundle_choices: choices,
+        bundle_choice_labels: labels,
       }];
     });
+    setBundleChoice(null);
     toast.success(`${b.name} added`);
   }
 
