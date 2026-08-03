@@ -8,6 +8,7 @@ import { Coffee, Plus, Minus, Star, Trash2, Package, BellRing } from "lucide-rea
 import { toast } from "sonner";
 import { CustomizeDialog, type VariantChoice } from "@/components/pos/CustomizeDialog";
 import { UpsellDialog, type UpsellChoice } from "@/components/pos/UpsellDialog";
+import { BundleChoiceDialog, type BundleChoiceRow } from "@/components/pos/BundleChoiceDialog";
 import {
   type MenuOptions, type SelectedCustom,
   hasAnyCustomization, customSignature, describeCustom,
@@ -27,7 +28,9 @@ type Cat = { id: string; name: string; sort_order: number };
 type Variant = { id: string; menu_item_id: string; name: string; price: number; sort_order: number };
 type Bundle = { id: string; name: string; description: string | null; price: number };
 type BundleItem = {
+  id?: string;
   bundle_id: string; menu_item_id: string; qty: number; variant_id?: string | null;
+  variant_ids?: string[];
   discount_type: "percent" | "fixed"; discount_value: number;
 };
 type CartLine = {
@@ -40,6 +43,8 @@ type CartLine = {
   customization: SelectedCustom | null; notes: string | null;
   variant_id: string | null;
   is_upsell?: boolean;
+  bundle_choices?: { bundle_item_id: string; variant_id: string }[];
+  bundle_choice_labels?: string[];
 };
 
 function SelfOrderPage() {
