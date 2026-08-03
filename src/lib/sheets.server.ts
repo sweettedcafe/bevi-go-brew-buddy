@@ -36,21 +36,36 @@ const IDENTITY_HEADERS: Record<string, string[]> = {
   ],
 };
 
+// Secondary identity that never relies on the raw Order ID. Google Sheets can
+// coerce ID-looking text (e.g. "139e300…") into scientific notation, which
+// would make an already-synced row look brand new on the next read.
+const FALLBACK_HEADERS: Record<string, string[]> = {
+  "Per order": ["Order #", "Date", "Time", "Type", "Total"],
+  Discounts: ["Order #", "Date", "Time", "Promotion / discount", "Amount"],
+  "Per item": ["Order #", "Date", "Time", "Type", "Item", "Variant", "Qty"],
+};
+
 type KeyBuilder = (row: Cell[]) => string;
+
+function buildKey(labels: string[], wanted: string[] | undefined): KeyBuilder | null {
+  if (!wanted) return null;
+  const indexes = wanted
+    .map((label) => labels.indexOf(label.toLowerCase()))
+    .filter((index) => index >= 0);
+  if (indexes.length === 0) return null;
+  return (row) => indexes.map((index) => canonicalCell(row[index] ?? "")).join("\u0001");
+}
 
 function makeKeyBuilder(tab: string, headerRow: Cell[]): KeyBuilder {
   const labels = headerRow.map((cell) => String(cell ?? "").trim().toLowerCase());
-  const wanted = IDENTITY_HEADERS[tab];
-  if (wanted) {
-    const indexes = wanted
-      .map((label) => labels.indexOf(label.toLowerCase()))
-      .filter((index) => index >= 0);
-    if (indexes.length > 0) {
-      return (row) => indexes.map((index) => canonicalCell(row[index] ?? "")).join("\u0001");
-    }
-  }
-  return (row) => row.map(canonicalCell).join("\u0001");
+  return buildKey(labels, IDENTITY_HEADERS[tab]) ?? ((row) => row.map(canonicalCell).join("\u0001"));
 }
+
+function makeFallbackBuilder(tab: string, headerRow: Cell[]): KeyBuilder | null {
+  const labels = headerRow.map((cell) => String(cell ?? "").trim().toLowerCase());
+  return buildKey(labels, FALLBACK_HEADERS[tab]);
+}
+
 
 
 function columnName(count: number): string {
@@ -127,27 +142,40 @@ export async function syncSheets(
     // identity fields, so a record already present is never appended twice.
     const keyOfExisting = makeKeyBuilder(tab, sheetHeader);
     const keyOfIncoming = makeKeyBuilder(tab, sheet.headers);
+    const altOfExisting = makeFallbackBuilder(tab, sheetHeader);
+    const altOfIncoming = makeFallbackBuilder(tab, sheet.headers);
 
     const seen = new Map<string, number>();
+    const seenAlt = new Map<string, number>();
     for (const row of existingRows) {
       if (row.every((cell) => String(cell ?? "").trim() === "")) continue;
       const key = keyOfExisting(row);
-      if (!key) continue;
-      seen.set(key, (seen.get(key) ?? 0) + 1);
+      if (key) seen.set(key, (seen.get(key) ?? 0) + 1);
+      const alt = altOfExisting?.(row);
+      if (alt) seenAlt.set(alt, (seenAlt.get(alt) ?? 0) + 1);
     }
 
     const newRows: Cell[][] = [];
+    const queuedKeys = new Set<string>();
+    const queuedAlts = new Set<string>();
     for (const row of sheet.rows) {
       const key = keyOfIncoming(row);
-      const remaining = key ? (seen.get(key) ?? 0) : 0;
-      if (remaining > 0) {
-        seen.set(key, remaining - 1);
+      const alt = altOfIncoming?.(row);
+      const hasKey = key ? (seen.get(key) ?? 0) > 0 || queuedKeys.has(key) : false;
+      const hasAlt = alt ? (seenAlt.get(alt) ?? 0) > 0 || queuedAlts.has(alt) : false;
+      if (hasKey || hasAlt) {
+        if (key) seen.set(key, Math.max(0, (seen.get(key) ?? 0) - 1));
+        if (alt) seenAlt.set(alt, Math.max(0, (seenAlt.get(alt) ?? 0) - 1));
         skipped += 1;
         continue;
       }
+      if (key) queuedKeys.add(key);
+      if (alt) queuedAlts.add(alt);
       newRows.push(row);
       appended += 1;
     }
+
+
 
 
     const lastColumn = columnName(sheet.headers.length);
@@ -178,8 +206,11 @@ export async function syncSheets(
         }),
       });
       const endRow = newRows.length + 1;
+      // RAW keeps ID-like text (e.g. "139e300…") as text instead of letting
+      // Sheets coerce it into scientific notation, which broke deduplication.
       await call(
-        `/spreadsheets/${id}/values/${quoted}!A2:${lastColumn}${endRow}?valueInputOption=USER_ENTERED`,
+        `/spreadsheets/${id}/values/${quoted}!A2:${lastColumn}${endRow}?valueInputOption=RAW`,
+
         {
           method: "PUT",
           body: JSON.stringify({ majorDimension: "ROWS", values: newRows }),
