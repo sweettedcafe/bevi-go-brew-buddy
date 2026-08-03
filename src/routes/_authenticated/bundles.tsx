@@ -368,7 +368,8 @@ function EditBundleDialog({
             <h3 className="font-medium text-sm">Items in this bundle</h3>
             <Button size="sm" variant="outline"
               onClick={() => setRows((a) => [...a, {
-                menu_item_id: "", variant_id: null, qty: "1", discount_type: "percent", discount_value: "0",
+                menu_item_id: "", variant_ids: [] as string[], qty: "1",
+                discount_type: "percent" as const, discount_value: "0",
               }])}>
               <Plus className="h-3 w-3 mr-1" /> Add item
             </Button>
