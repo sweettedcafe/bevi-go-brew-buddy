@@ -25,6 +25,7 @@ import { CustomizeDialog } from "@/components/pos/CustomizeDialog";
 import { CameraScannerDialog } from "@/components/pos/CameraScannerDialog";
 import { PrintPreviewDialog, type PrintPreviewDocument } from "@/components/print/PrintPreviewDialog";
 import { UpsellDialog, type UpsellChoice } from "@/components/pos/UpsellDialog";
+import { BundleChoiceDialog, type BundleChoiceRow } from "@/components/pos/BundleChoiceDialog";
 import {
   type MenuOptions, type SelectedCustom,
   hasAnyCustomization, addonTotal, customSignature, describeCustom,
@@ -130,6 +131,7 @@ function POSPage() {
   const [topSellers, setTopSellers] = useState<Set<string>>(new Set());
   const [bundles, setBundles] = useState<Bundle[]>([]);
   const [bundleItems, setBundleItems] = useState<BundleItem[]>([]);
+  const [bundleChoice, setBundleChoice] = useState<{ bundle: Bundle; rows: BundleChoiceRow[] } | null>(null);
   const [discounts, setDiscounts] = useState<DiscountRow[]>([]);
 
   // Barcode / customer loyalty
