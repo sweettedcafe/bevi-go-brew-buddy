@@ -35,6 +35,7 @@ type BundleItem = {
   bundle_id?: string;
   menu_item_id: string;
   variant_id: string | null;
+  variant_ids: string[];
   qty: number;
   discount_type: "percent" | "fixed";
   discount_value: number;
@@ -85,6 +86,7 @@ function BundlesPage() {
       discount_type: (r.discount_type ?? "percent") as "percent" | "fixed",
       discount_value: Number(r.discount_value ?? 0),
       variant_id: r.variant_id ?? null,
+      variant_ids: (r.variant_ids ?? (r.variant_id ? [r.variant_id] : [])) as string[],
     })));
     setOwners((o ?? []) as Owner[]);
     setVariants((v ?? []) as Variant[]);
