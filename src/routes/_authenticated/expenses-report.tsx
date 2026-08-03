@@ -159,16 +159,12 @@ function ExpensesReportPage() {
         },
       });
       toast.success(
-        res.shared
-          ? "Exported to Google Sheets — anyone with the link can edit"
-          : "Exported to Google Sheets (sharing not enabled on the connection)",
+        `Synced to the shared Google Sheet — ${res.appended} new row${res.appended === 1 ? "" : "s"} added`,
         {
-          description: "Use Download to save an Excel copy.",
-          action: { label: "Open", onClick: () => window.open(res.url, "_blank") },
-          cancel: {
-            label: "Download",
-            onClick: () => window.open(res.downloadXlsx, "_blank"),
-          },
+          description: res.skipped
+            ? `${res.skipped} row${res.skipped === 1 ? " was" : "s were"} already there and skipped.`
+            : "Records are appended to the same sheet, no download needed.",
+          action: { label: "Open sheet", onClick: () => window.open(res.url, "_blank") },
           duration: 15000,
         },
       );
