@@ -749,6 +749,19 @@ function SelfOrderPage() {
         />
       ) : null}
 
+      {bundleChoice && (
+        <BundleChoiceDialog
+          key={bundleChoice.bundle.id}
+          open
+          onOpenChange={(o) => { if (!o) setBundleChoice(null); }}
+          bundleName={bundleChoice.bundle.name}
+          rows={bundleChoice.rows}
+          onConfirm={(picked) => commitBundle(bundleChoice.bundle, picked)}
+        />
+      )}
+
+
+
       {imagePreview && (
         <div
           onClick={() => setImagePreview(null)}
