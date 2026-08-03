@@ -578,10 +578,17 @@ function SelfOrderPage() {
           ) : bundles.map((b) => {
             const rows = bundleItems.filter((x) => x.bundle_id === b.id);
             let price = 0;
+            let hasChoice = false;
             for (const r of rows) {
               const it = items.find((i) => i.id === r.menu_item_id);
               if (!it) continue;
-              const base = Number(it.price);
+              const allowed = (r.variant_ids?.length ? r.variant_ids : (r.variant_id ? [r.variant_id] : []))
+                .map((vid) => variants.find((v) => v.id === vid))
+                .filter(Boolean) as Variant[];
+              if (allowed.length > 1) hasChoice = true;
+              const base = allowed.length
+                ? Math.min(...allowed.map((v) => Number(v.price)))
+                : Number(it.price);
               const unit = r.discount_type === "percent"
                 ? Math.max(0, base - base * (Number(r.discount_value) || 0) / 100)
                 : Math.max(0, base - (Number(r.discount_value) || 0));
@@ -595,7 +602,8 @@ function SelfOrderPage() {
                 </div>
                 <div className="font-medium leading-tight mt-1">{b.name}</div>
                 {b.description && <div className="text-xs text-muted-foreground mt-1 line-clamp-2">{b.description}</div>}
-                <div className="mt-2 font-display text-lg text-primary">₱{fmt(price)}</div>
+                {hasChoice && <div className="text-[10px] text-muted-foreground mt-1">Choose your combination</div>}
+                <div className="mt-2 font-display text-lg text-primary">₱{fmt(price)}{hasChoice ? "+" : ""}</div>
               </button>
             );
           })
