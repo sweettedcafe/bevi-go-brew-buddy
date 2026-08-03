@@ -612,16 +612,38 @@ function POSPage() {
 
 
 
+  function bundleChoiceRows(b: Bundle): BundleChoiceRow[] {
+    return bundleItems
+      .filter((x) => x.bundle_id === b.id && (x.variant_ids?.length ?? 0) > 1)
+      .map((x) => ({
+        bundle_item_id: x.id ?? `${x.bundle_id}:${x.menu_item_id}`,
+        item_name: items.find((i) => i.id === x.menu_item_id)?.name ?? "Item",
+        qty: x.qty,
+        choices: (x.variant_ids ?? [])
+          .map((vid) => variants.find((v) => v.id === vid))
+          .filter(Boolean)
+          .map((v: any) => ({ id: v.id, menu_item_id: v.menu_item_id, name: v.name, price: Number(v.price) })),
+      }))
+      .filter((r) => r.choices.length > 1);
+  }
+
   function addBundle(b: Bundle) {
     const rows = bundleItems.filter((x) => x.bundle_id === b.id);
     if (rows.length === 0) { toast.error("Bundle has no items"); return; }
+    const choiceRows = bundleChoiceRows(b);
+    if (choiceRows.length > 0) { setBundleChoice({ bundle: b, rows: choiceRows }); return; }
+    commitBundle(b, {});
+  }
+
+  function commitBundle(b: Bundle, picked: Record<string, string>) {
+    const rows = bundleItems.filter((x) => x.bundle_id === b.id);
     const newLines: CartLine[] = [];
     for (const r of rows) {
       const it = items.find((x) => x.id === r.menu_item_id);
       if (!it) continue;
-      const bv = (r as any).variant_id
-        ? variants.find((v) => v.id === (r as any).variant_id) ?? null
-        : null;
+      const key = r.id ?? `${r.bundle_id}:${r.menu_item_id}`;
+      const vid = picked[key] ?? r.variant_id ?? null;
+      const bv = vid ? variants.find((v) => v.id === vid) ?? null : null;
       const base = Number(bv?.price ?? it.price);
       const unit = r.discount_type === "percent"
         ? Math.max(0, base - base * (Number(r.discount_value) || 0) / 100)
@@ -640,6 +662,7 @@ function POSPage() {
     }
     if (newLines.length === 0) { toast.error("Bundle items unavailable"); return; }
     setCart((c) => [...c, ...newLines]);
+    setBundleChoice(null);
     toast.success(`${b.name} added`);
   }
 
