@@ -155,13 +155,21 @@ function BundlesPage() {
                     <div className="mt-2 space-y-1">
                       {its.map((x) => {
                         const it = itemById(x.menu_item_id);
-                        const vr = variantById(x.variant_id);
+                        const chosen = (x.variant_ids?.length ? x.variant_ids : (x.variant_id ? [x.variant_id] : []))
+                          .map((vid) => variantById(vid)).filter(Boolean) as Variant[];
+                        const vr = chosen[0] ?? null;
                         const unit = discountedUnit(it, x.discount_type, x.discount_value, vr);
                         const orig = Number(vr?.price ?? it?.price ?? 0);
+                        const multi = chosen.length > 1;
                         return (
                           <div key={x.id} className="flex items-center justify-between text-xs gap-2">
                             <div className="flex items-center gap-1 min-w-0">
-                              <span className="truncate">{it?.name ?? "—"}{vr ? ` — ${vr.name}` : ""} × {x.qty}</span>
+                              <span className="truncate">
+                                {it?.name ?? "—"}
+                                {multi
+                                  ? ` — choice of ${chosen.length}: ${chosen.map((v) => v.name).join(" / ")}`
+                                  : vr ? ` — ${vr.name}` : ""} × {x.qty}
+                              </span>
                               <Badge variant="outline" className="text-[10px] shrink-0">{ownerName(it?.owner_id ?? null)}</Badge>
                             </div>
                             <div className="shrink-0 text-muted-foreground">
