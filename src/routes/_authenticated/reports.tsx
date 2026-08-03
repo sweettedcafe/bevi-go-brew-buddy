@@ -398,7 +398,11 @@ function ReportsPage() {
 
   const exportSheets = useServerFn(exportToGoogleSheets);
   const [sheetsBusy, setSheetsBusy] = useState(false);
-  async function openSheetsImport() {
+  const [autoSync, setAutoSync] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    return localStorage.getItem("reports_sheet_autosync") !== "0";
+  });
+  async function openSheetsImport(silent = false) {
     setSheetsBusy(true);
     try {
       const perOrder = {
@@ -430,6 +434,12 @@ function ReportsPage() {
           sheets: [perOrder, perItem, discounts],
         },
       });
+      if (silent) {
+        if (res.appended > 0) {
+          toast.success(`Google Sheet updated — ${res.appended} new row${res.appended === 1 ? "" : "s"} appended`);
+        }
+        return;
+      }
       toast.success(
         `Synced to the shared Google Sheet — ${res.appended} new row${res.appended === 1 ? "" : "s"} added`,
         {
@@ -441,11 +451,25 @@ function ReportsPage() {
         },
       );
     } catch (e: any) {
-      toast.error(e?.message ?? "Google Sheets export failed");
+      if (!silent) toast.error(e?.message ?? "Google Sheets export failed");
+      else console.error("Auto-append to Google Sheets failed", e);
     } finally {
       setSheetsBusy(false);
     }
   }
+
+  // Auto-append new records to the shared workbook whenever the loaded data changes.
+  const lastSyncSig = useRef("");
+  useEffect(() => {
+    if (!autoSync) return;
+    const sig = `${filteredOrders.length}|${itemRows.length}|${discountRows.length}|${filteredOrders[0]?.id ?? ""}`;
+    if (!filteredOrders.length && !itemRows.length) return;
+    if (sig === lastSyncSig.current) return;
+    lastSyncSig.current = sig;
+    const t = setTimeout(() => { void openSheetsImport(true); }, 1500);
+    return () => clearTimeout(t);
+  }, [autoSync, filteredOrders, itemRows, discountRows]);
+
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-4">
