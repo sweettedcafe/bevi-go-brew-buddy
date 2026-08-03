@@ -247,12 +247,12 @@ function EditBundleDialog({
     is_active: bundle.is_active,
   });
   const [rows, setRows] = useState<Array<{
-    menu_item_id: string; variant_id: string | null; qty: string;
+    menu_item_id: string; variant_ids: string[]; qty: string;
     discount_type: "percent" | "fixed"; discount_value: string;
   }>>(
     initialItems.map((x) => ({
       menu_item_id: x.menu_item_id,
-      variant_id: x.variant_id ?? null,
+      variant_ids: x.variant_ids?.length ? x.variant_ids : (x.variant_id ? [x.variant_id] : []),
       qty: String(x.qty),
       discount_type: x.discount_type,
       discount_value: String(x.discount_value),
@@ -264,11 +264,17 @@ function EditBundleDialog({
   const variantsFor = (itemId: string) =>
     variants.filter((v) => v.menu_item_id === itemId).sort((a, b) => a.sort_order - b.sort_order);
   const variantOf = (id: string | null) => (id ? variants.find((v) => v.id === id) ?? null : null);
+  // pricing reference = cheapest of the allowed choices
+  const refVariant = (ids: string[]) => {
+    const vs = ids.map((i) => variantOf(i)).filter(Boolean) as Variant[];
+    if (vs.length === 0) return null;
+    return vs.reduce((a, b) => (Number(b.price) < Number(a.price) ? b : a));
+  };
 
   const componentTotal = useMemo(() =>
     rows.reduce((s, r) => {
       const it = items.find((x) => x.id === r.menu_item_id);
-      const vr = variantOf(r.variant_id);
+      const vr = refVariant(r.variant_ids);
       return s + (it ? Number(vr?.price ?? it.price) * (Number(r.qty) || 0) : 0);
     }, 0),
   [rows, items, variants]);
@@ -278,7 +284,7 @@ function EditBundleDialog({
     rows.reduce((s, r) => {
       const it = items.find((x) => x.id === r.menu_item_id);
       if (!it) return s;
-      const unit = discountedUnit(it, r.discount_type, Number(r.discount_value) || 0, variantOf(r.variant_id));
+      const unit = discountedUnit(it, r.discount_type, Number(r.discount_value) || 0, refVariant(r.variant_ids));
       return s + unit * (Number(r.qty) || 0);
     }, 0),
   [rows, items, variants]);
