@@ -641,6 +641,9 @@ function SelfOrderPage() {
                       {l.name}
                     </div>
                     <div className="text-xs text-muted-foreground">{fmt(l.unit_price)} × {l.qty}</div>
+                    {(l.bundle_choice_labels?.length ?? 0) > 0 && (
+                      <div className="text-[11px] text-muted-foreground">{l.bundle_choice_labels!.join(" · ")}</div>
+                    )}
                     {desc.length > 0 && <div className="text-[11px] text-muted-foreground">{desc.join(" · ")}</div>}
                   </div>
                   <Button size="icon" variant="outline" className="h-7 w-7"
