@@ -11,25 +11,47 @@ type SheetMeta = { properties: { sheetId: number; title: string } };
 function canonicalCell(value: Cell): string {
   const text = String(value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
   if (/^-?\d+(?:\.\d+)?$/.test(text)) return String(Number(text));
+  // Strip currency/thousand separators so "1,234.50" and "1234.5" match.
+  const numeric = text.replace(/[^\d.\-]/g, "");
+  if (text && /^[^a-z]+$/.test(text) && /^-?\d+(?:\.\d+)?$/.test(numeric)) {
+    return String(Number(numeric));
+  }
   return text;
 }
 
-function rowKey(title: string, row: Cell[]): string {
-  // Order ID is immutable and uniquely identifies rows in these two tabs.
-  if (title === "Per order" || title === "Discounts") {
-    return canonicalCell(row[1] ?? "");
-  }
+// Identity fields per tab, expressed as header labels so the key stays correct
+// even if the sheet's columns are reordered or the app's column set changes.
+const IDENTITY_HEADERS: Record<string, string[]> = {
+  "Per order": ["Order ID"],
+  Discounts: ["Order ID"],
+  "Per item": [
+    "Order ID",
+    "Item",
+    "Variant",
+    "Extras",
+    "Flavors",
+    "Other",
+    "Special instructions",
+    "Qty",
+  ],
+};
 
-  // Per-item rows do not expose their database line ID, so use the immutable
-  // order ID plus the item/configuration fields while ignoring formatted date,
-  // time and money cells that Google Sheets may render differently.
-  if (title === "Per item") {
-    const identityColumns = [1, 5, 6, 7, 8, 9, 10, 17];
-    return identityColumns.map((index) => canonicalCell(row[index] ?? "")).join("\u0001");
-  }
+type KeyBuilder = (row: Cell[]) => string;
 
-  return row.map(canonicalCell).join("\u0001");
+function makeKeyBuilder(tab: string, headerRow: Cell[]): KeyBuilder {
+  const labels = headerRow.map((cell) => String(cell ?? "").trim().toLowerCase());
+  const wanted = IDENTITY_HEADERS[tab];
+  if (wanted) {
+    const indexes = wanted
+      .map((label) => labels.indexOf(label.toLowerCase()))
+      .filter((index) => index >= 0);
+    if (indexes.length > 0) {
+      return (row) => indexes.map((index) => canonicalCell(row[index] ?? "")).join("\u0001");
+    }
+  }
+  return (row) => row.map(canonicalCell).join("\u0001");
 }
+
 
 function columnName(count: number): string {
   let result = "";
@@ -97,20 +119,36 @@ export async function syncSheets(
 
     const current = await call(`/spreadsheets/${id}/values/${quoted}!A1:ZZ100000`);
     const values = (current.values ?? []) as Cell[][];
+    const sheetHeader = values.length > 0 ? values[0]! : sheet.headers;
     const existingRows = values.length > 0 ? values.slice(1) : [];
-    const seen = new Set(existingRows.map((row) => rowKey(tab, row)).filter(Boolean));
-    const newRows: Cell[][] = [];
 
+    // Keys for rows already in the sheet are read using the sheet's own header
+    // row; keys for incoming rows use the payload header. Both map the same
+    // identity fields, so a record already present is never appended twice.
+    const keyOfExisting = makeKeyBuilder(tab, sheetHeader);
+    const keyOfIncoming = makeKeyBuilder(tab, sheet.headers);
+
+    const seen = new Map<string, number>();
+    for (const row of existingRows) {
+      if (row.every((cell) => String(cell ?? "").trim() === "")) continue;
+      const key = keyOfExisting(row);
+      if (!key) continue;
+      seen.set(key, (seen.get(key) ?? 0) + 1);
+    }
+
+    const newRows: Cell[][] = [];
     for (const row of sheet.rows) {
-      const key = rowKey(tab, row);
-      if (key && seen.has(key)) {
+      const key = keyOfIncoming(row);
+      const remaining = key ? (seen.get(key) ?? 0) : 0;
+      if (remaining > 0) {
+        seen.set(key, remaining - 1);
         skipped += 1;
         continue;
       }
-      if (key) seen.add(key);
       newRows.push(row);
       appended += 1;
     }
+
 
     const lastColumn = columnName(sheet.headers.length);
     if (values.length === 0) {
