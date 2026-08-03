@@ -381,7 +381,7 @@ function EditBundleDialog({
               {rows.map((r, i) => {
                 const it = items.find((x) => x.id === r.menu_item_id);
                 const rowVariants = it ? variantsFor(it.id) : [];
-                const vr = variantOf(r.variant_id);
+                const vr = refVariant(r.variant_ids);
                 const unit = discountedUnit(it, r.discount_type, Number(r.discount_value) || 0, vr);
                 return (
                   <div key={i} className="border rounded-md p-2 space-y-2">
@@ -392,7 +392,7 @@ function EditBundleDialog({
                           const firstVariant = variants
                             .filter((vv) => vv.menu_item_id === v)
                             .sort((a, b) => a.sort_order - b.sort_order)[0];
-                          return { ...x, menu_item_id: v, variant_id: firstVariant?.id ?? null };
+                          return { ...x, menu_item_id: v, variant_ids: firstVariant ? [firstVariant.id] : [] };
                         }))}>
                         <SelectTrigger className="flex-1"><SelectValue placeholder="Pick item" /></SelectTrigger>
                         <SelectContent>
@@ -413,19 +413,36 @@ function EditBundleDialog({
                       </Button>
                     </div>
                     {rowVariants.length > 0 && (
-                      <div className="flex gap-2 items-center text-xs">
-                        <span className="text-muted-foreground w-14">Variant</span>
-                        <Select value={r.variant_id ?? ""}
-                          onValueChange={(v) => setRows((arr) => arr.map((x, k) => k === i ? { ...x, variant_id: v } : x))}>
-                          <SelectTrigger className="flex-1"><SelectValue placeholder="Pick variant" /></SelectTrigger>
-                          <SelectContent>
-                            {rowVariants.map((v) => (
-                              <SelectItem key={v.id} value={v.id}>
-                                {v.name} ({Number(v.price).toFixed(2)})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                      <div className="text-xs space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground">Variants allowed</span>
+                          <span className="text-[10px] text-muted-foreground">
+                            (tick more than one to let the guest choose — one per order)
+                          </span>
+                          <button type="button" className="ml-auto underline text-[10px]"
+                            onClick={() => setRows((arr) => arr.map((x, k) => k === i
+                              ? { ...x, variant_ids: x.variant_ids.length === rowVariants.length ? [] : rowVariants.map((v) => v.id) }
+                              : x))}>
+                            {r.variant_ids.length === rowVariants.length ? "Clear all" : "Select all"}
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1">
+                          {rowVariants.map((v) => {
+                            const on = r.variant_ids.includes(v.id);
+                            return (
+                              <button type="button" key={v.id}
+                                onClick={() => setRows((arr) => arr.map((x, k) => k === i
+                                  ? { ...x, variant_ids: on
+                                      ? x.variant_ids.filter((id) => id !== v.id)
+                                      : [...x.variant_ids, v.id] }
+                                  : x))}
+                                className={`rounded border px-2 py-1 text-left ${on ? "border-primary bg-primary/10" : "hover:bg-accent"}`}>
+                                <div className="truncate">{v.name}</div>
+                                <div className="text-[10px] text-muted-foreground">{Number(v.price).toFixed(2)}</div>
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
                     )}
                     <div className="flex gap-2 items-center text-xs">
