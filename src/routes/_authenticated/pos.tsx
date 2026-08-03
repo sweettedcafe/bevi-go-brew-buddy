@@ -73,7 +73,9 @@ type Bundle = {
   starts_at: string | null; ends_at: string | null; is_active: boolean;
 };
 type BundleItem = {
-  bundle_id: string; menu_item_id: string; variant_id?: string | null; qty: number;
+  id?: string;
+  bundle_id: string; menu_item_id: string; variant_id?: string | null;
+  variant_ids?: string[]; qty: number;
   discount_type: "percent" | "fixed"; discount_value: number;
 };
 type DiscountRow = {
@@ -187,7 +189,7 @@ function POSPage() {
         db.from("menu_item_popularity").select("menu_item_id,qty_sold").order("qty_sold", { ascending: false }).limit(3),
         db.from("bundles").select("*").eq("is_active", true)
           .or(`ends_at.is.null,ends_at.gt.${nowIso}`),
-        db.from("bundle_items").select("bundle_id,menu_item_id,qty,discount_type,discount_value"),
+        db.from("bundle_items").select("id,bundle_id,menu_item_id,variant_id,variant_ids,qty,discount_type,discount_value"),
         db.from("menu_item_variants").select("*").eq("is_active", true).order("sort_order"),
         db.from("discounts").select("*").eq("is_active", true),
       ]);
@@ -202,9 +204,11 @@ function POSPage() {
       );
       setBundles(visibleBundles);
       setBundleItems(((bi ?? []) as any[]).map((r) => ({
+        id: r.id,
         bundle_id: r.bundle_id,
         menu_item_id: r.menu_item_id,
         variant_id: r.variant_id ?? null,
+        variant_ids: (r.variant_ids ?? (r.variant_id ? [r.variant_id] : [])) as string[],
         qty: Number(r.qty),
         discount_type: (r.discount_type ?? "percent") as "percent" | "fixed",
         discount_value: Number(r.discount_value ?? 0),
