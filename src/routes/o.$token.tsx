@@ -29,7 +29,7 @@ type Variant = { id: string; menu_item_id: string; name: string; price: number; 
 type Bundle = { id: string; name: string; description: string | null; price: number };
 type BundleItem = {
   id?: string;
-  bundle_id: string; menu_item_id: string; qty: number; variant_id?: string | null;
+  bundle_id: string; menu_item_id: string; menu_item_ids?: string[]; qty: number; variant_id?: string | null;
   variant_ids?: string[];
   discount_type: "percent" | "fixed"; discount_value: number;
 };
@@ -43,7 +43,7 @@ type CartLine = {
   customization: SelectedCustom | null; notes: string | null;
   variant_id: string | null;
   is_upsell?: boolean;
-  bundle_choices?: { bundle_item_id: string; variant_id: string }[];
+  bundle_choices?: { bundle_item_id: string; variant_id: string | null; menu_item_id: string }[];
   bundle_choice_labels?: string[];
 };
 
@@ -377,17 +377,39 @@ function SelfOrderPage() {
     maybeOfferUpsell(it, cart);
   }
 
+  function choicesFor(x: BundleItem) {
+    const ids = x.menu_item_ids?.length ? x.menu_item_ids : [x.menu_item_id];
+    const multiItem = ids.length > 1;
+    const out: { id: string; menu_item_id: string; name: string; price: number }[] = [];
+    for (const iid of ids) {
+      const it = items.find((i) => i.id === iid);
+      if (!it) continue;
+      const vs = variants.filter((v) => v.menu_item_id === iid
+        && (!(x.variant_ids?.length) || x.variant_ids.includes(v.id)));
+      if (vs.length > 0) {
+        for (const v of vs) out.push({
+          id: v.id, menu_item_id: iid,
+          name: multiItem ? `${it.name} — ${v.name}` : v.name,
+          price: Number(v.price),
+        });
+      } else {
+        out.push({ id: `item:${iid}`, menu_item_id: iid, name: it.name, price: Number(it.price) });
+      }
+    }
+    return out;
+  }
+  const bRowKey = (x: BundleItem) => x.id ?? `${x.bundle_id}:${x.menu_item_id}`;
+
   function bundleChoiceRows(b: Bundle): BundleChoiceRow[] {
     return bundleItems
-      .filter((x) => x.bundle_id === b.id && (x.variant_ids?.length ?? 0) > 1)
+      .filter((x) => x.bundle_id === b.id)
       .map((x) => ({
-        bundle_item_id: x.id ?? `${x.bundle_id}:${x.menu_item_id}`,
-        item_name: items.find((i) => i.id === x.menu_item_id)?.name ?? "Item",
+        bundle_item_id: bRowKey(x),
+        item_name: (x.menu_item_ids?.length ?? 1) > 1
+          ? "Choose one"
+          : (items.find((i) => i.id === x.menu_item_id)?.name ?? "Item"),
         qty: x.qty,
-        choices: (x.variant_ids ?? [])
-          .map((vid) => variants.find((v) => v.id === vid))
-          .filter(Boolean)
-          .map((v: any) => ({ id: v.id, menu_item_id: v.menu_item_id, name: v.name, price: Number(v.price) })),
+        choices: choicesFor(x),
       }))
       .filter((r) => r.choices.length > 1);
   }
@@ -405,15 +427,16 @@ function SelfOrderPage() {
     // compute effective bundle price from its component discounts
     let price = 0;
     const labels: string[] = [];
-    const choices: { bundle_item_id: string; variant_id: string }[] = [];
+    const choices: { bundle_item_id: string; variant_id: string | null; menu_item_id: string }[] = [];
     for (const r of rows) {
-      const it = items.find((i) => i.id === r.menu_item_id);
+      const opts = choicesFor(r);
+      const chosen = opts.find((o) => o.id === picked[bRowKey(r)]) ?? opts[0];
+      if (!chosen) continue;
+      const it = items.find((i) => i.id === chosen.menu_item_id);
       if (!it) continue;
-      const key = r.id ?? `${r.bundle_id}:${r.menu_item_id}`;
-      const vid = picked[key] ?? r.variant_id ?? null;
-      const bv = vid ? variants.find((v) => v.id === vid) : null;
-      if (bv && r.id && picked[key]) choices.push({ bundle_item_id: r.id, variant_id: bv.id });
-      if (bv) labels.push(`${it.name} — ${bv.name}`);
+      const bv = chosen.id.startsWith("item:") ? null : variants.find((v) => v.id === chosen.id) ?? null;
+      if (r.id) choices.push({ bundle_item_id: r.id, variant_id: bv?.id ?? null, menu_item_id: it.id });
+      labels.push(bv ? `${it.name} — ${bv.name}` : it.name);
       const base = Number(bv?.price ?? it.price);
       const unit = r.discount_type === "percent"
         ? Math.max(0, base - base * (Number(r.discount_value) || 0) / 100)
@@ -421,13 +444,13 @@ function SelfOrderPage() {
       price += unit * r.qty;
     }
     price = Math.round(price * 100) / 100;
-    const sig = choices.map((c) => `${c.bundle_item_id}:${c.variant_id}`).sort().join("|");
+    const sig = choices.map((c) => `${c.bundle_item_id}:${c.menu_item_id}:${c.variant_id ?? ""}`).sort().join("|");
     setCart((c) => {
       const f = c.find((l) => l.kind === "bundle" && l.bundle_id === b.id
-        && (l.bundle_choices ?? []).map((x) => `${x.bundle_item_id}:${x.variant_id}`).sort().join("|") === sig);
+        && (l.bundle_choices ?? []).map((x) => `${x.bundle_item_id}:${x.menu_item_id}:${x.variant_id ?? ""}`).sort().join("|") === sig);
       if (f) return c.map((l) => l.lineId === f.lineId ? { ...l, qty: l.qty + 1 } : l);
       return [...c, {
-        lineId: newId(), kind: "bundle",
+        lineId: newId(), kind: "bundle" as const,
         menu_item_id: null, bundle_id: b.id, name: b.name,
         unit_price: price, qty: 1, addon_total: 0,
         customization: null, notes: null, variant_id: null,
@@ -580,15 +603,10 @@ function SelfOrderPage() {
             let price = 0;
             let hasChoice = false;
             for (const r of rows) {
-              const it = items.find((i) => i.id === r.menu_item_id);
-              if (!it) continue;
-              const allowed = (r.variant_ids?.length ? r.variant_ids : (r.variant_id ? [r.variant_id] : []))
-                .map((vid) => variants.find((v) => v.id === vid))
-                .filter(Boolean) as Variant[];
-              if (allowed.length > 1) hasChoice = true;
-              const base = allowed.length
-                ? Math.min(...allowed.map((v) => Number(v.price)))
-                : Number(it.price);
+              const opts = choicesFor(r);
+              if (opts.length === 0) continue;
+              if (opts.length > 1) hasChoice = true;
+              const base = Math.min(...opts.map((o) => o.price));
               const unit = r.discount_type === "percent"
                 ? Math.max(0, base - base * (Number(r.discount_value) || 0) / 100)
                 : Math.max(0, base - (Number(r.discount_value) || 0));
