@@ -119,20 +119,36 @@ export async function syncSheets(
 
     const current = await call(`/spreadsheets/${id}/values/${quoted}!A1:ZZ100000`);
     const values = (current.values ?? []) as Cell[][];
+    const sheetHeader = values.length > 0 ? values[0]! : sheet.headers;
     const existingRows = values.length > 0 ? values.slice(1) : [];
-    const seen = new Set(existingRows.map((row) => rowKey(tab, row)).filter(Boolean));
-    const newRows: Cell[][] = [];
 
+    // Keys for rows already in the sheet are read using the sheet's own header
+    // row; keys for incoming rows use the payload header. Both map the same
+    // identity fields, so a record already present is never appended twice.
+    const keyOfExisting = makeKeyBuilder(tab, sheetHeader);
+    const keyOfIncoming = makeKeyBuilder(tab, sheet.headers);
+
+    const seen = new Map<string, number>();
+    for (const row of existingRows) {
+      if (row.every((cell) => String(cell ?? "").trim() === "")) continue;
+      const key = keyOfExisting(row);
+      if (!key) continue;
+      seen.set(key, (seen.get(key) ?? 0) + 1);
+    }
+
+    const newRows: Cell[][] = [];
     for (const row of sheet.rows) {
-      const key = rowKey(tab, row);
-      if (key && seen.has(key)) {
+      const key = keyOfIncoming(row);
+      const remaining = key ? (seen.get(key) ?? 0) : 0;
+      if (remaining > 0) {
+        seen.set(key, remaining - 1);
         skipped += 1;
         continue;
       }
-      if (key) seen.add(key);
       newRows.push(row);
       appended += 1;
     }
+
 
     const lastColumn = columnName(sheet.headers.length);
     if (values.length === 0) {
