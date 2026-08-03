@@ -75,7 +75,7 @@ type Bundle = {
 };
 type BundleItem = {
   id?: string;
-  bundle_id: string; menu_item_id: string; variant_id?: string | null;
+  bundle_id: string; menu_item_id: string; menu_item_ids?: string[]; variant_id?: string | null;
   variant_ids?: string[]; qty: number;
   discount_type: "percent" | "fixed"; discount_value: number;
 };
@@ -191,7 +191,7 @@ function POSPage() {
         db.from("menu_item_popularity").select("menu_item_id,qty_sold").order("qty_sold", { ascending: false }).limit(3),
         db.from("bundles").select("*").eq("is_active", true)
           .or(`ends_at.is.null,ends_at.gt.${nowIso}`),
-        db.from("bundle_items").select("id,bundle_id,menu_item_id,variant_id,variant_ids,qty,discount_type,discount_value"),
+        db.from("bundle_items").select("id,bundle_id,menu_item_id,menu_item_ids,variant_id,variant_ids,qty,discount_type,discount_value"),
         db.from("menu_item_variants").select("*").eq("is_active", true).order("sort_order"),
         db.from("discounts").select("*").eq("is_active", true),
       ]);
@@ -209,6 +209,7 @@ function POSPage() {
         id: r.id,
         bundle_id: r.bundle_id,
         menu_item_id: r.menu_item_id,
+        menu_item_ids: (r.menu_item_ids ?? [r.menu_item_id]) as string[],
         variant_id: r.variant_id ?? null,
         variant_ids: (r.variant_ids ?? (r.variant_id ? [r.variant_id] : [])) as string[],
         qty: Number(r.qty),
@@ -614,17 +615,42 @@ function POSPage() {
 
 
 
+  // every concrete choice a bundle component offers (item, or item+variant)
+  function choicesFor(x: BundleItem) {
+    const ids = x.menu_item_ids?.length ? x.menu_item_ids : [x.menu_item_id];
+    const multiItem = ids.length > 1;
+    const out: { id: string; menu_item_id: string; name: string; price: number }[] = [];
+    for (const iid of ids) {
+      const it = items.find((i) => i.id === iid);
+      if (!it) continue;
+      const vs = variants.filter((v) => v.menu_item_id === iid
+        && (!(x.variant_ids?.length) || x.variant_ids.includes(v.id)));
+      if (vs.length > 0) {
+        for (const v of vs) {
+          out.push({
+            id: v.id, menu_item_id: iid,
+            name: multiItem ? `${it.name} — ${v.name}` : v.name,
+            price: Number(v.price),
+          });
+        }
+      } else {
+        out.push({ id: `item:${iid}`, menu_item_id: iid, name: it.name, price: Number(it.price) });
+      }
+    }
+    return out;
+  }
+  const rowKey = (x: BundleItem) => x.id ?? `${x.bundle_id}:${x.menu_item_id}`;
+
   function bundleChoiceRows(b: Bundle): BundleChoiceRow[] {
     return bundleItems
-      .filter((x) => x.bundle_id === b.id && (x.variant_ids?.length ?? 0) > 1)
+      .filter((x) => x.bundle_id === b.id)
       .map((x) => ({
-        bundle_item_id: x.id ?? `${x.bundle_id}:${x.menu_item_id}`,
-        item_name: items.find((i) => i.id === x.menu_item_id)?.name ?? "Item",
+        bundle_item_id: rowKey(x),
+        item_name: (x.menu_item_ids?.length ?? 1) > 1
+          ? "Choose one"
+          : (items.find((i) => i.id === x.menu_item_id)?.name ?? "Item"),
         qty: x.qty,
-        choices: (x.variant_ids ?? [])
-          .map((vid) => variants.find((v) => v.id === vid))
-          .filter(Boolean)
-          .map((v: any) => ({ id: v.id, menu_item_id: v.menu_item_id, name: v.name, price: Number(v.price) })),
+        choices: choicesFor(x),
       }))
       .filter((r) => r.choices.length > 1);
   }
@@ -641,11 +667,12 @@ function POSPage() {
     const rows = bundleItems.filter((x) => x.bundle_id === b.id);
     const newLines: CartLine[] = [];
     for (const r of rows) {
-      const it = items.find((x) => x.id === r.menu_item_id);
+      const opts = choicesFor(r);
+      const chosen = opts.find((o) => o.id === picked[rowKey(r)]) ?? opts[0];
+      if (!chosen) continue;
+      const it = items.find((x) => x.id === chosen.menu_item_id);
       if (!it) continue;
-      const key = r.id ?? `${r.bundle_id}:${r.menu_item_id}`;
-      const vid = picked[key] ?? r.variant_id ?? null;
-      const bv = vid ? variants.find((v) => v.id === vid) ?? null : null;
+      const bv = chosen.id.startsWith("item:") ? null : variants.find((v) => v.id === chosen.id) ?? null;
       const base = Number(bv?.price ?? it.price);
       const unit = r.discount_type === "percent"
         ? Math.max(0, base - base * (Number(r.discount_value) || 0) / 100)

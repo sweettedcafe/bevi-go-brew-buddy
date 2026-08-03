@@ -34,6 +34,7 @@ type BundleItem = {
   id?: string;
   bundle_id?: string;
   menu_item_id: string;
+  menu_item_ids?: string[];
   variant_id: string | null;
   variant_ids: string[];
   qty: number;
@@ -87,6 +88,7 @@ function BundlesPage() {
       discount_value: Number(r.discount_value ?? 0),
       variant_id: r.variant_id ?? null,
       variant_ids: (r.variant_ids ?? (r.variant_id ? [r.variant_id] : [])) as string[],
+      menu_item_ids: (r.menu_item_ids ?? [r.menu_item_id]) as string[],
     })));
     setOwners((o ?? []) as Owner[]);
     setVariants((v ?? []) as Variant[]);
@@ -154,24 +156,30 @@ function BundlesPage() {
                     {b.description && <div className="text-sm text-muted-foreground">{b.description}</div>}
                     <div className="mt-2 space-y-1">
                       {its.map((x) => {
-                        const it = itemById(x.menu_item_id);
+                        const ids = x.menu_item_ids?.length ? x.menu_item_ids : [x.menu_item_id];
+                        const itemsOf = ids.map((id) => itemById(id)).filter(Boolean) as MenuItem[];
+                        const it = itemsOf[0];
                         const chosen = (x.variant_ids?.length ? x.variant_ids : (x.variant_id ? [x.variant_id] : []))
                           .map((vid) => variantById(vid)).filter(Boolean) as Variant[];
                         const vr = chosen[0] ?? null;
                         const unit = discountedUnit(it, x.discount_type, x.discount_value, vr);
                         const orig = Number(vr?.price ?? it?.price ?? 0);
-                        const multi = chosen.length > 1;
+                        const labels = itemsOf.map((mi) => {
+                          const vs = chosen.filter((v) => v.menu_item_id === mi.id);
+                          return vs.length ? `${mi.name} (${vs.map((v) => v.name).join("/")})` : mi.name;
+                        });
+                        const multi = itemsOf.length > 1 || chosen.length > 1;
                         return (
                           <div key={x.id} className="flex items-center justify-between text-xs gap-2">
                             <div className="flex items-center gap-1 min-w-0">
                               <span className="truncate">
-                                {it?.name ?? "—"}
                                 {multi
-                                  ? ` — choice of ${chosen.length}: ${chosen.map((v) => v.name).join(" / ")}`
-                                  : vr ? ` — ${vr.name}` : ""} × {x.qty}
+                                  ? `Choice of: ${labels.join(" / ")}`
+                                  : `${it?.name ?? "—"}${vr ? ` — ${vr.name}` : ""}`} × {x.qty}
                               </span>
                               <Badge variant="outline" className="text-[10px] shrink-0">{ownerName(it?.owner_id ?? null)}</Badge>
                             </div>
+
                             <div className="shrink-0 text-muted-foreground">
                               {x.discount_value > 0 && (
                                 <span className="line-through mr-1">{orig.toFixed(2)}</span>
@@ -247,11 +255,11 @@ function EditBundleDialog({
     is_active: bundle.is_active,
   });
   const [rows, setRows] = useState<Array<{
-    menu_item_id: string; variant_ids: string[]; qty: string;
+    menu_item_ids: string[]; variant_ids: string[]; qty: string;
     discount_type: "percent" | "fixed"; discount_value: string;
   }>>(
     initialItems.map((x) => ({
-      menu_item_id: x.menu_item_id,
+      menu_item_ids: (x as any).menu_item_ids?.length ? (x as any).menu_item_ids : [x.menu_item_id],
       variant_ids: x.variant_ids?.length ? x.variant_ids : (x.variant_id ? [x.variant_id] : []),
       qty: String(x.qty),
       discount_type: x.discount_type,
@@ -259,41 +267,60 @@ function EditBundleDialog({
     })),
   );
   const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState<Record<number, string>>({});
 
   const ownerName = (id: string | null) => id ? (owners.find((x) => x.id === id)?.name ?? "—") : "—";
   const variantsFor = (itemId: string) =>
     variants.filter((v) => v.menu_item_id === itemId).sort((a, b) => a.sort_order - b.sort_order);
   const variantOf = (id: string | null) => (id ? variants.find((v) => v.id === id) ?? null : null);
+
+  // every concrete choice a row offers (item, or item+variant)
+  type Choice = { menu_item_id: string; variant: Variant | null; price: number };
+  const rowChoices = (r: { menu_item_ids: string[]; variant_ids: string[] }): Choice[] => {
+    const out: Choice[] = [];
+    for (const iid of r.menu_item_ids) {
+      const it = items.find((x) => x.id === iid);
+      if (!it) continue;
+      const vs = variantsFor(iid);
+      if (vs.length > 0) {
+        const picked = vs.filter((v) => r.variant_ids.includes(v.id));
+        for (const v of picked) out.push({ menu_item_id: iid, variant: v, price: Number(v.price) });
+      } else {
+        out.push({ menu_item_id: iid, variant: null, price: Number(it.price) });
+      }
+    }
+    return out;
+  };
   // pricing reference = cheapest of the allowed choices
-  const refVariant = (ids: string[]) => {
-    const vs = ids.map((i) => variantOf(i)).filter(Boolean) as Variant[];
-    if (vs.length === 0) return null;
-    return vs.reduce((a, b) => (Number(b.price) < Number(a.price) ? b : a));
+  const refChoice = (r: { menu_item_ids: string[]; variant_ids: string[] }): Choice | null => {
+    const cs = rowChoices(r);
+    if (cs.length === 0) return null;
+    return cs.reduce((a, b) => (b.price < a.price ? b : a));
   };
 
   const componentTotal = useMemo(() =>
     rows.reduce((s, r) => {
-      const it = items.find((x) => x.id === r.menu_item_id);
-      const vr = refVariant(r.variant_ids);
-      return s + (it ? Number(vr?.price ?? it.price) * (Number(r.qty) || 0) : 0);
+      const c = refChoice(r);
+      return s + (c ? c.price * (Number(r.qty) || 0) : 0);
     }, 0),
   [rows, items, variants]);
 
   // auto-computed bundle price = sum of discounted units * qty
   const computedPrice = useMemo(() =>
     rows.reduce((s, r) => {
-      const it = items.find((x) => x.id === r.menu_item_id);
-      if (!it) return s;
-      const unit = discountedUnit(it, r.discount_type, Number(r.discount_value) || 0, refVariant(r.variant_ids));
+      const c = refChoice(r);
+      if (!c) return s;
+      const it = items.find((x) => x.id === c.menu_item_id);
+      const unit = discountedUnit(it, r.discount_type, Number(r.discount_value) || 0, c.variant);
       return s + unit * (Number(r.qty) || 0);
     }, 0),
   [rows, items, variants]);
 
   async function save() {
     if (!f.name.trim()) return toast.error("Name required");
-    if (rows.length === 0 || rows.some((r) => !r.menu_item_id || Number(r.qty) <= 0))
+    if (rows.length === 0 || rows.some((r) => r.menu_item_ids.length === 0 || Number(r.qty) <= 0))
       return toast.error("Add at least one item with qty > 0");
-    if (rows.some((r) => variantsFor(r.menu_item_id).length > 0 && r.variant_ids.length === 0))
+    if (rows.some((r) => rowChoices(r).length === 0))
       return toast.error("Pick a variant for every item that has variants");
     setSaving(true);
     const payload = {
@@ -316,7 +343,8 @@ function EditBundleDialog({
     await db.from("bundle_items").delete().eq("bundle_id", id);
     const ins = rows.map((r) => ({
       bundle_id: id,
-      menu_item_id: r.menu_item_id,
+      menu_item_id: r.menu_item_ids[0],
+      menu_item_ids: r.menu_item_ids,
       variant_id: r.variant_ids[0] ?? null,
       variant_ids: r.variant_ids,
       qty: Number(r.qty),
@@ -368,7 +396,7 @@ function EditBundleDialog({
             <h3 className="font-medium text-sm">Items in this bundle</h3>
             <Button size="sm" variant="outline"
               onClick={() => setRows((a) => [...a, {
-                menu_item_id: "", variant_ids: [] as string[], qty: "1",
+                menu_item_ids: [] as string[], variant_ids: [] as string[], qty: "1",
                 discount_type: "percent" as const, discount_value: "0",
               }])}>
               <Plus className="h-3 w-3 mr-1" /> Add item
@@ -379,32 +407,60 @@ function EditBundleDialog({
           ) : (
             <div className="space-y-2">
               {rows.map((r, i) => {
-                const it = items.find((x) => x.id === r.menu_item_id);
-                const rowVariants = it ? variantsFor(it.id) : [];
-                const vr = refVariant(r.variant_ids);
-                const unit = discountedUnit(it, r.discount_type, Number(r.discount_value) || 0, vr);
+                const chosenItems = r.menu_item_ids
+                  .map((id) => items.find((x) => x.id === id))
+                  .filter(Boolean) as MenuItem[];
+                const c = refChoice(r);
+                const refItem = c ? items.find((x) => x.id === c.menu_item_id) : undefined;
+                const unit = discountedUnit(refItem, r.discount_type, Number(r.discount_value) || 0, c?.variant ?? null);
+                const q = (search[i] ?? "").toLowerCase();
+                const visible = q ? items.filter((mi) => mi.name.toLowerCase().includes(q)) : items;
                 return (
                   <div key={i} className="border rounded-md p-2 space-y-2">
-                    <div className="flex gap-2 items-center">
-                      <Select value={r.menu_item_id}
-                        onValueChange={(v) => setRows((arr) => arr.map((x, k) => {
-                          if (k !== i) return x;
-                          const firstVariant = variants
-                            .filter((vv) => vv.menu_item_id === v)
-                            .sort((a, b) => a.sort_order - b.sort_order)[0];
-                          return { ...x, menu_item_id: v, variant_ids: firstVariant ? [firstVariant.id] : [] };
-                        }))}>
-                        <SelectTrigger className="flex-1"><SelectValue placeholder="Pick item" /></SelectTrigger>
-                        <SelectContent>
-                          {items.map((mi) => {
-                            const vs = variants.filter((v) => v.menu_item_id === mi.id);
+                    <div className="flex gap-2 items-start">
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <div className="flex items-center gap-2">
+                          <Input className="h-8 text-xs" placeholder="Search items to include…"
+                            value={search[i] ?? ""}
+                            onChange={(e) => setSearch((s) => ({ ...s, [i]: e.target.value }))} />
+                          <span className="text-[10px] text-muted-foreground shrink-0">
+                            {r.menu_item_ids.length} selected
+                          </span>
+                        </div>
+                        <div className="max-h-40 overflow-y-auto rounded border divide-y">
+                          {visible.map((mi) => {
+                            const vs = variantsFor(mi.id);
+                            const on = r.menu_item_ids.includes(mi.id);
                             const label = vs.length
                               ? `${mi.name} (from ${Math.min(...vs.map((v) => Number(v.price))).toFixed(2)})`
                               : `${mi.name} (${Number(mi.price).toFixed(2)})`;
-                            return <SelectItem key={mi.id} value={mi.id}>{label}</SelectItem>;
+                            return (
+                              <button type="button" key={mi.id}
+                                onClick={() => setRows((arr) => arr.map((x, k) => {
+                                  if (k !== i) return x;
+                                  if (on) {
+                                    return {
+                                      ...x,
+                                      menu_item_ids: x.menu_item_ids.filter((id) => id !== mi.id),
+                                      variant_ids: x.variant_ids.filter((vid) => !vs.some((v) => v.id === vid)),
+                                    };
+                                  }
+                                  return {
+                                    ...x,
+                                    menu_item_ids: [...x.menu_item_ids, mi.id],
+                                    variant_ids: [...x.variant_ids, ...vs.map((v) => v.id)],
+                                  };
+                                }))}
+                                className={`w-full text-left px-2 py-1 text-xs ${on ? "bg-primary/10 font-medium" : "hover:bg-accent"}`}>
+                                {on ? "✓ " : ""}{label}
+                              </button>
+                            );
                           })}
-                        </SelectContent>
-                      </Select>
+                          {visible.length === 0 && (
+                            <div className="px-2 py-1 text-xs text-muted-foreground">No match</div>
+                          )}
+                        </div>
+                      </div>
                       <Input className="w-16" type="number" value={r.qty}
                         onChange={(e) => setRows((arr) => arr.map((x, k) => k === i ? { ...x, qty: e.target.value } : x))} />
                       <Button size="icon" variant="ghost"
@@ -412,39 +468,47 @@ function EditBundleDialog({
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
-                    {rowVariants.length > 0 && (
-                      <div className="text-xs space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-muted-foreground">Variants allowed</span>
-                          <span className="text-[10px] text-muted-foreground">
-                            (tick more than one to let the guest choose — one per order)
-                          </span>
-                          <button type="button" className="ml-auto underline text-[10px]"
-                            onClick={() => setRows((arr) => arr.map((x, k) => k === i
-                              ? { ...x, variant_ids: x.variant_ids.length === rowVariants.length ? [] : rowVariants.map((v) => v.id) }
-                              : x))}>
-                            {r.variant_ids.length === rowVariants.length ? "Clear all" : "Select all"}
-                          </button>
+                    {chosenItems.map((ci) => {
+                      const rowVariants = variantsFor(ci.id);
+                      if (rowVariants.length === 0) return null;
+                      const allOn = rowVariants.every((v) => r.variant_ids.includes(v.id));
+                      return (
+                        <div key={ci.id} className="text-xs space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-muted-foreground truncate">{ci.name} — variants allowed</span>
+                            <button type="button" className="ml-auto underline text-[10px]"
+                              onClick={() => setRows((arr) => arr.map((x, k) => k === i
+                                ? { ...x, variant_ids: allOn
+                                    ? x.variant_ids.filter((id) => !rowVariants.some((v) => v.id === id))
+                                    : Array.from(new Set([...x.variant_ids, ...rowVariants.map((v) => v.id)])) }
+                                : x))}>
+                              {allOn ? "Clear all" : "Select all"}
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-1">
+                            {rowVariants.map((v) => {
+                              const on = r.variant_ids.includes(v.id);
+                              return (
+                                <button type="button" key={v.id}
+                                  onClick={() => setRows((arr) => arr.map((x, k) => k === i
+                                    ? { ...x, variant_ids: on
+                                        ? x.variant_ids.filter((id) => id !== v.id)
+                                        : [...x.variant_ids, v.id] }
+                                    : x))}
+                                  className={`rounded border px-2 py-1 text-left ${on ? "border-primary bg-primary/10" : "hover:bg-accent"}`}>
+                                  <div className="truncate">{v.name}</div>
+                                  <div className="text-[10px] text-muted-foreground">{Number(v.price).toFixed(2)}</div>
+                                </button>
+                              );
+                            })}
+                          </div>
                         </div>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1">
-                          {rowVariants.map((v) => {
-                            const on = r.variant_ids.includes(v.id);
-                            return (
-                              <button type="button" key={v.id}
-                                onClick={() => setRows((arr) => arr.map((x, k) => k === i
-                                  ? { ...x, variant_ids: on
-                                      ? x.variant_ids.filter((id) => id !== v.id)
-                                      : [...x.variant_ids, v.id] }
-                                  : x))}
-                                className={`rounded border px-2 py-1 text-left ${on ? "border-primary bg-primary/10" : "hover:bg-accent"}`}>
-                                <div className="truncate">{v.name}</div>
-                                <div className="text-[10px] text-muted-foreground">{Number(v.price).toFixed(2)}</div>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
+                      );
+                    })}
+                    <div className="text-[10px] text-muted-foreground">
+                      Tick several items/variants to let the guest choose one of them.
+                    </div>
+
                     <div className="flex gap-2 items-center text-xs">
                       <span className="text-muted-foreground w-14">Discount</span>
                       <Select value={r.discount_type}
@@ -458,7 +522,7 @@ function EditBundleDialog({
                       <Input className="w-24" type="number" value={r.discount_value}
                         onChange={(e) => setRows((arr) => arr.map((x, k) => k === i ? { ...x, discount_value: e.target.value } : x))} />
                       <div className="ml-auto flex items-center gap-2">
-                        <Badge variant="outline" className="text-[10px]">{ownerName(it?.owner_id ?? null)}</Badge>
+                        <Badge variant="outline" className="text-[10px]">{ownerName(refItem?.owner_id ?? null)}</Badge>
                         <span className="text-muted-foreground">
                           unit: <span className="text-primary font-medium">{unit.toFixed(2)}</span>
                         </span>
