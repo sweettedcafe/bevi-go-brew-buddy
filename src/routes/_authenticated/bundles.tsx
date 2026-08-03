@@ -293,7 +293,7 @@ function EditBundleDialog({
     if (!f.name.trim()) return toast.error("Name required");
     if (rows.length === 0 || rows.some((r) => !r.menu_item_id || Number(r.qty) <= 0))
       return toast.error("Add at least one item with qty > 0");
-    if (rows.some((r) => variantsFor(r.menu_item_id).length > 0 && !r.variant_id))
+    if (rows.some((r) => variantsFor(r.menu_item_id).length > 0 && r.variant_ids.length === 0))
       return toast.error("Pick a variant for every item that has variants");
     setSaving(true);
     const payload = {
@@ -317,7 +317,8 @@ function EditBundleDialog({
     const ins = rows.map((r) => ({
       bundle_id: id,
       menu_item_id: r.menu_item_id,
-      variant_id: r.variant_id,
+      variant_id: r.variant_ids[0] ?? null,
+      variant_ids: r.variant_ids,
       qty: Number(r.qty),
       discount_type: r.discount_type,
       discount_value: Number(r.discount_value) || 0,
