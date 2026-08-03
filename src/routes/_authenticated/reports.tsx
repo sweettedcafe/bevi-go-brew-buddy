@@ -490,9 +490,21 @@ function ReportsPage() {
           <Button size="sm" variant="outline" onClick={exportCurrent}>
             <Download className="h-3 w-3 mr-1" /> Export CSV
           </Button>
-          <Button size="sm" variant="outline" onClick={openSheetsImport} disabled={sheetsBusy}>
-            <FileSpreadsheet className="h-3 w-3 mr-1" /> {sheetsBusy ? "Exporting…" : "Google Sheets"}
+          <Button size="sm" onClick={() => void openSheetsImport(false)} disabled={sheetsBusy}>
+            <FileSpreadsheet className="h-3 w-3 mr-1" /> {sheetsBusy ? "Appending…" : "Append to Google Sheet"}
           </Button>
+          <label className="flex items-center gap-1 text-xs text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={autoSync}
+              onChange={(e) => {
+                setAutoSync(e.target.checked);
+                localStorage.setItem("reports_sheet_autosync", e.target.checked ? "1" : "0");
+              }}
+            />
+            Auto-append
+          </label>
+
         </div>
       </header>
 
