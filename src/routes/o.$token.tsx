@@ -8,6 +8,7 @@ import { Coffee, Plus, Minus, Star, Trash2, Package, BellRing } from "lucide-rea
 import { toast } from "sonner";
 import { CustomizeDialog, type VariantChoice } from "@/components/pos/CustomizeDialog";
 import { UpsellDialog, type UpsellChoice } from "@/components/pos/UpsellDialog";
+import { BundleChoiceDialog, type BundleChoiceRow } from "@/components/pos/BundleChoiceDialog";
 import {
   type MenuOptions, type SelectedCustom,
   hasAnyCustomization, customSignature, describeCustom,
@@ -27,7 +28,9 @@ type Cat = { id: string; name: string; sort_order: number };
 type Variant = { id: string; menu_item_id: string; name: string; price: number; sort_order: number };
 type Bundle = { id: string; name: string; description: string | null; price: number };
 type BundleItem = {
+  id?: string;
   bundle_id: string; menu_item_id: string; qty: number; variant_id?: string | null;
+  variant_ids?: string[];
   discount_type: "percent" | "fixed"; discount_value: number;
 };
 type CartLine = {
@@ -40,6 +43,8 @@ type CartLine = {
   customization: SelectedCustom | null; notes: string | null;
   variant_id: string | null;
   is_upsell?: boolean;
+  bundle_choices?: { bundle_item_id: string; variant_id: string }[];
+  bundle_choice_labels?: string[];
 };
 
 function SelfOrderPage() {
@@ -50,6 +55,7 @@ function SelfOrderPage() {
   const [variants, setVariants] = useState<Variant[]>([]);
   const [bundles, setBundles] = useState<Bundle[]>([]);
   const [bundleItems, setBundleItems] = useState<BundleItem[]>([]);
+  const [bundleChoice, setBundleChoice] = useState<{ bundle: Bundle; rows: BundleChoiceRow[] } | null>(null);
   const [activeCat, setActiveCat] = useState<string | "all" | "__bundles__">("all");
   const [cart, setCart] = useState<CartLine[]>([]);
   const [customizing, setCustomizing] = useState<{
@@ -371,15 +377,43 @@ function SelfOrderPage() {
     maybeOfferUpsell(it, cart);
   }
 
+  function bundleChoiceRows(b: Bundle): BundleChoiceRow[] {
+    return bundleItems
+      .filter((x) => x.bundle_id === b.id && (x.variant_ids?.length ?? 0) > 1)
+      .map((x) => ({
+        bundle_item_id: x.id ?? `${x.bundle_id}:${x.menu_item_id}`,
+        item_name: items.find((i) => i.id === x.menu_item_id)?.name ?? "Item",
+        qty: x.qty,
+        choices: (x.variant_ids ?? [])
+          .map((vid) => variants.find((v) => v.id === vid))
+          .filter(Boolean)
+          .map((v: any) => ({ id: v.id, menu_item_id: v.menu_item_id, name: v.name, price: Number(v.price) })),
+      }))
+      .filter((r) => r.choices.length > 1);
+  }
+
   function addBundle(b: Bundle) {
     const rows = bundleItems.filter((x) => x.bundle_id === b.id);
     if (rows.length === 0) { toast.error("Bundle is empty"); return; }
+    const choiceRows = bundleChoiceRows(b);
+    if (choiceRows.length > 0) { setBundleChoice({ bundle: b, rows: choiceRows }); return; }
+    commitBundle(b, {});
+  }
+
+  function commitBundle(b: Bundle, picked: Record<string, string>) {
+    const rows = bundleItems.filter((x) => x.bundle_id === b.id);
     // compute effective bundle price from its component discounts
     let price = 0;
+    const labels: string[] = [];
+    const choices: { bundle_item_id: string; variant_id: string }[] = [];
     for (const r of rows) {
       const it = items.find((i) => i.id === r.menu_item_id);
       if (!it) continue;
-      const bv = r.variant_id ? variants.find((v) => v.id === r.variant_id) : null;
+      const key = r.id ?? `${r.bundle_id}:${r.menu_item_id}`;
+      const vid = picked[key] ?? r.variant_id ?? null;
+      const bv = vid ? variants.find((v) => v.id === vid) : null;
+      if (bv && r.id && picked[key]) choices.push({ bundle_item_id: r.id, variant_id: bv.id });
+      if (bv) labels.push(`${it.name} — ${bv.name}`);
       const base = Number(bv?.price ?? it.price);
       const unit = r.discount_type === "percent"
         ? Math.max(0, base - base * (Number(r.discount_value) || 0) / 100)
@@ -387,16 +421,21 @@ function SelfOrderPage() {
       price += unit * r.qty;
     }
     price = Math.round(price * 100) / 100;
+    const sig = choices.map((c) => `${c.bundle_item_id}:${c.variant_id}`).sort().join("|");
     setCart((c) => {
-      const f = c.find((l) => l.kind === "bundle" && l.bundle_id === b.id);
+      const f = c.find((l) => l.kind === "bundle" && l.bundle_id === b.id
+        && (l.bundle_choices ?? []).map((x) => `${x.bundle_item_id}:${x.variant_id}`).sort().join("|") === sig);
       if (f) return c.map((l) => l.lineId === f.lineId ? { ...l, qty: l.qty + 1 } : l);
       return [...c, {
         lineId: newId(), kind: "bundle",
         menu_item_id: null, bundle_id: b.id, name: b.name,
         unit_price: price, qty: 1, addon_total: 0,
         customization: null, notes: null, variant_id: null,
+        bundle_choices: choices,
+        bundle_choice_labels: labels,
       }];
     });
+    setBundleChoice(null);
     toast.success(`${b.name} added`);
   }
 
@@ -438,7 +477,7 @@ function SelfOrderPage() {
           is_upsell: !!l.is_upsell,
         })),
         bundles: cart.filter((l) => l.kind === "bundle").map((l) => ({
-          bundle_id: l.bundle_id, qty: l.qty,
+          bundle_id: l.bundle_id, qty: l.qty, choices: l.bundle_choices ?? [],
         })),
       },
     });
@@ -539,10 +578,17 @@ function SelfOrderPage() {
           ) : bundles.map((b) => {
             const rows = bundleItems.filter((x) => x.bundle_id === b.id);
             let price = 0;
+            let hasChoice = false;
             for (const r of rows) {
               const it = items.find((i) => i.id === r.menu_item_id);
               if (!it) continue;
-              const base = Number(it.price);
+              const allowed = (r.variant_ids?.length ? r.variant_ids : (r.variant_id ? [r.variant_id] : []))
+                .map((vid) => variants.find((v) => v.id === vid))
+                .filter(Boolean) as Variant[];
+              if (allowed.length > 1) hasChoice = true;
+              const base = allowed.length
+                ? Math.min(...allowed.map((v) => Number(v.price)))
+                : Number(it.price);
               const unit = r.discount_type === "percent"
                 ? Math.max(0, base - base * (Number(r.discount_value) || 0) / 100)
                 : Math.max(0, base - (Number(r.discount_value) || 0));
@@ -556,7 +602,8 @@ function SelfOrderPage() {
                 </div>
                 <div className="font-medium leading-tight mt-1">{b.name}</div>
                 {b.description && <div className="text-xs text-muted-foreground mt-1 line-clamp-2">{b.description}</div>}
-                <div className="mt-2 font-display text-lg text-primary">₱{fmt(price)}</div>
+                {hasChoice && <div className="text-[10px] text-muted-foreground mt-1">Choose your combination</div>}
+                <div className="mt-2 font-display text-lg text-primary">₱{fmt(price)}{hasChoice ? "+" : ""}</div>
               </button>
             );
           })
@@ -602,6 +649,9 @@ function SelfOrderPage() {
                       {l.name}
                     </div>
                     <div className="text-xs text-muted-foreground">{fmt(l.unit_price)} × {l.qty}</div>
+                    {(l.bundle_choice_labels?.length ?? 0) > 0 && (
+                      <div className="text-[11px] text-muted-foreground">{l.bundle_choice_labels!.join(" · ")}</div>
+                    )}
                     {desc.length > 0 && <div className="text-[11px] text-muted-foreground">{desc.join(" · ")}</div>}
                   </div>
                   <Button size="icon" variant="outline" className="h-7 w-7"
@@ -709,6 +759,19 @@ function SelfOrderPage() {
           }}
         />
       ) : null}
+
+      {bundleChoice && (
+        <BundleChoiceDialog
+          key={bundleChoice.bundle.id}
+          open
+          onOpenChange={(o) => { if (!o) setBundleChoice(null); }}
+          bundleName={bundleChoice.bundle.name}
+          rows={bundleChoice.rows}
+          onConfirm={(picked) => commitBundle(bundleChoice.bundle, picked)}
+        />
+      )}
+
+
 
       {imagePreview && (
         <div

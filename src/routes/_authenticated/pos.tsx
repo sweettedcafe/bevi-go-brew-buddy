@@ -25,6 +25,7 @@ import { CustomizeDialog } from "@/components/pos/CustomizeDialog";
 import { CameraScannerDialog } from "@/components/pos/CameraScannerDialog";
 import { PrintPreviewDialog, type PrintPreviewDocument } from "@/components/print/PrintPreviewDialog";
 import { UpsellDialog, type UpsellChoice } from "@/components/pos/UpsellDialog";
+import { BundleChoiceDialog, type BundleChoiceRow } from "@/components/pos/BundleChoiceDialog";
 import {
   type MenuOptions, type SelectedCustom,
   hasAnyCustomization, addonTotal, customSignature, describeCustom,
@@ -73,7 +74,9 @@ type Bundle = {
   starts_at: string | null; ends_at: string | null; is_active: boolean;
 };
 type BundleItem = {
-  bundle_id: string; menu_item_id: string; variant_id?: string | null; qty: number;
+  id?: string;
+  bundle_id: string; menu_item_id: string; variant_id?: string | null;
+  variant_ids?: string[]; qty: number;
   discount_type: "percent" | "fixed"; discount_value: number;
 };
 type DiscountRow = {
@@ -128,6 +131,7 @@ function POSPage() {
   const [topSellers, setTopSellers] = useState<Set<string>>(new Set());
   const [bundles, setBundles] = useState<Bundle[]>([]);
   const [bundleItems, setBundleItems] = useState<BundleItem[]>([]);
+  const [bundleChoice, setBundleChoice] = useState<{ bundle: Bundle; rows: BundleChoiceRow[] } | null>(null);
   const [discounts, setDiscounts] = useState<DiscountRow[]>([]);
 
   // Barcode / customer loyalty
@@ -187,7 +191,7 @@ function POSPage() {
         db.from("menu_item_popularity").select("menu_item_id,qty_sold").order("qty_sold", { ascending: false }).limit(3),
         db.from("bundles").select("*").eq("is_active", true)
           .or(`ends_at.is.null,ends_at.gt.${nowIso}`),
-        db.from("bundle_items").select("bundle_id,menu_item_id,qty,discount_type,discount_value"),
+        db.from("bundle_items").select("id,bundle_id,menu_item_id,variant_id,variant_ids,qty,discount_type,discount_value"),
         db.from("menu_item_variants").select("*").eq("is_active", true).order("sort_order"),
         db.from("discounts").select("*").eq("is_active", true),
       ]);
@@ -202,9 +206,11 @@ function POSPage() {
       );
       setBundles(visibleBundles);
       setBundleItems(((bi ?? []) as any[]).map((r) => ({
+        id: r.id,
         bundle_id: r.bundle_id,
         menu_item_id: r.menu_item_id,
         variant_id: r.variant_id ?? null,
+        variant_ids: (r.variant_ids ?? (r.variant_id ? [r.variant_id] : [])) as string[],
         qty: Number(r.qty),
         discount_type: (r.discount_type ?? "percent") as "percent" | "fixed",
         discount_value: Number(r.discount_value ?? 0),
@@ -608,16 +614,38 @@ function POSPage() {
 
 
 
+  function bundleChoiceRows(b: Bundle): BundleChoiceRow[] {
+    return bundleItems
+      .filter((x) => x.bundle_id === b.id && (x.variant_ids?.length ?? 0) > 1)
+      .map((x) => ({
+        bundle_item_id: x.id ?? `${x.bundle_id}:${x.menu_item_id}`,
+        item_name: items.find((i) => i.id === x.menu_item_id)?.name ?? "Item",
+        qty: x.qty,
+        choices: (x.variant_ids ?? [])
+          .map((vid) => variants.find((v) => v.id === vid))
+          .filter(Boolean)
+          .map((v: any) => ({ id: v.id, menu_item_id: v.menu_item_id, name: v.name, price: Number(v.price) })),
+      }))
+      .filter((r) => r.choices.length > 1);
+  }
+
   function addBundle(b: Bundle) {
     const rows = bundleItems.filter((x) => x.bundle_id === b.id);
     if (rows.length === 0) { toast.error("Bundle has no items"); return; }
+    const choiceRows = bundleChoiceRows(b);
+    if (choiceRows.length > 0) { setBundleChoice({ bundle: b, rows: choiceRows }); return; }
+    commitBundle(b, {});
+  }
+
+  function commitBundle(b: Bundle, picked: Record<string, string>) {
+    const rows = bundleItems.filter((x) => x.bundle_id === b.id);
     const newLines: CartLine[] = [];
     for (const r of rows) {
       const it = items.find((x) => x.id === r.menu_item_id);
       if (!it) continue;
-      const bv = (r as any).variant_id
-        ? variants.find((v) => v.id === (r as any).variant_id) ?? null
-        : null;
+      const key = r.id ?? `${r.bundle_id}:${r.menu_item_id}`;
+      const vid = picked[key] ?? r.variant_id ?? null;
+      const bv = vid ? variants.find((v) => v.id === vid) ?? null : null;
       const base = Number(bv?.price ?? it.price);
       const unit = r.discount_type === "percent"
         ? Math.max(0, base - base * (Number(r.discount_value) || 0) / 100)
@@ -636,6 +664,7 @@ function POSPage() {
     }
     if (newLines.length === 0) { toast.error("Bundle items unavailable"); return; }
     setCart((c) => [...c, ...newLines]);
+    setBundleChoice(null);
     toast.success(`${b.name} added`);
   }
 
@@ -1692,6 +1721,17 @@ function POSPage() {
           }}
         />
       ) : null}
+
+      {bundleChoice && (
+        <BundleChoiceDialog
+          key={bundleChoice.bundle.id}
+          open
+          onOpenChange={(o) => { if (!o) setBundleChoice(null); }}
+          bundleName={bundleChoice.bundle.name}
+          rows={bundleChoice.rows}
+          onConfirm={(picked) => commitBundle(bundleChoice.bundle, picked)}
+        />
+      )}
 
 
     </div>
