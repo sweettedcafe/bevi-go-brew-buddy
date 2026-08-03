@@ -156,23 +156,25 @@ export async function syncSheets(
     }
 
     const newRows: Cell[][] = [];
+    const queuedKeys = new Set<string>();
+    const queuedAlts = new Set<string>();
     for (const row of sheet.rows) {
       const key = keyOfIncoming(row);
       const alt = altOfIncoming?.(row);
-      const hasKey = key ? (seen.get(key) ?? 0) > 0 : false;
-      const hasAlt = alt ? (seenAlt.get(alt) ?? 0) > 0 : false;
+      const hasKey = key ? (seen.get(key) ?? 0) > 0 || queuedKeys.has(key) : false;
+      const hasAlt = alt ? (seenAlt.get(alt) ?? 0) > 0 || queuedAlts.has(alt) : false;
       if (hasKey || hasAlt) {
         if (key) seen.set(key, Math.max(0, (seen.get(key) ?? 0) - 1));
         if (alt) seenAlt.set(alt, Math.max(0, (seenAlt.get(alt) ?? 0) - 1));
         skipped += 1;
         continue;
       }
-      // Reserve this record so duplicates inside one payload aren't written twice.
-      if (key) seen.set(key, 0);
-      if (alt) seenAlt.set(alt, 0);
+      if (key) queuedKeys.add(key);
+      if (alt) queuedAlts.add(alt);
       newRows.push(row);
       appended += 1;
     }
+
 
 
 
