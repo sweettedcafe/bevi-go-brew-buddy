@@ -206,8 +206,11 @@ export async function syncSheets(
         }),
       });
       const endRow = newRows.length + 1;
+      // RAW keeps ID-like text (e.g. "139e300…") as text instead of letting
+      // Sheets coerce it into scientific notation, which broke deduplication.
       await call(
-        `/spreadsheets/${id}/values/${quoted}!A2:${lastColumn}${endRow}?valueInputOption=USER_ENTERED`,
+        `/spreadsheets/${id}/values/${quoted}!A2:${lastColumn}${endRow}?valueInputOption=RAW`,
+
         {
           method: "PUT",
           body: JSON.stringify({ majorDimension: "ROWS", values: newRows }),
