@@ -706,7 +706,7 @@ function ReportsPage() {
             <div className="flex flex-wrap gap-2 mt-2">
               {ownerSubtotals.map(([owner, t]) => (
                 <Badge key={owner} variant="outline" className="text-xs">
-                  {owner}: {t.qty} units · ₱{t.revenue.toFixed(2)}
+                  {owner}: {t.qty} units · ₱{t.revenue.toFixed(2)} net
                 </Badge>
               ))}
             </div>
