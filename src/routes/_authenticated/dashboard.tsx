@@ -54,7 +54,20 @@ async function loadOrders(from: Date, to: Date) {
     .select("id,total,subtotal,discount_total,status,customer_id,customer_name,created_at,business_date")
     .gte("business_date", isoDay(from))
     .lte("business_date", isoDay(to));
-  return ((data ?? []) as Row[]).filter((o) => o.status !== "voided" && o.status !== "refunded");
+  const rows = ((data ?? []) as Row[]).filter((o) => o.status !== "voided" && o.status !== "refunded");
+  if (!rows.length) return rows;
+  // Net sale = gross − discount − payment fee, matching Reports and Analytics.
+  const { data: pays } = await db.from("order_payments")
+    .select("order_id,fee_amount")
+    .in("order_id", rows.map((o) => o.id));
+  const feeByOrder = new Map<string, number>();
+  ((pays ?? []) as Row[]).forEach((p) => {
+    feeByOrder.set(p.order_id, (feeByOrder.get(p.order_id) ?? 0) + Number(p.fee_amount || 0));
+  });
+  return rows.map((o) => {
+    const fee = feeByOrder.get(o.id) ?? 0;
+    return { ...o, fee_amount: fee, total: Number(o.total || 0) - fee } as Row;
+  });
 }
 
 

@@ -79,7 +79,12 @@ const PER_ITEM_COLS = [
   { key: "qty", label: "Qty" },
   { key: "unit_price", label: "Unit price" },
   { key: "addon_total", label: "Add-ons" },
-  { key: "revenue", label: "Revenue" },
+  { key: "gross_sale", label: "Subtotal (Gross sale)" },
+  { key: "discount_total", label: "Discount" },
+  { key: "discount_label", label: "Discount label" },
+  { key: "payment_label", label: "Payment" },
+  { key: "fee_amount", label: "Fee" },
+  { key: "revenue", label: "Net sale" },
 ];
 
 const DISCOUNT_COLS = [
@@ -203,7 +208,13 @@ function ReportsPage() {
     for (const o of orders) {
       const placedByCustomer = o.source === "self";
       const cashierEmail = placedByCustomer ? "self-order" : (staffEmails[o.cashier_id] ?? "—");
-      for (const it of (o._items ?? [])) {
+      const lines = (o._items ?? []) as any[];
+      // Order-level discount and payment fee, prorated across the lines by gross value.
+      const grossOf = (x: any) => Number(x.unit_price || 0) * Number(x.qty || 0);
+      const grossSum = lines.reduce((s, x) => s + grossOf(x), 0);
+      const orderDisc = Number(o.discount_total || 0);
+      const orderFee = Number(o.fee_amount || 0);
+      for (const it of lines) {
         const c = (it.customization ?? null) as any;
         const listOf = (arr: any): string =>
           Array.isArray(arr) ? arr.map((x: any) => x?.label).filter(Boolean).join(", ") : "";
@@ -215,6 +226,10 @@ function ReportsPage() {
           : "";
         const other = [listOf(c?.others), listOf(c?.other), groups, c?.milk?.label ?? ""]
           .filter(Boolean).join(" | ");
+        const gross = grossOf(it);
+        const share = grossSum !== 0 ? gross / grossSum : (lines.length ? 1 / lines.length : 0);
+        const lineDisc = orderDisc * share;
+        const lineFee = orderFee * share;
         rows.push({
           id: it.id,
           order_id: o.id,
@@ -237,7 +252,13 @@ function ReportsPage() {
           qty: Number(it.qty || 0),
           unit_price: Number(it.unit_price || 0),
           addon_total: Number(it.addon_total || 0),
-          revenue: Number(it.line_total || 0),
+          gross_sale: gross,
+          discount_total: lineDisc,
+          discount_label: o.discount_label ?? "—",
+          payment_label: o.payment_label ?? "—",
+          fee_amount: lineFee,
+          // Net sale = gross sale − discount − fee
+          revenue: gross - lineDisc - lineFee,
         });
       }
     }
@@ -289,6 +310,25 @@ function ReportsPage() {
       return true;
     });
   }, [itemRowsAll, filters.category, filters.item, filters.owner, filters.status]);
+
+  // Scorecard figures for the Per item tab (paid lines only, voids stay signed).
+  const itemTotals = useMemo(() => {
+    let gross = 0, disc = 0, fee = 0, net = 0, qty = 0, held = 0, heldCount = 0;
+    const heldOrders = new Set<string>();
+    for (const r of itemRows) {
+      if (r.status === "on_hold" || r.status === "open") {
+        held += Number(r.gross_sale || 0);
+        if (!heldOrders.has(r.order_id)) { heldOrders.add(r.order_id); heldCount++; }
+        continue;
+      }
+      gross += Number(r.gross_sale || 0);
+      disc += Number(r.discount_total || 0);
+      fee += Number(r.fee_amount || 0);
+      net += Number(r.revenue || 0);
+      qty += Number(r.qty || 0);
+    }
+    return { gross, disc, fee, net, qty, held, heldCount };
+  }, [itemRows]);
 
   const ownerSubtotals = useMemo(() => {
     const m = new Map<string, { qty: number; revenue: number }>();
@@ -415,7 +455,8 @@ function ReportsPage() {
         headers: PER_ITEM_COLS.map((c) => c.label),
         rows: itemRows.map((r) => PER_ITEM_COLS.map((c) => {
           const v = (r as any)[c.key];
-          if (c.key === "revenue") return Number(v).toFixed(2);
+          if (["revenue", "gross_sale", "discount_total", "fee_amount", "unit_price", "addon_total"].includes(c.key))
+            return Number(v || 0).toFixed(2);
           if (c.key === "created_at") return new Date((r as any).created_at).toLocaleString();
           if (c.key === "date_only") return (r as any).created_at ? new Date((r as any).created_at).toLocaleDateString() : "";
           if (c.key === "time_only") return (r as any).created_at ? new Date((r as any).created_at).toLocaleTimeString() : "";
@@ -563,13 +604,23 @@ function ReportsPage() {
         </div>
       </Card>
 
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <Stat label="Orders" value={totals.count.toString()} />
-        <Stat label="Gross" value={`₱${totals.gross.toFixed(2)}`} />
-        <Stat label="Discounts" value={`₱${totals.disc.toFixed(2)}`} />
-        <Stat label="Net (completed)" value={`₱${totals.net.toFixed(2)}`} />
-        <Stat label={`On hold (${totals.heldCount})`} value={`₱${totals.held.toFixed(2)}`} />
-      </div>
+      {tab === "item" ? (
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <Stat label="Units sold" value={itemTotals.qty.toString()} />
+          <Stat label="Gross sale" value={`₱${itemTotals.gross.toFixed(2)}`} />
+          <Stat label="Discounts" value={`₱${itemTotals.disc.toFixed(2)}`} />
+          <Stat label="Fees" value={`₱${itemTotals.fee.toFixed(2)}`} />
+          <Stat label="Net sale" value={`₱${itemTotals.net.toFixed(2)}`} />
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <Stat label="Orders" value={totals.count.toString()} />
+          <Stat label="Gross" value={`₱${totals.gross.toFixed(2)}`} />
+          <Stat label="Discounts" value={`₱${totals.disc.toFixed(2)}`} />
+          <Stat label="Net (completed)" value={`₱${totals.net.toFixed(2)}`} />
+          <Stat label={`On hold (${totals.heldCount})`} value={`₱${totals.held.toFixed(2)}`} />
+        </div>
+      )}
 
 
       {imported && (
@@ -655,7 +706,7 @@ function ReportsPage() {
             <div className="flex flex-wrap gap-2 mt-2">
               {ownerSubtotals.map(([owner, t]) => (
                 <Badge key={owner} variant="outline" className="text-xs">
-                  {owner}: {t.qty} units · ₱{t.revenue.toFixed(2)}
+                  {owner}: {t.qty} units · ₱{t.revenue.toFixed(2)} net
                 </Badge>
               ))}
             </div>
@@ -664,8 +715,8 @@ function ReportsPage() {
             cols={PER_ITEM_COLS.filter((c) => colsItem.includes(c.key))}
             rows={itemRows}
             render={(row, key) => {
-              if (key === "revenue") {
-                const n = Number(row.revenue);
+              if (["revenue", "gross_sale", "discount_total", "fee_amount", "unit_price", "addon_total"].includes(key)) {
+                const n = Number((row as any)[key] || 0);
                 return <span className={n < 0 ? "text-destructive" : ""}>₱{n.toFixed(2)}</span>;
               }
               if (key === "qty") {
