@@ -79,7 +79,12 @@ const PER_ITEM_COLS = [
   { key: "qty", label: "Qty" },
   { key: "unit_price", label: "Unit price" },
   { key: "addon_total", label: "Add-ons" },
-  { key: "revenue", label: "Revenue" },
+  { key: "gross_sale", label: "Subtotal (Gross sale)" },
+  { key: "discount_total", label: "Discount" },
+  { key: "discount_label", label: "Discount label" },
+  { key: "payment_label", label: "Payment" },
+  { key: "fee_amount", label: "Fee" },
+  { key: "revenue", label: "Net sale" },
 ];
 
 const DISCOUNT_COLS = [
