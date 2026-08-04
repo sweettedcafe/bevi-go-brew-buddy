@@ -66,7 +66,7 @@ async function loadOrders(from: Date, to: Date) {
   });
   return rows.map((o) => {
     const fee = feeByOrder.get(o.id) ?? 0;
-    return { ...o, fee_amount: fee, total: Number(o.total || 0) - fee };
+    return { ...o, fee_amount: fee, total: Number(o.total || 0) - fee } as Row;
   });
 }
 
