@@ -208,7 +208,13 @@ function ReportsPage() {
     for (const o of orders) {
       const placedByCustomer = o.source === "self";
       const cashierEmail = placedByCustomer ? "self-order" : (staffEmails[o.cashier_id] ?? "—");
-      for (const it of (o._items ?? [])) {
+      const lines = (o._items ?? []) as any[];
+      // Order-level discount and payment fee, prorated across the lines by gross value.
+      const grossOf = (x: any) => Number(x.unit_price || 0) * Number(x.qty || 0);
+      const grossSum = lines.reduce((s, x) => s + grossOf(x), 0);
+      const orderDisc = Number(o.discount_total || 0);
+      const orderFee = Number(o.fee_amount || 0);
+      for (const it of lines) {
         const c = (it.customization ?? null) as any;
         const listOf = (arr: any): string =>
           Array.isArray(arr) ? arr.map((x: any) => x?.label).filter(Boolean).join(", ") : "";
@@ -220,6 +226,10 @@ function ReportsPage() {
           : "";
         const other = [listOf(c?.others), listOf(c?.other), groups, c?.milk?.label ?? ""]
           .filter(Boolean).join(" | ");
+        const gross = grossOf(it);
+        const share = grossSum !== 0 ? gross / grossSum : (lines.length ? 1 / lines.length : 0);
+        const lineDisc = orderDisc * share;
+        const lineFee = orderFee * share;
         rows.push({
           id: it.id,
           order_id: o.id,
@@ -242,7 +252,13 @@ function ReportsPage() {
           qty: Number(it.qty || 0),
           unit_price: Number(it.unit_price || 0),
           addon_total: Number(it.addon_total || 0),
-          revenue: Number(it.line_total || 0),
+          gross_sale: gross,
+          discount_total: lineDisc,
+          discount_label: o.discount_label ?? "—",
+          payment_label: o.payment_label ?? "—",
+          fee_amount: lineFee,
+          // Net sale = gross sale − discount − fee
+          revenue: gross - lineDisc - lineFee,
         });
       }
     }
