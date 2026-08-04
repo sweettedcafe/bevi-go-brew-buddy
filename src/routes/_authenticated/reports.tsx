@@ -715,8 +715,8 @@ function ReportsPage() {
             cols={PER_ITEM_COLS.filter((c) => colsItem.includes(c.key))}
             rows={itemRows}
             render={(row, key) => {
-              if (key === "revenue") {
-                const n = Number(row.revenue);
+              if (["revenue", "gross_sale", "discount_total", "fee_amount", "unit_price", "addon_total"].includes(key)) {
+                const n = Number((row as any)[key] || 0);
                 return <span className={n < 0 ? "text-destructive" : ""}>₱{n.toFixed(2)}</span>;
               }
               if (key === "qty") {
