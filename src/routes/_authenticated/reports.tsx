@@ -455,7 +455,8 @@ function ReportsPage() {
         headers: PER_ITEM_COLS.map((c) => c.label),
         rows: itemRows.map((r) => PER_ITEM_COLS.map((c) => {
           const v = (r as any)[c.key];
-          if (c.key === "revenue") return Number(v).toFixed(2);
+          if (["revenue", "gross_sale", "discount_total", "fee_amount", "unit_price", "addon_total"].includes(c.key))
+            return Number(v || 0).toFixed(2);
           if (c.key === "created_at") return new Date((r as any).created_at).toLocaleString();
           if (c.key === "date_only") return (r as any).created_at ? new Date((r as any).created_at).toLocaleDateString() : "";
           if (c.key === "time_only") return (r as any).created_at ? new Date((r as any).created_at).toLocaleTimeString() : "";
