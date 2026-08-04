@@ -311,6 +311,25 @@ function ReportsPage() {
     });
   }, [itemRowsAll, filters.category, filters.item, filters.owner, filters.status]);
 
+  // Scorecard figures for the Per item tab (paid lines only, voids stay signed).
+  const itemTotals = useMemo(() => {
+    let gross = 0, disc = 0, fee = 0, net = 0, qty = 0, held = 0, heldCount = 0;
+    const heldOrders = new Set<string>();
+    for (const r of itemRows) {
+      if (r.status === "on_hold" || r.status === "open") {
+        held += Number(r.gross_sale || 0);
+        if (!heldOrders.has(r.order_id)) { heldOrders.add(r.order_id); heldCount++; }
+        continue;
+      }
+      gross += Number(r.gross_sale || 0);
+      disc += Number(r.discount_total || 0);
+      fee += Number(r.fee_amount || 0);
+      net += Number(r.revenue || 0);
+      qty += Number(r.qty || 0);
+    }
+    return { gross, disc, fee, net, qty, held, heldCount };
+  }, [itemRows]);
+
   const ownerSubtotals = useMemo(() => {
     const m = new Map<string, { qty: number; revenue: number }>();
     for (const r of itemRows) {
