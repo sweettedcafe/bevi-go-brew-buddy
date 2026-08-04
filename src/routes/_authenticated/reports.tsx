@@ -603,13 +603,23 @@ function ReportsPage() {
         </div>
       </Card>
 
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <Stat label="Orders" value={totals.count.toString()} />
-        <Stat label="Gross" value={`₱${totals.gross.toFixed(2)}`} />
-        <Stat label="Discounts" value={`₱${totals.disc.toFixed(2)}`} />
-        <Stat label="Net (completed)" value={`₱${totals.net.toFixed(2)}`} />
-        <Stat label={`On hold (${totals.heldCount})`} value={`₱${totals.held.toFixed(2)}`} />
-      </div>
+      {tab === "item" ? (
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <Stat label="Units sold" value={itemTotals.qty.toString()} />
+          <Stat label="Gross sale" value={`₱${itemTotals.gross.toFixed(2)}`} />
+          <Stat label="Discounts" value={`₱${itemTotals.disc.toFixed(2)}`} />
+          <Stat label="Fees" value={`₱${itemTotals.fee.toFixed(2)}`} />
+          <Stat label="Net sale" value={`₱${itemTotals.net.toFixed(2)}`} />
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <Stat label="Orders" value={totals.count.toString()} />
+          <Stat label="Gross" value={`₱${totals.gross.toFixed(2)}`} />
+          <Stat label="Discounts" value={`₱${totals.disc.toFixed(2)}`} />
+          <Stat label="Net (completed)" value={`₱${totals.net.toFixed(2)}`} />
+          <Stat label={`On hold (${totals.heldCount})`} value={`₱${totals.held.toFixed(2)}`} />
+        </div>
+      )}
 
 
       {imported && (
