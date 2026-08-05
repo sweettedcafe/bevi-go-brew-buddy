@@ -151,38 +151,92 @@ export async function syncSheets(
 
     const current = await call(`/spreadsheets/${id}/values/${quoted}!A1:ZZ100000`);
     const values = (current.values ?? []) as Cell[][];
-    const sheetHeader = values.length > 0 ? values[0]! : sheet.headers;
-    const existingRows = values.length > 0 ? values.slice(1) : [];
+    const oldHeader = values.length > 0 ? values[0]! : [];
+    let existingRows = values.length > 0 ? values.slice(1) : [];
+    const lastColumn = columnName(sheet.headers.length);
 
-    // Keys for rows already in the sheet are read using the sheet's own header
-    // row; keys for incoming rows use the payload header. Both map the same
-    // identity fields, so a record already present is never appended twice.
-    const keyOfExisting = makeKeyBuilder(tab, sheetHeader);
-    const keyOfIncoming = makeKeyBuilder(tab, sheet.headers);
-    const altOfExisting = makeFallbackBuilder(tab, sheetHeader);
-    const altOfIncoming = makeFallbackBuilder(tab, sheet.headers);
+    const norm = (cell: Cell) => String(cell ?? "").trim().toLowerCase();
+    const headerMatches =
+      oldHeader.length === sheet.headers.length &&
+      sheet.headers.every((label, i) => norm(oldHeader[i] ?? "") === norm(label));
 
-    const seen = new Map<string, number>();
-    const seenAlt = new Map<string, number>();
-    for (const row of existingRows) {
-      if (row.every((cell) => String(cell ?? "").trim() === "")) continue;
-      const key = keyOfExisting(row);
-      if (key) seen.set(key, (seen.get(key) ?? 0) + 1);
-      const alt = altOfExisting?.(row);
-      if (alt) seenAlt.set(alt, (seenAlt.get(alt) ?? 0) + 1);
+    // The report gained columns: rewrite the sheet's header row and re-map every
+    // existing row into the new column order so nothing lands under a wrong label.
+    if (values.length > 0 && !headerMatches) {
+      const oldLabels = oldHeader.map(norm);
+      existingRows = existingRows.map((row) =>
+        sheet.headers.map((label) => {
+          const from = oldLabels.indexOf(norm(label));
+          return from >= 0 ? (row[from] ?? "") : "";
+        }),
+      );
+      if (oldHeader.length > sheet.headers.length) {
+        await call(`/spreadsheets/${id}/values/${quoted}!${columnName(sheet.headers.length + 1)}1:ZZ100000:clear`, {
+          method: "POST",
+          body: JSON.stringify({}),
+        });
+      }
+      const endRow = existingRows.length + 1;
+      await call(
+        `/spreadsheets/${id}/values/${quoted}!A1:${lastColumn}${endRow}?valueInputOption=RAW`,
+        {
+          method: "PUT",
+          body: JSON.stringify({
+            majorDimension: "ROWS",
+            values: [sheet.headers as Cell[], ...existingRows],
+          }),
+        },
+      );
+    } else if (values.length === 0) {
+      await call(`/spreadsheets/${id}/values/${quoted}!A1:${lastColumn}1?valueInputOption=USER_ENTERED`, {
+        method: "PUT",
+        body: JSON.stringify({ majorDimension: "ROWS", values: [sheet.headers] }),
+      });
     }
+
+    // From here on both sides share the payload header.
+    const keyOf = makeKeyBuilder(tab, sheet.headers);
+    const altOf = makeFallbackBuilder(tab, sheet.headers);
+
+    // key -> sheet row numbers (1-based, header is row 1) so matched rows can be
+    // refreshed in place, filling the newly added columns for old records.
+    const seen = new Map<string, number[]>();
+    const seenAlt = new Map<string, number[]>();
+    existingRows.forEach((row, index) => {
+      if (row.every((cell) => String(cell ?? "").trim() === "")) return;
+      const rowNumber = index + 2;
+      const key = keyOf(row);
+      if (key) seen.set(key, [...(seen.get(key) ?? []), rowNumber]);
+      const alt = altOf?.(row);
+      if (alt) seenAlt.set(alt, [...(seenAlt.get(alt) ?? []), rowNumber]);
+    });
 
     const newRows: Cell[][] = [];
     const queuedKeys = new Set<string>();
     const queuedAlts = new Set<string>();
+    const updates: { range: string; values: Cell[][] }[] = [];
     for (const row of sheet.rows) {
-      const key = keyOfIncoming(row);
-      const alt = altOfIncoming?.(row);
-      const hasKey = key ? (seen.get(key) ?? 0) > 0 || queuedKeys.has(key) : false;
-      const hasAlt = alt ? (seenAlt.get(alt) ?? 0) > 0 || queuedAlts.has(alt) : false;
-      if (hasKey || hasAlt) {
-        if (key) seen.set(key, Math.max(0, (seen.get(key) ?? 0) - 1));
-        if (alt) seenAlt.set(alt, Math.max(0, (seenAlt.get(alt) ?? 0) - 1));
+      const key = keyOf(row);
+      const alt = altOf?.(row);
+      const byKey = key ? (seen.get(key) ?? []) : [];
+      const byAlt = alt ? (seenAlt.get(alt) ?? []) : [];
+      const matchRow = byKey[0] ?? byAlt[0];
+      const queued = (key && queuedKeys.has(key)) || (alt && queuedAlts.has(alt));
+      if (matchRow !== undefined || queued) {
+        if (key) seen.set(key, byKey.slice(1));
+        if (alt) seenAlt.set(alt, byAlt.slice(1));
+        if (matchRow !== undefined) {
+          const existing = existingRows[matchRow - 2] ?? [];
+          const differs = sheet.headers.some(
+            (_, i) => String(existing[i] ?? "").trim() !== String(row[i] ?? "").trim(),
+          );
+          if (differs) {
+            updates.push({
+              range: `${quoted}!A${matchRow}:${lastColumn}${matchRow}`,
+              values: [row],
+            });
+          }
+        }
         skipped += 1;
         continue;
       }
@@ -192,14 +246,11 @@ export async function syncSheets(
       appended += 1;
     }
 
-
-
-
-    const lastColumn = columnName(sheet.headers.length);
-    if (values.length === 0) {
-      await call(`/spreadsheets/${id}/values/${quoted}!A1:${lastColumn}1?valueInputOption=USER_ENTERED`, {
-        method: "PUT",
-        body: JSON.stringify({ majorDimension: "ROWS", values: [sheet.headers] }),
+    // Backfill matched rows so the new columns are populated for older records.
+    for (let i = 0; i < updates.length; i += 100) {
+      await call(`/spreadsheets/${id}/values:batchUpdate`, {
+        method: "POST",
+        body: JSON.stringify({ valueInputOption: "RAW", data: updates.slice(i, i + 100) }),
       });
     }
 
@@ -227,13 +278,13 @@ export async function syncSheets(
       // Sheets coerce it into scientific notation, which broke deduplication.
       await call(
         `/spreadsheets/${id}/values/${quoted}!A2:${lastColumn}${endRow}?valueInputOption=RAW`,
-
         {
           method: "PUT",
           body: JSON.stringify({ majorDimension: "ROWS", values: newRows }),
         },
       );
     }
+
   }
 
   return {
