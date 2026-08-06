@@ -622,13 +622,14 @@ function ReportsPage() {
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-          <Stat label="Orders" value={totals.count.toString()} />
-          <Stat label="Gross" value={`₱${totals.gross.toFixed(2)}`} />
+          <Stat label="Units sold" value={totals.qty.toString()} />
+          <Stat label="Gross sale" value={`₱${totals.gross.toFixed(2)}`} />
           <Stat label="Discounts" value={`₱${totals.disc.toFixed(2)}`} />
-          <Stat label="Net (completed)" value={`₱${totals.net.toFixed(2)}`} />
-          <Stat label={`On hold (${totals.heldCount})`} value={`₱${totals.held.toFixed(2)}`} />
+          <Stat label="Fees" value={`₱${totals.fee.toFixed(2)}`} />
+          <Stat label="Net sale" value={`₱${totals.net.toFixed(2)}`} />
         </div>
       )}
+
 
 
       {imported && (
