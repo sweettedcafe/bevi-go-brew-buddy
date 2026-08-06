@@ -345,31 +345,39 @@ function ReportsPage() {
     [filteredOrders],
   );
 
+  // Per-order scorecards use the same definitions as Per item so both tabs tally:
+  // Gross sale = Σ unit_price × qty, Net sale = gross − discount − fee.
   const totals = useMemo(() => {
     const owner = filters.owner.trim().toLowerCase();
-    let gross = 0, disc = 0, net = 0, count = 0, held = 0, heldCount = 0;
+    let gross = 0, disc = 0, fee = 0, net = 0, qty = 0, count = 0, held = 0, heldCount = 0;
     for (const o of filteredOrders) {
       const st = statusOf(o);
-      const ownerRevenue = owner
-        ? ((o._items ?? []) as any[])
-            .filter((it) => (it.menu_items?.owners?.name ?? "").toLowerCase() === owner)
-            .reduce((s, it) => s + Number(it.line_total || 0), 0)
-        : 0;
+      const lines = ((o._items ?? []) as any[]);
+      const grossOf = (x: any) => Number(x.unit_price || 0) * Number(x.qty || 0);
+      const grossSum = lines.reduce((s, x) => s + grossOf(x), 0);
+      const scoped = owner
+        ? lines.filter((it) => (it.menu_items?.owners?.name ?? "").toLowerCase() === owner)
+        : lines;
+      const scopedGross = scoped.reduce((s, x) => s + grossOf(x), 0);
+      const share = grossSum !== 0 ? scopedGross / grossSum : (owner ? 0 : 1);
+      const oDisc = Number(o.discount_total || 0) * share;
+      const oFee = Number(o.fee_amount || 0) * share;
       if (st === "on_hold" || st === "open") {
-        held += owner ? ownerRevenue : Number(o.total || 0); heldCount++;
+        held += scopedGross; heldCount++;
         continue; // unpaid — never part of gross/net
       }
       // Signed totals: completed sales are positive, void/refund mirrors negative.
-      if (owner) {
-        gross += ownerRevenue; net += ownerRevenue;
-      } else {
-        gross += Number(o.subtotal); disc += Number(o.discount_total); net += Number(o.total);
-      }
+      gross += scopedGross;
+      disc += oDisc;
+      fee += oFee;
+      net += scopedGross - oDisc - oFee;
+      qty += scoped.reduce((s, x) => s + Number(x.qty || 0), 0);
       if ((o.txn_kind ?? "sale") === "sale" && st !== "voided" && st !== "refunded") count++;
     }
-    return { gross, disc, net, count, held, heldCount };
+    return { gross, disc, fee, net, qty, count, held, heldCount };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filteredOrders, filters.owner]);
+
 
 
   async function refund(id: string) {
