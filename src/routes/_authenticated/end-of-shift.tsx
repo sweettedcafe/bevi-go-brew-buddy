@@ -335,7 +335,7 @@ function EndOfShiftPage() {
                   }
                 />
               </div>
-              {canSetCash && !report.shift.clock_out && Number(report.shift.starting_cash) === 0 && (
+              {canSetCash && !report.shift.clock_out && Number(report.shift.starting_cash) === 0 ? (
                 <div className="mt-4 rounded-md border p-3 space-y-2">
                   <Label htmlFor="start-cash">Set starting cash for today (first shift only)</Label>
                   <div className="flex flex-wrap items-center gap-2">
@@ -354,7 +354,29 @@ function EndOfShiftPage() {
                     starting cash. Only the first shift of the day declares it; later shifts continue the same drawer.
                   </p>
                 </div>
+              ) : (
+                <div className="mt-4 rounded-md border p-3 space-y-2">
+                  <Label htmlFor="edit-start-cash">
+                    Edit starting cash for {report.shift.business_date} (currently {peso(report.shift.starting_cash)})
+                  </Label>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Input id="edit-start-cash" type="number" min="0" step="0.01" className="w-40"
+                      placeholder={Number(report.shift.starting_cash).toFixed(2)}
+                      value={cashInput} onChange={(e) => setCashInput(e.target.value)} />
+                    {prevClosing != null && (
+                      <Button size="sm" variant="outline" onClick={() => setCashInput(prevClosing.toFixed(2))}>
+                        Use yesterday's closing ({peso(prevClosing)})
+                      </Button>
+                    )}
+                    <Button size="sm" onClick={editStartingCash} disabled={savingCash}>Update</Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Use this if the starting cash was missed or entered incorrectly. The corrected amount applies to
+                    the whole business day's drawer{isAdmin ? "" : " for your own shift"}.
+                  </p>
+                </div>
               )}
+
 
 
               {report.breaks.length > 0 && (
