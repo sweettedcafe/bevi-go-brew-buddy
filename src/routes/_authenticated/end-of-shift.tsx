@@ -120,6 +120,26 @@ function EndOfShiftPage() {
     await refresh();
   };
 
+  const editStartingCash = async () => {
+    const v = Number(cashInput);
+    if (!Number.isFinite(v) || v < 0) { toast.error("Enter a valid amount"); return; }
+    setSavingCash(true);
+    const { error } = await (supabase as any).rpc("tc_edit_starting_cash", {
+      p_amount: v, p_shift_id: report?.shift.id ?? null,
+    });
+    setSavingCash(false);
+    if (error) {
+      toast.error(/function|does not exist|schema cache/i.test(error.message)
+        ? "Run supabase_phase51_schema.sql to enable editing starting cash."
+        : error.message);
+      return;
+    }
+    toast.success("Starting cash updated");
+    setCashInput("");
+    await refresh();
+  };
+
+
   const refresh = async () => {
     setLoading(true);
     const { data, error } = await supabase.rpc("tc_eos_report", { p_shift_id: null });
