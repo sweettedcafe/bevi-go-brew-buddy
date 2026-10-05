@@ -51,19 +51,59 @@ function AuditLogPage() {
   const [op, setOp] = useState<string>("all");
   const [q, setQ] = useState("");
   const [detail, setDetail] = useState<Row | null>(null);
+  const [item, setItem] = useState("all");
+  const [items, setItems] = useState<string[]>([]);
+  const [itemSearch, setItemSearch] = useState("");
+  const [itemOpen, setItemOpen] = useState(false);
+
+  function rowName(r: Row): string | null {
+    for (const d of [r.before_data, r.after_data]) {
+      if (d && typeof d === "object") {
+        const v =
+          (d as any).name ??
+          (d as any).item_name ??
+          (d as any).label ??
+          (d as any).title ??
+          (d as any).email;
+        if (typeof v === "string" && v.trim()) return v.trim();
+      }
+    }
+    return null;
+  }
 
   async function load(p = 0) {
     setLoading(true);
-    let qy = db.from("admin_audit_logs").select("*", { count: "exact" })
-      .gte("created_at", `${from}T00:00:00`)
-      .lte("created_at", `${to}T23:59:59`)
-      .order("created_at", { ascending: false })
-      .range(p * PAGE, p * PAGE + PAGE - 1);
-    if (table !== "all") qy = qy.eq("target_table", table);
-    if (op !== "all") qy = qy.ilike("action", `%.${op}`);
-    if (q.trim()) qy = qy.or(
-      `actor_email.ilike.%${q}%,target_id.ilike.%${q}%,action.ilike.%${q}%`,
-    );
+    const buildQuery = () => {
+      let qy = db.from("admin_audit_logs").select("*", { count: "exact" })
+        .gte("created_at", `${from}T00:00:00`)
+        .lte("created_at", `${to}T23:59:59`)
+        .order("created_at", { ascending: false });
+      if (table !== "all") qy = qy.eq("target_table", table);
+      if (op !== "all") qy = qy.ilike("action", `%.${op}`);
+      if (q.trim()) qy = qy.or(
+        `actor_email.ilike.%${q}%,target_id.ilike.%${q}%,action.ilike.%${q}%`,
+      );
+      return qy;
+    };
+
+    if (table !== "all" && item !== "all") {
+      // Item filter is a name stored in the row snapshot, so gather rows and
+      // filter client-side (no server-side JSON filter needed).
+      const all: Row[] = [];
+      for (let i = 0; i < 4; i++) {
+        const { data } = await buildQuery().range(i * 500, i * 500 + 499);
+        all.push(...((data ?? []) as Row[]));
+        if ((data?.length ?? 0) < 500) break;
+      }
+      const filtered = all.filter((r) => rowName(r) === item);
+      setRows(filtered.slice(p * PAGE, (p + 1) * PAGE));
+      setHasMore(filtered.length > (p + 1) * PAGE);
+      setPage(p);
+      setLoading(false);
+      return;
+    }
+
+    const qy = buildQuery().range(p * PAGE, p * PAGE + PAGE - 1);
     const { data, error } = await qy;
     setLoading(false);
     if (error) return;
@@ -71,6 +111,35 @@ function AuditLogPage() {
     setHasMore((data?.length ?? 0) === PAGE);
     setPage(p);
   }
+
+  // Build the searchable item list whenever the table changes.
+  useEffect(() => {
+    setItem("all");
+    setItemSearch("");
+    if (table === "all") {
+      setItems([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data } = await db
+        .from("admin_audit_logs")
+        .select("before_data,after_data")
+        .eq("target_table", table)
+        .gte("created_at", `${from}T00:00:00`)
+        .lte("created_at", `${to}T23:59:59`)
+        .limit(2000);
+      if (cancelled) return;
+      const names = new Set<string>();
+      (data ?? []).forEach((r: any) => {
+        const n = rowName(r);
+        if (n) names.add(n);
+      });
+      setItems(Array.from(names).sort());
+    })();
+    return () => { cancelled = true; };
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [table, from, to]);
 
   useEffect(() => { if (isAdmin) void load(0); /* eslint-disable-next-line */ }, []);
 
@@ -130,6 +199,65 @@ function AuditLogPage() {
             </SelectContent>
           </Select>
         </div>
+        {table !== "all" && (
+          <div className="min-w-[200px] relative">
+            <label className="text-xs text-muted-foreground">
+              Item {items.length > 0 ? `(${items.length})` : ""}
+            </label>
+            <div className="relative">
+              <Search className="h-3.5 w-3.5 absolute left-2.5 top-2.5 text-muted-foreground" />
+              <Input
+                value={item === "all" ? itemSearch : item}
+                placeholder={items.length === 0 ? "Loading items…" : "All items — search…"}
+                className="h-9 pl-8"
+                onChange={(e) => {
+                  setItemSearch(e.target.value);
+                  setItem("all");
+                  setItemOpen(true);
+                }}
+                onFocus={() => setItemOpen(true)}
+                onBlur={() => window.setTimeout(() => setItemOpen(false), 150)}
+              />
+            </div>
+            {itemOpen && items.length > 0 && (
+              <div className="absolute z-50 mt-1 w-full max-h-64 overflow-y-auto rounded-md border bg-popover text-popover-foreground shadow-md">
+                <div
+                  className={`px-2 py-1.5 text-xs cursor-pointer hover:bg-accent ${item === "all" ? "bg-accent" : ""}`}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    setItem("all");
+                    setItemSearch("");
+                    setItemOpen(false);
+                    void load(0);
+                  }}
+                >
+                  All items
+                </div>
+                {items
+                  .filter((n) => n.toLowerCase().includes(itemSearch.toLowerCase()))
+                  .slice(0, 100)
+                  .map((n) => (
+                    <div
+                      key={n}
+                      className={`px-2 py-1.5 text-sm cursor-pointer hover:bg-accent truncate ${item === n ? "bg-accent" : ""}`}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        setItem(n);
+                        setItemSearch("");
+                        setItemOpen(false);
+                        void load(0);
+                      }}
+                    >
+                      {n}
+                    </div>
+                  ))}
+                {items.filter((n) => n.toLowerCase().includes(itemSearch.toLowerCase())).length === 0 && (
+                  <div className="px-2 py-1.5 text-xs text-muted-foreground">No items match your search.</div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
         <div className="flex-1 min-w-[200px]">
           <label className="text-xs text-muted-foreground">Search (email, id, action)</label>
           <div className="relative">
