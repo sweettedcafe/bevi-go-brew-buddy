@@ -199,6 +199,65 @@ function AuditLogPage() {
             </SelectContent>
           </Select>
         </div>
+        {table !== "all" && (
+          <div className="min-w-[200px] relative">
+            <label className="text-xs text-muted-foreground">
+              Item {items.length > 0 ? `(${items.length})` : ""}
+            </label>
+            <div className="relative">
+              <Search className="h-3.5 w-3.5 absolute left-2.5 top-2.5 text-muted-foreground" />
+              <Input
+                value={item === "all" ? itemSearch : item}
+                placeholder={items.length === 0 ? "Loading items…" : "All items — search…"}
+                className="h-9 pl-8"
+                onChange={(e) => {
+                  setItemSearch(e.target.value);
+                  setItem("all");
+                  setItemOpen(true);
+                }}
+                onFocus={() => setItemOpen(true)}
+                onBlur={() => window.setTimeout(() => setItemOpen(false), 150)}
+              />
+            </div>
+            {itemOpen && items.length > 0 && (
+              <div className="absolute z-50 mt-1 w-full max-h-64 overflow-y-auto rounded-md border bg-popover text-popover-foreground shadow-md">
+                <div
+                  className={`px-2 py-1.5 text-xs cursor-pointer hover:bg-accent ${item === "all" ? "bg-accent" : ""}`}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    setItem("all");
+                    setItemSearch("");
+                    setItemOpen(false);
+                    void load(0);
+                  }}
+                >
+                  All items
+                </div>
+                {items
+                  .filter((n) => n.toLowerCase().includes(itemSearch.toLowerCase()))
+                  .slice(0, 100)
+                  .map((n) => (
+                    <div
+                      key={n}
+                      className={`px-2 py-1.5 text-sm cursor-pointer hover:bg-accent truncate ${item === n ? "bg-accent" : ""}`}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        setItem(n);
+                        setItemSearch("");
+                        setItemOpen(false);
+                        void load(0);
+                      }}
+                    >
+                      {n}
+                    </div>
+                  ))}
+                {items.filter((n) => n.toLowerCase().includes(itemSearch.toLowerCase())).length === 0 && (
+                  <div className="px-2 py-1.5 text-xs text-muted-foreground">No items match your search.</div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
         <div className="flex-1 min-w-[200px]">
           <label className="text-xs text-muted-foreground">Search (email, id, action)</label>
           <div className="relative">
