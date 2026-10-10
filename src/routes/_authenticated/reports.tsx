@@ -423,7 +423,8 @@ function ReportsPage() {
     if (exportPick.disc) files.push([`discounts-promos-${todayIso()}.csv`, build(discountRows, DISCOUNT_COLS)]);
     if (files.length === 0) { toast.error("Select at least one report to export."); return; }
     files.forEach(([name, csv], i) => setTimeout(() => downloadCsv(name, csv), i * 600));
-    toast.success(`Exporting ${files.length} file${files.length > 1 ? "s" : ""} (${files.length * 1} selected)`);
+    const names = files.map(([n]) => n.split("-").slice(0, 2).join(" ").replace(/-\d.*/, ""));
+    toast.success(`Exporting ${files.length} file${files.length > 1 ? "s" : ""}: ${names.join(", ")}`);
     setExportOpen(false);
   }
 
