@@ -235,9 +235,34 @@ function SelfOrderPage() {
   }
 
   function requestAlertPermission() {
+    try {
+      if ("serviceWorker" in navigator) void navigator.serviceWorker.register("/sw.js").catch(() => {});
+    } catch { /* noop */ }
     if (typeof Notification === "undefined" || Notification.permission !== "default") return;
     void Notification.requestPermission().catch(() => { /* visual/audio alert still works */ });
   }
+
+  // Keep the screen awake while waiting so the page stays alive and can buzz.
+  useEffect(() => {
+    if (!done) return;
+    let lock: any = null;
+    let stopped = false;
+    const acquire = async () => {
+      try {
+        if (document.visibilityState === "visible" && (navigator as any).wakeLock) {
+          lock = await (navigator as any).wakeLock.request("screen");
+        }
+      } catch { /* not supported or denied */ }
+    };
+    void acquire();
+    const onVis = () => { if (!stopped && document.visibilityState === "visible") void acquire(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      stopped = true;
+      document.removeEventListener("visibilitychange", onVis);
+      try { lock?.release(); } catch { /* noop */ }
+    };
+  }, [done]);
 
   // Ready alert: HTMLAudio loop (iOS + Android) + Web Audio beep + vibrate + flash
   useEffect(() => {
@@ -250,7 +275,26 @@ function SelfOrderPage() {
       document.title = titleOn ? "ORDER READY — Bevi & Go" : previousTitle;
     }, 700);
     let notification: Notification | null = null;
-    if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+    const notifTitle = "Your Bevi & Go order is ready";
+    const notifOpts = {
+      body: done ? `Order #${String(done.order_no).padStart(3, "0")} is ready at the counter.` : "Please proceed to the counter.",
+      tag: done ? `bevi-order-${done.order_id}` : "bevi-order-ready",
+      requireInteraction: true,
+      renotify: true,
+      vibrate: [500, 200, 500, 200, 500, 200, 500],
+      data: { url: window.location.href },
+    } as NotificationOptions;
+    // System notifications (via service worker) still buzz while the
+    // customer is in another app or the screen is locked.
+    const swNotify = () => {
+      if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
+      navigator.serviceWorker?.getRegistration?.().then((reg) => {
+        if (reg) void reg.showNotification(notifTitle, notifOpts);
+      }).catch(() => {});
+    };
+    swNotify();
+    const swTimer = window.setInterval(swNotify, 8000);
+    if (typeof Notification !== "undefined" && Notification.permission === "granted" && !navigator.serviceWorker?.controller) {
       try {
         notification = new Notification("Your Bevi & Go order is ready", {
           body: done ? `Order #${String(done.order_no).padStart(3, "0")} is ready at the counter.` : "Please proceed to the counter.",
@@ -312,6 +356,10 @@ function SelfOrderPage() {
 
     return () => {
       window.clearInterval(titleTimer);
+      window.clearInterval(swTimer);
+      navigator.serviceWorker?.getRegistration?.().then((reg) =>
+        reg?.getNotifications().then((ns) => ns.forEach((n) => n.close())),
+      ).catch(() => {});
       document.title = previousTitle;
       notification?.close();
       window.clearInterval(vTimer);
@@ -531,7 +579,16 @@ function SelfOrderPage() {
                 ? "This order was voided by the barista."
                 : "Show this number at the counter to pay."}
           </div>
-          <div className="font-display text-5xl text-primary">#{String(done.order_no).padStart(3,"0")}</div>
+          <div className="rounded-xl border-4 border-primary bg-primary/10 p-4 space-y-1">
+            <div className="text-xs font-bold uppercase tracking-widest text-primary">Your order number</div>
+            <div className="font-display text-7xl text-primary leading-none">#{String(done.order_no).padStart(3,"0")}</div>
+            <div className="text-sm font-semibold">Please remember this number — we'll call it at the counter.</div>
+          </div>
+          {!alerting && !ready && !voided && (
+            <div className="text-[11px] text-muted-foreground">
+              Allow notifications so your phone buzzes even when locked or in another app. Keep this page open.
+            </div>
+          )}
           <div className="text-[10px] text-muted-foreground font-mono break-all">ID: {done.order_id}</div>
           <div className="text-lg">Total ₱{fmt(done.total)}</div>
           {!ready && !voided && (
