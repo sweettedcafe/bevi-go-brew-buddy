@@ -44,10 +44,14 @@ type EOS = {
   leave_hours_deducted: number;
   net_worked_hours: number;
   payments: Array<{ method: string; gross: number; change: number; net: number; count: number }>;
-  expenses: Array<{ id: string; description: string; amount: number; quantity?: number | null; unit_price?: number | null; category: string | null; created_at: string; invoice_number?: string | null; receipt_url?: string | null }>;
+  expenses: Array<{ id: string; description: string; amount: number; quantity?: number | null; unit_price?: number | null; category: string | null; created_at: string; invoice_number?: string | null; receipt_url?: string | null; payment_method_code?: string | null; reason?: string | null }>;
   total_expenses: number;
   breaks: Array<{ id: string; type: "break" | "lunch"; started_at: string; ended_at: string | null }>;
 };
+
+type Balance = { code: string; label: string; kind: string; starting: number; sales: number; expenses: number };
+type PMOpt = { code: string; label: string; kind: string; is_active: boolean; owner_only?: boolean };
+const sumBy = (rows: Balance[], k: "starting" | "sales" | "expenses") => rows.reduce((s, r) => s + Number(r[k] ?? 0), 0);
 
 type ExpenseCategory = { id: string; name: string; sort_order: number; is_active: boolean };
 
@@ -64,6 +68,10 @@ function EndOfShiftPage() {
   const [unitPrice, setUnitPrice] = useState("");
   const [category, setCategory] = useState("");
   const [invoiceNo, setInvoiceNo] = useState("");
+  const [expMethod, setExpMethod] = useState("");
+  const [reason, setReason] = useState("");
+  const [pms, setPms] = useState<PMOpt[]>([]);
+  const [balances, setBalances] = useState<Balance[]>([]);
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [uploadingReceipt, setUploadingReceipt] = useState(false);
 
@@ -155,6 +163,13 @@ function EndOfShiftPage() {
       setPrevClosing(prev == null ? null : Number(prev));
       const { data: st } = await (supabase as any).rpc("tc_starting_cash_state");
       setCanSetCash(Boolean(st?.can_set));
+      const { data: pmData } = await (supabase as any).from("payment_methods").select("*").order("sort_order");
+      const pmRows = ((pmData ?? []) as any[]).map((m) => ({ code: m.code, label: m.label, kind: m.kind, is_active: m.is_active, owner_only: !!m.owner_only }));
+      setPms(pmRows);
+      setExpMethod((cur) => cur || (pmRows.find((m) => m.kind === "cash" && !m.owner_only)?.code ?? ""));
+      const { data: bal, error: balErr } = await (supabase as any).rpc("tc_eos_balances", { p_shift_id: shiftId });
+      if (balErr) console.warn("[eos] balances unavailable — run supabase_phase53_schema.sql", balErr.message);
+      setBalances(((bal ?? []) as Balance[]));
 
       if (us) setUpsellStats({
         offers: Number(us.offers ?? 0),
@@ -636,6 +651,50 @@ function EndOfShiftPage() {
       </Dialog>
     </div>
 
+  );
+}
+
+function BalancesReport({ balances, barista, timeIn, timeOut }: {
+  balances: Balance[]; barista: string; timeIn: string; timeOut: string;
+}) {
+  const net = (b: Balance) => Number(b.sales) - Number(b.expenses);
+  const eod = (b: Balance) => Number(b.starting) + net(b);
+  const Section = ({ title, value, totalLabel }: { title: string; value: (b: Balance) => number; totalLabel: string }) => (
+    <div className="border border-dashed border-border rounded-sm p-2 mb-3">
+      <div className="font-semibold mb-1">{title}</div>
+      {balances.map((b) => (
+        <div key={b.code} className="flex justify-between"><span>{b.label}</span><span className="tabular-nums">{peso(value(b))}</span></div>
+      ))}
+      <div className="flex justify-between font-semibold border-t border-foreground mt-1 pt-1">
+        <span>{totalLabel}</span><span className="tabular-nums">{peso(balances.reduce((s, b) => s + value(b), 0))}</span>
+      </div>
+    </div>
+  );
+  return (
+    <Card>
+      <CardHeader><CardTitle className="text-center tracking-wide">END OF SHIFT REPORT</CardTitle></CardHeader>
+      <CardContent className="max-w-lg mx-auto text-sm">
+        <div className="grid grid-cols-2 gap-y-1 mb-4">
+          <span>Barista</span><span className="text-right">{barista}</span>
+          <span>Time in</span><span className="text-right">{timeIn}</span>
+          <span>Time out</span><span className="text-right">{timeOut}</span>
+        </div>
+        {balances.length === 0 ? (
+          <p className="text-muted-foreground">Balances are not available yet. Run supabase_phase53_schema.sql on your database.</p>
+        ) : (
+          <>
+            <Section title="Starting Balance" value={(b) => Number(b.starting)} totalLabel="Total Starting Balance" />
+            <Section title="Sales - Current day" value={(b) => Number(b.sales)} totalLabel="Total Sales" />
+            <Section title="Expenses - Current day" value={(b) => Number(b.expenses)} totalLabel="Total Expenses" />
+            <Section title="Net Sales - Current day" value={net} totalLabel="Total Net Sales - Current day" />
+            <Section title="EOD Balance" value={eod} totalLabel="Total EOD balance" />
+            <p className="text-xs text-muted-foreground">
+              Starting balance is yesterday's EOD balance. Cash starting balance uses the declared starting cash.
+            </p>
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
