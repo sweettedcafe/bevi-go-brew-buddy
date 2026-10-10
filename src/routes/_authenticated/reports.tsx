@@ -410,19 +410,22 @@ function ReportsPage() {
     return v ?? "";
   }
 
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportPick, setExportPick] = useState({ order: true, item: true, disc: true });
+  const [imported, setImported] = useState<{ headers: string[]; rows: string[][] } | null>(null);
+
   function exportCurrent() {
     const build = (list: any[], cols: { key: string; label: string }[]) =>
       toCsv(list.map((r) => Object.fromEntries(cols.map((c) => [c.label, exportValue(r, c.key)]))), cols.map((c) => c.label));
-    const files: [string, string][] = [
-      [`per-order-${todayIso()}.csv`, build(filteredOrders, PER_ORDER_COLS)],
-      [`per-item-${todayIso()}.csv`, build(itemRows, PER_ITEM_COLS)],
-      [`discounts-promos-${todayIso()}.csv`, build(discountRows, DISCOUNT_COLS)],
-    ];
+    const files: [string, string][] = [];
+    if (exportPick.order) files.push([`per-order-${todayIso()}.csv`, build(filteredOrders, PER_ORDER_COLS)]);
+    if (exportPick.item) files.push([`per-item-${todayIso()}.csv`, build(itemRows, PER_ITEM_COLS)]);
+    if (exportPick.disc) files.push([`discounts-promos-${todayIso()}.csv`, build(discountRows, DISCOUNT_COLS)]);
+    if (files.length === 0) { toast.error("Select at least one report to export."); return; }
     files.forEach(([name, csv], i) => setTimeout(() => downloadCsv(name, csv), i * 600));
-    toast.success("Exporting Per order, Per item and Discounts & promos (3 files)");
+    toast.success(`Exporting ${files.length} file${files.length > 1 ? "s" : ""} (${files.length * 1} selected)`);
+    setExportOpen(false);
   }
-
-  const [imported, setImported] = useState<{ headers: string[]; rows: string[][] } | null>(null);
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-4">
@@ -430,11 +433,33 @@ function ReportsPage() {
         <BarChart3 className="h-5 w-5 text-primary" />
         <h1 className="text-2xl font-display">Reports</h1>
         <div className="ml-auto flex gap-2">
-          <Button size="sm" variant="outline" onClick={exportCurrent}>
-            <Download className="h-3 w-3 mr-1" /> Export CSV
-          </Button>
-
-
+          <Popover open={exportOpen} onOpenChange={setExportOpen}>
+            <PopoverTrigger asChild>
+              <Button size="sm" variant="outline">
+                <Download className="h-3 w-3 mr-1" /> Export CSV
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-64 space-y-3">
+              <div className="text-sm font-medium">Choose what to export</div>
+              {([
+                ["order", "Per order", filteredOrders.length],
+                ["item", "Per item", itemRows.length],
+                ["disc", "Discounts & promos", discountRows.length],
+              ] as const).map(([key, label, count]) => (
+                <label key={key} className="flex items-center gap-2 text-sm cursor-pointer">
+                  <Checkbox
+                    checked={exportPick[key]}
+                    onCheckedChange={(v) => setExportPick({ ...exportPick, [key]: !!v })}
+                  />
+                  {label}
+                  <span className="ml-auto text-xs text-muted-foreground">{count} rows</span>
+                </label>
+              ))}
+              <Button size="sm" className="w-full" onClick={exportCurrent}>
+                Export selected
+              </Button>
+            </PopoverContent>
+          </Popover>
         </div>
       </header>
 
