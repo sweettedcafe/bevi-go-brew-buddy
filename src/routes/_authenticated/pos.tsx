@@ -554,7 +554,7 @@ function POSPage() {
       .eq("customer_id", customerId)
       .gte("created_at", start.toISOString());
     const n = (data ?? []).filter((o: any) =>
-      String(o.status) !== "voided" &&
+      !["voided", "refunded"].includes(String(o.status)) &&
       (Number(o.discount_total) > 0 || o.discount_id || o.discount_label)).length;
     setDiscountsToday(n);
   }
