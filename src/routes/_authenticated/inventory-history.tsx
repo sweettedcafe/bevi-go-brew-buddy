@@ -13,6 +13,8 @@ import { toCsv, downloadCsv } from "@/lib/csv";
 export const Route = createFileRoute("/_authenticated/inventory-history")({
   head: () => ({
     meta: [
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
       { title: "Inventory Historical Report — Bevi & Go" },
       { name: "description", content: "Every stock addition, deduction and sale-based inventory change." },
       { property: "og:title", content: "Inventory Historical Report — Bevi & Go" },
@@ -26,6 +28,7 @@ const db = supabase as any;
 const pad = (n: number) => String(n).padStart(2, "0");
 const isoDay = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const isoTime = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+const displayTime = (d: Date) => d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit", hour12: true });
 
 type Row = {
   id: number; created_at: string; inventory_item_id: string; item_name: string | null;
@@ -117,7 +120,7 @@ function InventoryHistoryPage() {
               const d = new Date(r.created_at); const q = Number(r.delta);
               return (
                 <TableRow key={r.id}>
-                  <TableCell>{isoDay(d)}</TableCell><TableCell>{isoTime(d)}</TableCell>
+                  <TableCell>{isoDay(d)}</TableCell><TableCell className="whitespace-nowrap">{displayTime(d)}</TableCell>
                   <TableCell className={`text-right font-medium ${q < 0 ? "text-destructive" : "text-primary"}`}>
                     {q > 0 ? "+" : ""}{q.toLocaleString()} {r.unit}
                   </TableCell>

@@ -16,6 +16,14 @@ import { useServerFn } from "@tanstack/react-start";
 import { exportToGoogleSheets } from "@/lib/sheets.functions";
 
 export const Route = createFileRoute("/_authenticated/expenses-report")({
+  head: () => ({ meta: [
+    { title: "Expenses Report — Bevi & Go" },
+    { name: "description", content: "Expense details, payment methods, correction reasons, and exports." },
+    { property: "og:title", content: "Expenses Report — Bevi & Go" },
+    { property: "og:description", content: "Expense details, payment methods, correction reasons, and exports." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+  ] }),
   component: ExpensesReportPage,
 });
 
@@ -39,6 +47,8 @@ type Row = {
   created_at: string;
   cashier_user_id: string | null;
   cashier_email: string | null;
+  payment_method_code?: string | null;
+  reason?: string | null;
 };
 
 function ExpensesReportPage() {
@@ -49,6 +59,10 @@ function ExpensesReportPage() {
   const [cashierQuery, setCashierQuery] = useState("");
   const [invoiceQuery, setInvoiceQuery] = useState("");
   const [rowsAll, setRowsAll] = useState<Row[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<Array<{ code: string; label: string; kind: string }>>([]);
+  const paymentLabel = (code?: string | null) => code
+    ? paymentMethods.find((m) => m.code === code)?.label ?? code
+    : paymentMethods.find((m) => m.kind === "cash")?.label ?? "Cash";
   const [loading, setLoading] = useState(false);
   const [sheetsBusy, setSheetsBusy] = useState(false);
   const exportSheets = useServerFn(exportToGoogleSheets);
@@ -57,6 +71,8 @@ function ExpensesReportPage() {
     setLoading(true);
     const startIso = new Date(`${from}T00:00:00`).toISOString();
     const endIso = new Date(`${to}T23:59:59`).toISOString();
+    const { data: methods } = await db.from("payment_methods").select("code, label, kind").order("sort_order");
+    setPaymentMethods(methods ?? []);
     const { data, error } = await db.rpc("admin_list_expenses", {
       p_from: startIso, p_to: endIso,
     });
@@ -64,7 +80,7 @@ function ExpensesReportPage() {
       // Fallback: direct table read
       const fb = await db
         .from("shift_expenses")
-        .select("id, shift_id, description, category, quantity, unit_price, amount, invoice_number, receipt_url, created_at")
+        .select("id, shift_id, description, category, quantity, unit_price, amount, invoice_number, receipt_url, created_at, payment_method_code, reason")
         .gte("created_at", startIso).lte("created_at", endIso)
         .order("created_at", { ascending: false });
       if (fb.error) toast.error(fb.error.message);
@@ -72,7 +88,14 @@ function ExpensesReportPage() {
         ...r, cashier_user_id: null, cashier_email: null,
       })) as Row[]);
     } else {
-      setRowsAll((data ?? []) as Row[]);
+      // Preserve the report RPC’s cashier identity; enrich new columns through user-scoped reads.
+      const details = await db.from("shift_expenses").select("id, payment_method_code, reason")
+        .gte("created_at", startIso).lte("created_at", endIso);
+      if (details.error) toast.error("Payment methods and reasons could not be loaded: " + details.error.message);
+      const byId = new Map<string, { payment_method_code: string | null; reason: string | null }>(
+        (details.data ?? []).map((r: { id: string; payment_method_code: string | null; reason: string | null }) => [r.id, r]),
+      );
+      setRowsAll((data ?? []).map((r: Row) => ({ ...r, ...byId.get(r.id) })));
     }
     setLoading(false);
   }
@@ -120,13 +143,15 @@ function ExpensesReportPage() {
   }
 
   function exportCsv() {
-    const cols = ["date", "time", "invoice_number", "description", "category", "quantity", "unit_price", "amount", "cashier_email", "receipt_url"];
+    const cols = ["date", "time", "invoice_number", "description", "category", "payment_method", "quantity", "unit_price", "amount", "reason", "cashier_email", "receipt_url"];
     const data = rows.map((r) => ({
       date: fmtDate(r.created_at),
       time: fmtTime(r.created_at),
       invoice_number: r.invoice_number ?? "",
       description: r.description,
       category: r.category ?? "",
+      payment_method: paymentLabel(r.payment_method_code),
+      reason: r.reason ?? "",
       quantity: r.quantity ?? 1,
       unit_price: Number(r.unit_price ?? r.amount).toFixed(2),
       amount: Number(r.amount).toFixed(2),
@@ -139,16 +164,18 @@ function ExpensesReportPage() {
   async function exportSheetsBtn() {
     setSheetsBusy(true);
     try {
-      const headers = ["Date", "Time", "Invoice #", "Description", "Category", "Qty", "Unit price", "Total", "Cashier", "Receipt URL"];
+      const headers = ["Date", "Time", "Invoice #", "Description", "Category", "Payment Method", "Qty", "Unit price", "Total", "Reason", "Cashier", "Receipt URL"];
       const rowsArr = rows.map((r) => [
         fmtDate(r.created_at),
         fmtTime(r.created_at),
         r.invoice_number ?? "",
         r.description,
         r.category ?? "",
+        paymentLabel(r.payment_method_code),
         String(Number(r.quantity ?? 1)),
         Number(r.unit_price ?? r.amount).toFixed(2),
         Number(r.amount).toFixed(2),
+        r.reason ?? "",
         r.cashier_email ?? "",
         r.receipt_url ?? "",
       ]);
@@ -277,9 +304,11 @@ function ExpensesReportPage() {
                   <TableHead>Invoice #</TableHead>
                   <TableHead>Item / description</TableHead>
                   <TableHead>Category</TableHead>
+                  <TableHead>Payment Method</TableHead>
                   <TableHead className="text-right">Qty</TableHead>
                   <TableHead className="text-right">Unit price</TableHead>
                   <TableHead className="text-right">Total</TableHead>
+                  <TableHead>Reason</TableHead>
                   <TableHead>Cashier</TableHead>
                   <TableHead>Receipt</TableHead>
                   {isDeveloper && <TableHead></TableHead>}
@@ -293,9 +322,11 @@ function ExpensesReportPage() {
                     <TableCell className="text-xs">{r.invoice_number ?? "—"}</TableCell>
                     <TableCell>{r.description}</TableCell>
                     <TableCell className="text-muted-foreground">{r.category ?? "—"}</TableCell>
+                    <TableCell>{paymentLabel(r.payment_method_code)}</TableCell>
                     <TableCell className="text-right">{Number(r.quantity ?? 1)}</TableCell>
                     <TableCell className="text-right">{peso(Number(r.unit_price ?? r.amount))}</TableCell>
                     <TableCell className="text-right font-medium">{peso(r.amount)}</TableCell>
+                    <TableCell className="text-xs">{r.reason ?? "—"}</TableCell>
                     <TableCell className="text-xs">{r.cashier_email ?? "—"}</TableCell>
                     <TableCell>
                       {r.receipt_url ? (
