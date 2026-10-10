@@ -44,10 +44,14 @@ type EOS = {
   leave_hours_deducted: number;
   net_worked_hours: number;
   payments: Array<{ method: string; gross: number; change: number; net: number; count: number }>;
-  expenses: Array<{ id: string; description: string; amount: number; quantity?: number | null; unit_price?: number | null; category: string | null; created_at: string; invoice_number?: string | null; receipt_url?: string | null }>;
+  expenses: Array<{ id: string; description: string; amount: number; quantity?: number | null; unit_price?: number | null; category: string | null; created_at: string; invoice_number?: string | null; receipt_url?: string | null; payment_method_code?: string | null; reason?: string | null }>;
   total_expenses: number;
   breaks: Array<{ id: string; type: "break" | "lunch"; started_at: string; ended_at: string | null }>;
 };
+
+type Balance = { code: string; label: string; kind: string; starting: number; sales: number; expenses: number };
+type PMOpt = { code: string; label: string; kind: string; is_active: boolean; owner_only?: boolean };
+const sumBy = (rows: Balance[], k: "starting" | "sales" | "expenses") => rows.reduce((s, r) => s + Number(r[k] ?? 0), 0);
 
 type ExpenseCategory = { id: string; name: string; sort_order: number; is_active: boolean };
 
@@ -64,6 +68,10 @@ function EndOfShiftPage() {
   const [unitPrice, setUnitPrice] = useState("");
   const [category, setCategory] = useState("");
   const [invoiceNo, setInvoiceNo] = useState("");
+  const [expMethod, setExpMethod] = useState("");
+  const [reason, setReason] = useState("");
+  const [pms, setPms] = useState<PMOpt[]>([]);
+  const [balances, setBalances] = useState<Balance[]>([]);
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [uploadingReceipt, setUploadingReceipt] = useState(false);
 
@@ -155,6 +163,13 @@ function EndOfShiftPage() {
       setPrevClosing(prev == null ? null : Number(prev));
       const { data: st } = await (supabase as any).rpc("tc_starting_cash_state");
       setCanSetCash(Boolean(st?.can_set));
+      const { data: pmData } = await (supabase as any).from("payment_methods").select("*").order("sort_order");
+      const pmRows = ((pmData ?? []) as any[]).map((m) => ({ code: m.code, label: m.label, kind: m.kind, is_active: m.is_active, owner_only: !!m.owner_only }));
+      setPms(pmRows);
+      setExpMethod((cur) => cur || (pmRows.find((m) => m.kind === "cash" && !m.owner_only)?.code ?? ""));
+      const { data: bal, error: balErr } = await (supabase as any).rpc("tc_eos_balances", { p_shift_id: shiftId });
+      if (balErr) console.warn("[eos] balances unavailable — run supabase_phase53_schema.sql", balErr.message);
+      setBalances(((bal ?? []) as Balance[]));
 
       if (us) setUpsellStats({
         offers: Number(us.offers ?? 0),
@@ -194,24 +209,33 @@ function EndOfShiftPage() {
     const q = Number(qty);
     const up = Number(unitPrice);
     if (!desc.trim()) { toast.error("Description required"); return; }
-    if (!Number.isFinite(q) || q <= 0) { toast.error("Quantity must be > 0"); return; }
-    if (!Number.isFinite(up) || up < 0) { toast.error("Unit price must be ≥ 0"); return; }
+    if (!Number.isFinite(q) || q === 0) { toast.error("Quantity cannot be 0"); return; }
+    if (!Number.isFinite(up)) { toast.error("Enter a unit price"); return; }
+    if (!expMethod) { toast.error("Pick a payment method"); return; }
+    if (q * up < 0 && !reason.trim()) { toast.error("Reason is required for a negative entry"); return; }
     let receiptUrl: string | null = null;
     if (receiptFile) {
       receiptUrl = await uploadReceipt(receiptFile);
     }
-    const { error } = await (supabase as any).rpc("tc_add_expense_v3", {
+    const { error } = await (supabase as any).rpc("tc_add_expense_v4", {
       p_description: desc.trim(),
       p_quantity: q,
       p_unit_price: up,
       p_category: category.trim() || null,
       p_invoice_number: invoiceNo.trim() || null,
       p_receipt_url: receiptUrl,
+      p_payment_method_code: expMethod,
+      p_reason: reason.trim() || null,
     });
-    if (error) { toast.error(error.message); return; }
+    if (error) {
+      toast.error(/tc_add_expense_v4/.test(error.message)
+        ? "Please run supabase_phase53_schema.sql on your database first."
+        : error.message);
+      return;
+    }
     toast.success("Expense saved");
     setDesc(""); setQty("1"); setUnitPrice(""); setCategory("");
-    setInvoiceNo(""); setReceiptFile(null);
+    setInvoiceNo(""); setReceiptFile(null); setReason("");
     await refresh();
   };
   const deleteExpense = async (id: string) => {
@@ -220,9 +244,23 @@ function EndOfShiftPage() {
     await refresh();
   };
 
-  const totalPayments = (report?.payments ?? []).reduce((s, p) => s + Number(p.net), 0);
-  const cashNet = Number(report?.payments.find((p) => p.method === "cash")?.net ?? 0);
-  const expectedCash = report ? Number(report.shift.starting_cash) + cashNet - Number(report.total_expenses) : 0;
+  const pmLabel = (code?: string | null) =>
+    code ? (pms.find((m) => m.code === code)?.label ?? code) : (pms.find((m) => m.kind === "cash")?.label ?? "Cash");
+  const expenseMethodOptions = pms.filter((m) =>
+    m.is_active && (m.owner_only ? isAdmin : (m.kind === "cash" || m.kind === "transfer")));
+  // Owner-only (bank account) expenses never appear on the End of Shift report.
+  const ownerOnlyCodes = new Set(pms.filter((m) => m.owner_only).map((m) => m.code));
+  const visibleExpenses = (report?.expenses ?? []).filter((e) =>
+    !e.payment_method_code || (!ownerOnlyCodes.has(e.payment_method_code) && (isAdmin || pms.some((m) => m.code === e.payment_method_code))));
+  const visibleExpenseTotal = visibleExpenses.reduce((s, e) => s + Number(e.amount), 0);
+
+  const totalPayments = balances.length ? sumBy(balances, "sales") : (report?.payments ?? []).reduce((s, p) => s + Number(p.net), 0);
+  const cashRow = balances.find((b) => b.kind === "cash");
+  const cashNet = cashRow ? Number(cashRow.sales) : Number(report?.payments.find((p) => p.method === "cash")?.net ?? 0);
+  const expectedCash = report
+    ? (cashRow ? Number(cashRow.starting) + Number(cashRow.sales) - Number(cashRow.expenses)
+       : Number(report.shift.starting_cash) + cashNet - visibleExpenseTotal)
+    : 0;
 
   const summaryText = report ? buildSummary(report, totalPayments, cashNet, expectedCash) : "";
   const receiptRef = useRef<HTMLDivElement>(null);
@@ -399,32 +437,32 @@ function EndOfShiftPage() {
               <CardTitle>Net by payment method · {report.shift.business_date}</CardTitle>
             </CardHeader>
             <CardContent>
-              {report.payments.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No paid orders for this business date yet.</p>
+              {balances.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No payment methods set up yet (Settings → Payment Methods).</p>
               ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Method</TableHead>
-                      <TableHead className="text-right">Orders</TableHead>
-                      <TableHead className="text-right">Gross</TableHead>
-                      <TableHead className="text-right">Change</TableHead>
+                      <TableHead className="text-right">Sales</TableHead>
+                      <TableHead className="text-right">Expenses</TableHead>
                       <TableHead className="text-right">Net</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {report.payments.map((p) => (
-                      <TableRow key={p.method}>
-                        <TableCell className="capitalize font-medium">{p.method}</TableCell>
-                        <TableCell className="text-right">{p.count}</TableCell>
-                        <TableCell className="text-right">{peso(p.gross)}</TableCell>
-                        <TableCell className="text-right">{peso(p.change)}</TableCell>
-                        <TableCell className="text-right font-semibold">{peso(p.net)}</TableCell>
+                    {balances.map((b) => (
+                      <TableRow key={b.code}>
+                        <TableCell className="font-medium">{b.label}</TableCell>
+                        <TableCell className="text-right">{peso(b.sales)}</TableCell>
+                        <TableCell className="text-right">{peso(b.expenses)}</TableCell>
+                        <TableCell className="text-right font-semibold">{peso(Number(b.sales) - Number(b.expenses))}</TableCell>
                       </TableRow>
                     ))}
                     <TableRow>
-                      <TableCell colSpan={4} className="text-right font-semibold">Total net</TableCell>
-                      <TableCell className="text-right font-semibold">{peso(totalPayments)}</TableCell>
+                      <TableCell className="text-right font-semibold">Total</TableCell>
+                      <TableCell className="text-right font-semibold">{peso(sumBy(balances, "sales"))}</TableCell>
+                      <TableCell className="text-right font-semibold">{peso(sumBy(balances, "expenses"))}</TableCell>
+                      <TableCell className="text-right font-semibold">{peso(sumBy(balances, "sales") - sumBy(balances, "expenses"))}</TableCell>
                     </TableRow>
                   </TableBody>
                 </Table>
@@ -456,11 +494,11 @@ function EndOfShiftPage() {
                   </div>
                   <div className="md:col-span-1">
                     <Label htmlFor="exp-qty">Qty</Label>
-                    <Input id="exp-qty" type="number" min="0.01" step="0.01" value={qty} onChange={(e) => setQty(e.target.value)} />
+                    <Input id="exp-qty" type="number" step="0.01" value={qty} onChange={(e) => setQty(e.target.value)} />
                   </div>
                   <div className="md:col-span-2">
                     <Label htmlFor="exp-unit">Unit price (₱)</Label>
-                    <Input id="exp-unit" type="number" min="0" step="0.01" value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} />
+                    <Input id="exp-unit" type="number" step="0.01" value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} />
                   </div>
                   <div className="md:col-span-1">
                     <Label>Total</Label>
@@ -479,11 +517,32 @@ function EndOfShiftPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="md:col-span-1">
+                  <div className="md:col-span-2">
+                    <Label htmlFor="exp-pm">Payment method</Label>
+                    <Select value={expMethod} onValueChange={setExpMethod}>
+                      <SelectTrigger id="exp-pm"><SelectValue placeholder="Pick" /></SelectTrigger>
+                      <SelectContent>
+                        {expenseMethodOptions.map((m) => (
+                          <SelectItem key={m.code} value={m.code}>
+                            {m.label}{m.owner_only ? " (owner only)" : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="md:col-span-3">
+                    <Label htmlFor="exp-reason">Reason</Label>
+                    <Input id="exp-reason" value={reason} onChange={(e) => setReason(e.target.value)}
+                      placeholder="Required for negative / correction entries" />
+                  </div>
+                  <div className="md:col-span-2">
                     <Label htmlFor="exp-img" className="text-xs">Receipt</Label>
                     <Input id="exp-img" type="file" accept="image/*"
                       onChange={(e) => setReceiptFile(e.target.files?.[0] ?? null)} />
                   </div>
+                  <p className="md:col-span-12 text-xs text-muted-foreground">
+                    To cancel a wrong entry, add the same item with a negative quantity or price and write the reason.
+                  </p>
                   <div className="md:col-span-1">
                     <Button onClick={addExpense} disabled={uploadingReceipt} className="w-full gap-1">
                       <Plus className="h-4 w-4" />
@@ -492,7 +551,7 @@ function EndOfShiftPage() {
                 </div>
               )}
 
-              {report.expenses.length === 0 ? (
+              {visibleExpenses.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No expenses recorded.</p>
               ) : (
                 <Table>
@@ -503,24 +562,28 @@ function EndOfShiftPage() {
                       <TableHead>Invoice #</TableHead>
                       <TableHead>Description</TableHead>
                       <TableHead>Category</TableHead>
+                      <TableHead>Payment</TableHead>
                       <TableHead className="text-right">Qty</TableHead>
                       <TableHead className="text-right">Unit price</TableHead>
                       <TableHead className="text-right">Total</TableHead>
+                      <TableHead>Reason</TableHead>
                       <TableHead>Receipt</TableHead>
                       <TableHead></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {report.expenses.map((e) => (
+                    {visibleExpenses.map((e) => (
                       <TableRow key={e.id}>
                         <TableCell className="text-xs">{fmtDate(e.created_at)}</TableCell>
                         <TableCell className="text-xs">{fmtClock(e.created_at)}</TableCell>
                         <TableCell className="text-xs">{e.invoice_number ?? "—"}</TableCell>
                         <TableCell>{e.description}</TableCell>
                         <TableCell className="text-muted-foreground">{e.category ?? "—"}</TableCell>
+                        <TableCell className="text-xs">{pmLabel(e.payment_method_code)}</TableCell>
                         <TableCell className="text-right">{Number(e.quantity ?? 1)}</TableCell>
                         <TableCell className="text-right">{peso(e.unit_price ?? e.amount)}</TableCell>
-                        <TableCell className="text-right font-medium">{peso(e.amount)}</TableCell>
+                        <TableCell className={`text-right font-medium ${Number(e.amount) < 0 ? "text-destructive" : ""}`}>{peso(e.amount)}</TableCell>
+                        <TableCell className="text-xs">{e.reason ?? "—"}</TableCell>
                         <TableCell>
                           {e.receipt_url ? (
                             <div className="flex items-center gap-2">
@@ -541,9 +604,9 @@ function EndOfShiftPage() {
                       </TableRow>
                     ))}
                     <TableRow>
-                      <TableCell colSpan={7} className="text-right font-semibold">Total expenses</TableCell>
-                      <TableCell className="text-right font-semibold">{peso(report.total_expenses)}</TableCell>
-                      <TableCell colSpan={2} />
+                      <TableCell colSpan={8} className="text-right font-semibold">Total expenses</TableCell>
+                      <TableCell className="text-right font-semibold">{peso(visibleExpenseTotal)}</TableCell>
+                      <TableCell colSpan={3} />
                     </TableRow>
                   </TableBody>
                 </Table>
@@ -551,24 +614,12 @@ function EndOfShiftPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader><CardTitle>Cash summary</CardTitle></CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                <Field label="Starting cash" value={peso(report.shift.starting_cash)} />
-                <Field label="Cash sales (net)" value={peso(report.payments.find((p) => p.method === "cash")?.net ?? 0)} />
-                <Field label="Expenses paid" value={peso(report.total_expenses)} />
-                <Field
-                  label="Expected cash on hand"
-                  value={peso(
-                    Number(report.shift.starting_cash) +
-                    Number(report.payments.find((p) => p.method === "cash")?.net ?? 0) -
-                    Number(report.total_expenses)
-                  )}
-                />
-              </div>
-            </CardContent>
-          </Card>
+          <BalancesReport
+            balances={balances}
+            barista={report.user_email ?? "—"}
+            timeIn={fmtTime(report.shift.clock_in)}
+            timeOut={report.shift.clock_out ? fmtTime(report.shift.clock_out) : "In progress"}
+          />
         </>
       )}
 
@@ -600,6 +651,50 @@ function EndOfShiftPage() {
       </Dialog>
     </div>
 
+  );
+}
+
+function BalancesReport({ balances, barista, timeIn, timeOut }: {
+  balances: Balance[]; barista: string; timeIn: string; timeOut: string;
+}) {
+  const net = (b: Balance) => Number(b.sales) - Number(b.expenses);
+  const eod = (b: Balance) => Number(b.starting) + net(b);
+  const Section = ({ title, value, totalLabel }: { title: string; value: (b: Balance) => number; totalLabel: string }) => (
+    <div className="border border-dashed border-border rounded-sm p-2 mb-3">
+      <div className="font-semibold mb-1">{title}</div>
+      {balances.map((b) => (
+        <div key={b.code} className="flex justify-between"><span>{b.label}</span><span className="tabular-nums">{peso(value(b))}</span></div>
+      ))}
+      <div className="flex justify-between font-semibold border-t border-foreground mt-1 pt-1">
+        <span>{totalLabel}</span><span className="tabular-nums">{peso(balances.reduce((s, b) => s + value(b), 0))}</span>
+      </div>
+    </div>
+  );
+  return (
+    <Card>
+      <CardHeader><CardTitle className="text-center tracking-wide">END OF SHIFT REPORT</CardTitle></CardHeader>
+      <CardContent className="max-w-lg mx-auto text-sm">
+        <div className="grid grid-cols-2 gap-y-1 mb-4">
+          <span>Barista</span><span className="text-right">{barista}</span>
+          <span>Time in</span><span className="text-right">{timeIn}</span>
+          <span>Time out</span><span className="text-right">{timeOut}</span>
+        </div>
+        {balances.length === 0 ? (
+          <p className="text-muted-foreground">Balances are not available yet. Run supabase_phase53_schema.sql on your database.</p>
+        ) : (
+          <>
+            <Section title="Starting Balance" value={(b) => Number(b.starting)} totalLabel="Total Starting Balance" />
+            <Section title="Sales - Current day" value={(b) => Number(b.sales)} totalLabel="Total Sales" />
+            <Section title="Expenses - Current day" value={(b) => Number(b.expenses)} totalLabel="Total Expenses" />
+            <Section title="Net Sales - Current day" value={net} totalLabel="Total Net Sales - Current day" />
+            <Section title="EOD Balance" value={eod} totalLabel="Total EOD balance" />
+            <p className="text-xs text-muted-foreground">
+              Starting balance is yesterday's EOD balance. Cash starting balance uses the declared starting cash.
+            </p>
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

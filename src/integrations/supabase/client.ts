@@ -12,4 +12,4 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   },
 });
 
-export type AppRole = "developer" | "admin" | "barista" | "accountant";
+export type AppRole = "developer" | "admin" | "barista" | "accountant" | "partner";

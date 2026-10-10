@@ -158,7 +158,7 @@ function HistoryPage() {
                       {r.customer_name || "Walk-in"} · <span className="text-muted-foreground capitalize">{r.order_type.replace("_", " ")}</span>
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {new Date(r.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      {new Date(r.created_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })}
                     </div>
                   </div>
                   {txnKind !== "sale" && (

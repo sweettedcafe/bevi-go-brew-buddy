@@ -25,7 +25,7 @@ export type NavGroup = { id: string; label: string; icon: typeof LayoutDashboard
 export const GROUPS: NavGroup[] = [
   {
     id: "overview", label: "Overview", icon: LayoutDashboard, items: [
-      { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["developer", "admin"] },
+      { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["developer", "admin", "partner"] },
     ],
   },
   {
@@ -58,7 +58,7 @@ export const GROUPS: NavGroup[] = [
   },
   {
     id: "reports", label: "Reports", icon: BarChart3, items: [
-      { to: "/reports", label: "Reports", icon: BarChart3, roles: ["developer", "admin", "accountant"] },
+      { to: "/reports", label: "Reports", icon: BarChart3, roles: ["developer", "admin", "accountant", "partner"] },
       { to: "/sales-summary", label: "Sales Summary", icon: FileText, roles: ["developer", "admin"] },
       { to: "/analytics", label: "Analytics", icon: BarChart3, roles: ["developer", "admin"] },
       { to: "/expenses-report", label: "Expenses Report", icon: Wallet, roles: ["developer", "admin", "accountant"] },
@@ -91,16 +91,16 @@ function AuthenticatedLayout() {
   const navigate = useNavigate();
   const path = useRouterState({ select: (s) => s.location.pathname });
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [grants, setGrants] = useState<Array<{ role: AppRole; path: string }>>([]);
+  const [grants, setGrants] = useState<Array<{ role: AppRole; path: string; allowed: boolean }>>([]);
 
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
     (supabase as any)
       .from("role_access_grants")
-      .select("role, path")
+      .select("*")
       .then(({ data }: any) => {
-        if (!cancelled) setGrants(((data ?? []) as any[]).map((r) => ({ role: r.role, path: r.path })));
+        if (!cancelled) setGrants(((data ?? []) as any[]).map((r) => ({ role: r.role, path: r.path, allowed: r.allowed !== false })));
       });
     return () => { cancelled = true; };
   }, [user]);
@@ -128,8 +128,15 @@ function AuthenticatedLayout() {
 
   const effectiveRoles: AppRole[] = roles.length > 0 ? roles : [primaryRole ?? "barista"];
   const grantedPaths = new Set(
-    grants.filter((g) => effectiveRoles.includes(g.role)).map((g) => g.path),
+    grants.filter((g) => g.allowed && effectiveRoles.includes(g.role)).map((g) => g.path),
   );
+  // A path is revoked only if every default role the user holds for it is switched off.
+  const isRevoked = (path: string, defaults: AppRole[]) => {
+    const mine = defaults.filter((r) => effectiveRoles.includes(r));
+    if (mine.includes("developer")) return false;
+    if (path === "/access-control" && mine.includes("admin")) return false; // never lock admins out
+    return mine.length > 0 && mine.every((r) => grants.some((g) => g.role === r && g.path === path && !g.allowed));
+  };
   const visibleGroups = GROUPS
     .map((g) => ({
       ...g,
@@ -139,7 +146,7 @@ function AuthenticatedLayout() {
         // Developer-only items require the developer role explicitly (no granting)
         const isDevOnly = i.roles.length === 1 && i.roles[0] === "developer";
         if (isDevOnly) return effectiveRoles.includes("developer");
-        return roleAllowed || granted;
+        return (roleAllowed && !isRevoked(i.to, i.roles)) || granted;
       }),
     }))
     .filter((g) => g.items.length > 0);

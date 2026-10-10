@@ -16,7 +16,7 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
 
-const ROLE_PRIORITY: AppRole[] = ["developer", "admin", "barista"];
+const ROLE_PRIORITY: AppRole[] = ["developer", "admin", "partner", "accountant", "barista"];
 
 async function fetchRoles(userId: string): Promise<{ roles: AppRole[]; error: string | null }> {
   const { data, error } = await supabase

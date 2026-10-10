@@ -16,9 +16,9 @@ export const Route = createFileRoute("/_authenticated/access-control")({
 const db = supabase as any;
 
 // Non-developer roles that can receive extra grants.
-const GRANTABLE_ROLES: AppRole[] = ["barista", "accountant", "admin"];
+const GRANTABLE_ROLES: AppRole[] = ["barista", "accountant", "partner", "admin"];
 
-type Grant = { role: AppRole; path: string };
+type Grant = { role: AppRole; path: string; allowed: boolean };
 
 function AccessControlPage() {
   const { hasRole } = useAuth();
@@ -29,16 +29,16 @@ function AccessControlPage() {
 
   const load = async () => {
     setLoading(true);
-    const { data, error } = await db.from("role_access_grants").select("role, path");
+    const { data, error } = await db.from("role_access_grants").select("*");
     if (error) toast.error(error.message);
-    setGrants(((data ?? []) as any[]).map((r) => ({ role: r.role, path: r.path })));
+    setGrants(((data ?? []) as any[]).map((r) => ({ role: r.role, path: r.path, allowed: r.allowed !== false })));
     setLoading(false);
   };
 
   useEffect(() => { void load(); }, []);
 
-  const grantSet = useMemo(
-    () => new Set(grants.map((g) => `${g.role}:${g.path}`)),
+  const grantMap = useMemo(
+    () => new Map(grants.map((g) => [`${g.role}:${g.path}`, g.allowed])),
     [grants],
   );
 
@@ -59,14 +59,19 @@ function AccessControlPage() {
     if (!canManage) return;
     const key = `${role}:${path}`;
     setBusyKey(key);
-    if (next) {
-      const { error } = await db.from("role_access_grants").insert({ role, path });
-      if (error) toast.error(error.message);
-      else setGrants((prev) => [...prev, { role, path }]);
+    const isDefault = rows.find((r) => r.path === path)?.defaults.includes(role) ?? false;
+    // Default ON + unchecked → store an "off" row. Extra ON → store an "on" row. Otherwise remove the row.
+    const needsRow = isDefault ? !next : next;
+    const without = (prev: Grant[]) => prev.filter((g) => !(g.role === role && g.path === path));
+    if (needsRow) {
+      const { error } = await db.from("role_access_grants")
+        .upsert({ role, path, allowed: next }, { onConflict: "role,path" });
+      if (error) toast.error(/allowed/.test(error.message) ? "Run supabase_phase53_schema.sql first." : error.message);
+      else setGrants((prev) => [...without(prev), { role, path, allowed: next }]);
     } else {
       const { error } = await db.from("role_access_grants").delete().eq("role", role).eq("path", path);
       if (error) toast.error(error.message);
-      else setGrants((prev) => prev.filter((g) => !(g.role === role && g.path === path)));
+      else setGrants(without);
     }
     setBusyKey(null);
   };
@@ -116,13 +121,14 @@ function AccessControlPage() {
                       </td>
                       {GRANTABLE_ROLES.map((r) => {
                         const isDefault = row.defaults.includes(r);
-                        const checked = isDefault || grantSet.has(`${r}:${row.path}`);
+                        const stored = grantMap.get(`${r}:${row.path}`);
+                        const checked = stored === undefined ? isDefault : stored;
                         const key = `${r}:${row.path}`;
                         return (
                           <td key={r} className="py-2 px-3 text-center">
                             <Checkbox
                               checked={checked}
-                              disabled={!canManage || isDefault || busyKey === key}
+                              disabled={!canManage || busyKey === key}
                               onCheckedChange={(v) => toggle(r, row.path, !!v)}
                               aria-label={`Grant ${row.label} to ${r}`}
                             />
@@ -134,8 +140,8 @@ function AccessControlPage() {
                 </tbody>
               </table>
               <p className="text-xs text-muted-foreground mt-4">
-                Roles with the item enabled by default show a locked checkbox — they always have access.
-                Extra grants take effect the next time that user reloads the app.
+                Every box can be switched on or off, including default access. Changes take effect the next time
+                that user reloads the app. Admins always keep access to this page.
               </p>
             </div>
           )}

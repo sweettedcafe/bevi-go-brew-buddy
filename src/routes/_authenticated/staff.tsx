@@ -60,6 +60,16 @@ function StaffPage() {
     await load();
   };
 
+  const changeRole = async (r: Row, next: AppRole) => {
+    if (next === r.role) return;
+    const { error: e1 } = await db.rpc("assign_role_by_email", { p_email: r.email, p_role: next });
+    if (e1) { toast.error(e1.message); return; }
+    const { error: e2 } = await db.rpc("remove_role_assignment", { p_user_id: r.user_id, p_role: r.role });
+    if (e2) { toast.error(e2.message); return; }
+    toast.success(`${r.email} is now ${next}`);
+    await load();
+  };
+
   return (
     <div className="p-8 max-w-5xl mx-auto">
       <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground mb-2">
@@ -82,6 +92,7 @@ function StaffPage() {
               <SelectContent>
                 <SelectItem value="barista">Barista</SelectItem>
                 <SelectItem value="accountant">Accountant</SelectItem>
+                <SelectItem value="partner">Partner</SelectItem>
                 <SelectItem value="admin">Admin</SelectItem>
                 {hasRole("developer") && <SelectItem value="developer">Developer</SelectItem>}
               </SelectContent>
@@ -108,9 +119,22 @@ function StaffPage() {
               {rows.map((r) => (
                 <div key={`${r.user_id}-${r.role}`} className="py-3 flex items-center justify-between text-sm gap-3">
                   <div className="truncate flex-1">{r.email}</div>
-                  <Badge variant={r.role === "developer" ? "default" : "secondary"} className="capitalize">
-                    {r.role}
-                  </Badge>
+                  {canManage && (r.role !== "developer" || hasRole("developer")) ? (
+                    <Select value={r.role} onValueChange={(v) => changeRole(r, v as AppRole)}>
+                      <SelectTrigger className="w-40 capitalize"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="barista">Barista</SelectItem>
+                        <SelectItem value="accountant">Accountant</SelectItem>
+                        <SelectItem value="partner">Partner</SelectItem>
+                        <SelectItem value="admin">Admin</SelectItem>
+                        {hasRole("developer") && <SelectItem value="developer">Developer</SelectItem>}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Badge variant={r.role === "developer" ? "default" : "secondary"} className="capitalize">
+                      {r.role}
+                    </Badge>
+                  )}
                   {canManage && (
                     <Button size="icon" variant="ghost" onClick={() => removeRole(r.user_id, r.role)}
                       title="Remove role">

@@ -24,7 +24,7 @@ const peso = (n: number) => `₱${Number(n || 0).toFixed(2)}`;
 const todayIso = () => new Date().toISOString().slice(0, 10);
 const daysAgoIso = (n: number) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
 const fmtDate = (iso: string) => new Date(iso).toLocaleDateString();
-const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString();
+const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit", hour12: true });
 
 type Row = {
   id: string;

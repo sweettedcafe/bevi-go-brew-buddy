@@ -1568,7 +1568,7 @@ function POSPage() {
                           </Badge>
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          Held {new Date(h.held_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · {fmt(Number(h.total))}
+                          Held {new Date(h.held_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })} · {fmt(Number(h.total))}
                         </div>
                       </div>
                       <PlayCircle className="h-4 w-4 text-primary" />
@@ -1609,7 +1609,7 @@ function POSPage() {
                       )}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {new Date(o.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · {o.order_type}
+                      {new Date(o.created_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })} · {o.order_type}
                     </div>
                   </div>
                   <div className="font-medium">{fmt(Number(o.total))}</div>

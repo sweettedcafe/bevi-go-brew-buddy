@@ -100,7 +100,7 @@ export function labelsHTML(labels: DrinkLabel[], s: PrintSettings): string {
     <section class="label${i < labels.length - 1 ? " brk" : ""}">
       <div class="row top">
         <span class="ord">#${String(l.orderNo).padStart(3, "0")}${l.orderId ? ` · ${esc(l.orderId.slice(0, 8))}` : ""}</span>
-        <span class="when">${new Date(l.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+        <span class="when">${new Date(l.createdAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })}</span>
       </div>
       <div class="name">${esc(l.drinkName)}</div>
       ${l.cupTotal > 1 ? `<div class="cup">${l.cupIndex} of ${l.cupTotal}</div>` : ""}

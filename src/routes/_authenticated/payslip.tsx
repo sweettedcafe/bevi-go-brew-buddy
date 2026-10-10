@@ -26,7 +26,7 @@ type Shift = {
 const todayIso = () => new Date().toISOString().slice(0, 10);
 const firstOfMonth = () => { const d = new Date(); d.setDate(1); return d.toISOString().slice(0, 10); };
 const fmtTime = (iso: string | null) => iso
-  ? new Intl.DateTimeFormat("en-PH", { timeZone: MANILA_TZ, hour: "2-digit", minute: "2-digit" }).format(new Date(iso))
+  ? new Intl.DateTimeFormat("en-PH", { timeZone: MANILA_TZ, hour: "numeric", minute: "2-digit", hour12: true }).format(new Date(iso))
   : "—";
 const hrs = (s: number) => (Number(s) / 3600).toFixed(2);
 
