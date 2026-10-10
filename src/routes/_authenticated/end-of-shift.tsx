@@ -154,6 +154,19 @@ function EndOfShiftPage() {
     setCashInput("");
     await refresh();
   };
+  // Auto-apply yesterday's closing as today's starting cash (first shift, not yet declared).
+  const autoAppliedRef = useRef<string | null>(null);
+  useEffect(() => {
+    const s = report?.shift;
+    if (!s || !canSetCash || s.clock_out || prevClosing == null) return;
+    if (Number(s.starting_cash) !== 0 || autoAppliedRef.current === s.id) return;
+    autoAppliedRef.current = s.id;
+    (async () => {
+      const { error } = await (supabase as any).rpc("tc_set_starting_cash", { p_amount: prevClosing });
+      if (!error) await refresh();
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [report?.shift?.id, report?.shift?.starting_cash, canSetCash, prevClosing]);
 
 
   const refresh = async () => {
@@ -371,26 +384,7 @@ function EndOfShiftPage() {
                   }
                 />
               </div>
-              {canSetCash && !report.shift.clock_out && Number(report.shift.starting_cash) === 0 ? (
-                <div className="mt-4 rounded-md border p-3 space-y-2">
-                  <Label htmlFor="start-cash">Set starting cash for today (first shift only)</Label>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Input id="start-cash" type="number" min="0" step="0.01" className="w-40"
-                      placeholder={prevClosing != null ? prevClosing.toFixed(2) : "0.00"}
-                      value={cashInput} onChange={(e) => setCashInput(e.target.value)} />
-                    {prevClosing != null && (
-                      <Button size="sm" variant="outline" onClick={() => setCashInput(prevClosing.toFixed(2))}>
-                        Use yesterday's closing ({peso(prevClosing)})
-                      </Button>
-                    )}
-                    <Button size="sm" onClick={saveStartingCash} disabled={savingCash}>Save</Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Yesterday's closing cash (starting cash + cash payments − expenses) carries over as today's
-                    starting cash. Only the first shift of the day declares it; later shifts continue the same drawer.
-                  </p>
-                </div>
-              ) : (
+              {isAdmin ? (
                 <div className="mt-4 rounded-md border p-3 space-y-2">
                   <Label htmlFor="edit-start-cash">
                     Edit starting cash for {report.shift.business_date} (currently {peso(report.shift.starting_cash)})
@@ -407,10 +401,15 @@ function EndOfShiftPage() {
                     <Button size="sm" onClick={editStartingCash} disabled={savingCash}>Update</Button>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Use this if the starting cash was missed or entered incorrectly. The corrected amount applies to
-                    the whole business day's drawer{isAdmin ? "" : " for your own shift"}.
+                    Starting cash is filled in automatically from yesterday's closing. Only admins and developers
+                    can correct it here if there's an issue.
                   </p>
                 </div>
+              ) : (
+                <p className="mt-4 text-xs text-muted-foreground">
+                  Starting cash is set automatically from yesterday's closing
+                  {prevClosing != null ? ` (${peso(prevClosing)})` : ""}. Ask an admin if it needs correcting.
+                </p>
               )}
 
 
