@@ -12,7 +12,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { AlertTriangle, Upload, Download, Plus, Pencil, PackagePlus, PackageMinus } from "lucide-react";
+import { AlertTriangle, Upload, Download, Plus, Pencil, PackagePlus, PackageMinus, Search } from "lucide-react";
 import { toast } from "sonner";
 import { toCsv, downloadCsv } from "@/lib/csv";
 import { fetchPublicCsv } from "@/lib/fetch-csv.functions";
@@ -55,6 +55,8 @@ function InventoryPage() {
     || primaryRole === "admin" || primaryRole === "developer";
   // Baristas may adjust pack counts, but not edit/create items.
   const canAdjustPacks = isAdmin || roles.includes("barista") || primaryRole === "barista";
+  const isDeveloper = roles.includes("developer") || primaryRole === "developer";
+  const [search, setSearch] = useState("");
   const [rows, setRows] = useState<Inv[]>([]);
   const [loading, setLoading] = useState(true);
   const [showInactive, setShowInactive] = useState(false);
@@ -72,10 +74,11 @@ function InventoryPage() {
   useEffect(() => { void load(); }, []);
   useRealtime("inventory_items", () => { void load(); });
 
-  const visible = useMemo(
-    () => rows.filter((r) => showInactive || r.is_active),
-    [rows, showInactive],
-  );
+  const visible = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return rows.filter((r) => (showInactive || r.is_active)
+      && (!q || r.name.toLowerCase().includes(q) || (r.pack_label ?? "").toLowerCase().includes(q)));
+  }, [rows, showInactive, search]);
   const needRestock = useMemo(
     () => rows.filter((r) => r.is_active && stateOf(r) !== "ok"),
     [rows],
@@ -150,6 +153,11 @@ function InventoryPage() {
         </Card>
       )}
 
+      <div className="relative">
+        <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+        <Input className="pl-9" placeholder="Search item…" value={search} onChange={(e) => setSearch(e.target.value)} />
+      </div>
+
       {loading ? (
         <div className="text-muted-foreground text-sm">Loading…</div>
       ) : visible.length === 0 ? (
@@ -208,12 +216,12 @@ function InventoryPage() {
                         </>
                       )}
                       {isAdmin && (
-                        <>
-                          <Switch checked={r.is_active} onCheckedChange={() => toggleActive(r)} />
-                          <Button size="icon" variant="ghost" onClick={() => setEditing(r)}>
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                        </>
+                        <Switch checked={r.is_active} onCheckedChange={() => toggleActive(r)} />
+                      )}
+                      {isDeveloper && (
+                        <Button size="icon" variant="ghost" onClick={() => setEditing(r)}>
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
                       )}
                     </div>
                   )}
