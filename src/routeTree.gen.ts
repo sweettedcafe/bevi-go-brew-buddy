@@ -28,6 +28,7 @@ import { Route as AuthenticatedEosAdminRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedExpensesReportRouteImport } from './routes/_authenticated/expenses-report'
 import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticated/history'
 import { Route as AuthenticatedInventoryRouteImport } from './routes/_authenticated/inventory'
+import { Route as AuthenticatedInventoryHistoryRouteImport } from './routes/_authenticated/inventory-history'
 import { Route as AuthenticatedManualRouteImport } from './routes/_authenticated/manual'
 import { Route as AuthenticatedMenuRouteImport } from './routes/_authenticated/menu'
 import { Route as AuthenticatedPaymentsRouteImport } from './routes/_authenticated/payments'
@@ -143,6 +144,12 @@ const AuthenticatedInventoryRoute = AuthenticatedInventoryRouteImport.update({
   path: '/inventory',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedInventoryHistoryRoute =
+  AuthenticatedInventoryHistoryRouteImport.update({
+    id: '/inventory-history',
+    path: '/inventory-history',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedManualRoute = AuthenticatedManualRouteImport.update({
   id: '/manual',
   path: '/manual',
@@ -259,6 +266,7 @@ export interface FileRoutesByFullPath {
   '/expenses-report': typeof AuthenticatedExpensesReportRoute
   '/history': typeof AuthenticatedHistoryRoute
   '/inventory': typeof AuthenticatedInventoryRoute
+  '/inventory-history': typeof AuthenticatedInventoryHistoryRoute
   '/manual': typeof AuthenticatedManualRoute
   '/menu': typeof AuthenticatedMenuRoute
   '/payments': typeof AuthenticatedPaymentsRoute
@@ -297,6 +305,7 @@ export interface FileRoutesByTo {
   '/expenses-report': typeof AuthenticatedExpensesReportRoute
   '/history': typeof AuthenticatedHistoryRoute
   '/inventory': typeof AuthenticatedInventoryRoute
+  '/inventory-history': typeof AuthenticatedInventoryHistoryRoute
   '/manual': typeof AuthenticatedManualRoute
   '/menu': typeof AuthenticatedMenuRoute
   '/payments': typeof AuthenticatedPaymentsRoute
@@ -337,6 +346,7 @@ export interface FileRoutesById {
   '/_authenticated/expenses-report': typeof AuthenticatedExpensesReportRoute
   '/_authenticated/history': typeof AuthenticatedHistoryRoute
   '/_authenticated/inventory': typeof AuthenticatedInventoryRoute
+  '/_authenticated/inventory-history': typeof AuthenticatedInventoryHistoryRoute
   '/_authenticated/manual': typeof AuthenticatedManualRoute
   '/_authenticated/menu': typeof AuthenticatedMenuRoute
   '/_authenticated/payments': typeof AuthenticatedPaymentsRoute
@@ -377,6 +387,7 @@ export interface FileRouteTypes {
     | '/expenses-report'
     | '/history'
     | '/inventory'
+    | '/inventory-history'
     | '/manual'
     | '/menu'
     | '/payments'
@@ -415,6 +426,7 @@ export interface FileRouteTypes {
     | '/expenses-report'
     | '/history'
     | '/inventory'
+    | '/inventory-history'
     | '/manual'
     | '/menu'
     | '/payments'
@@ -454,6 +466,7 @@ export interface FileRouteTypes {
     | '/_authenticated/expenses-report'
     | '/_authenticated/history'
     | '/_authenticated/inventory'
+    | '/_authenticated/inventory-history'
     | '/_authenticated/manual'
     | '/_authenticated/menu'
     | '/_authenticated/payments'
@@ -625,6 +638,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedInventoryRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/inventory-history': {
+      id: '/_authenticated/inventory-history'
+      path: '/inventory-history'
+      fullPath: '/inventory-history'
+      preLoaderRoute: typeof AuthenticatedInventoryHistoryRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/manual': {
       id: '/_authenticated/manual'
       path: '/manual'
@@ -768,6 +788,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedExpensesReportRoute: typeof AuthenticatedExpensesReportRoute
   AuthenticatedHistoryRoute: typeof AuthenticatedHistoryRoute
   AuthenticatedInventoryRoute: typeof AuthenticatedInventoryRoute
+  AuthenticatedInventoryHistoryRoute: typeof AuthenticatedInventoryHistoryRoute
   AuthenticatedManualRoute: typeof AuthenticatedManualRoute
   AuthenticatedMenuRoute: typeof AuthenticatedMenuRoute
   AuthenticatedPaymentsRoute: typeof AuthenticatedPaymentsRoute
@@ -795,6 +816,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedExpensesReportRoute: AuthenticatedExpensesReportRoute,
   AuthenticatedHistoryRoute: AuthenticatedHistoryRoute,
   AuthenticatedInventoryRoute: AuthenticatedInventoryRoute,
+  AuthenticatedInventoryHistoryRoute: AuthenticatedInventoryHistoryRoute,
   AuthenticatedManualRoute: AuthenticatedManualRoute,
   AuthenticatedMenuRoute: AuthenticatedMenuRoute,
   AuthenticatedPaymentsRoute: AuthenticatedPaymentsRoute,
