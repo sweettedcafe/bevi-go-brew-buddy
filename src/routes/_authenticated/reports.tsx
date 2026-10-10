@@ -467,7 +467,7 @@ function ReportsPage() {
             return Number(v || 0).toFixed(2);
           if (c.key === "created_at") return new Date((r as any).created_at).toLocaleString();
           if (c.key === "date_only") return (r as any).created_at ? new Date((r as any).created_at).toLocaleDateString() : "";
-          if (c.key === "time_only") return (r as any).created_at ? new Date((r as any).created_at).toLocaleTimeString() : "";
+          if (c.key === "time_only") return (r as any).created_at ? new Date((r as any).created_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit", hour12: true }) : "";
           if (c.key === "order_no") return `#${String(v).padStart(3, "0")}`;
           return v == null ? "" : String(v);
         })),
@@ -735,7 +735,7 @@ function ReportsPage() {
               if (key === "txn_kind") return <TxnBadge k={row.txn_kind ?? "sale"} />;
               if (key === "created_at") return new Date(row.created_at).toLocaleString();
               if (key === "date_only") return row.created_at ? new Date(row.created_at).toLocaleDateString() : "—";
-              if (key === "time_only") return row.created_at ? new Date(row.created_at).toLocaleTimeString() : "—";
+              if (key === "time_only") return row.created_at ? new Date(row.created_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit", hour12: true }) : "—";
               if (key === "order_no") return `#${String(row.order_no).padStart(3, "0")}`;
               if (key === "order_id_short") return <span className="font-mono text-xs">{row.order_id_short}</span>;
               if (key === "placed_by") return (
@@ -793,7 +793,7 @@ function fmt(v: any, key: string, row?: any) {
   }
   if (key === "time_only") {
     const iso = row?.created_at;
-    return iso ? new Date(iso).toLocaleTimeString() : "—";
+    return iso ? new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit", hour12: true }) : "—";
   }
   if (v == null) return "—";
   if (key === "created_at") return new Date(v).toLocaleString();
