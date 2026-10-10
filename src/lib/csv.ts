@@ -1,6 +1,7 @@
 // CSV helper that writes values in spreadsheet-friendly types:
 // - Dates  -> YYYY-MM-DD (recognized as a date column)
-// - Times  -> HH:MM:SS 24h (recognized as a time column)
+// - Times  -> kept exactly as displayed: 12-hour AM/PM (e.g. "3:45:12 PM");
+//   bare 24h times are passed through unchanged.
 // - Numbers / currency like "₱1,234.50" -> plain number 1234.50
 // - UTF-8 BOM so Excel opens it correctly.
 
@@ -20,10 +21,9 @@ function normalize(v: unknown): string {
   if (m) return `${m[3]}-${pad(+m[1])}-${pad(+m[2])}`;
   m = s.match(TIME_LOCAL);
   if (m) {
-    let h = +m[1];
     const ap = m[4]?.toLowerCase();
-    if (ap === "pm" && h < 12) h += 12;
-    if (ap === "am" && h === 12) h = 0;
+    if (ap) return s; // 12-hour AM/PM stays exactly as shown in the app
+    const h = +m[1];
     return `${pad(h)}:${m[2]}:${m[3] ?? "00"}`;
   }
   // Keep long digit strings (IDs, phone numbers, invoice numbers with leading 0) as text

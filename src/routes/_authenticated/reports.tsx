@@ -393,15 +393,14 @@ function ReportsPage() {
     await loadAll();
   }
 
-  // Export value in spreadsheet-friendly types: real date, 24h time, plain numbers.
+  // Export values in spreadsheet-friendly types: real date, time exactly as shown
+  // in the app (12-hour AM/PM), plain numbers.
   function exportValue(row: any, key: string) {
     const iso = row?.created_at;
-    const pad = (n: number) => String(n).padStart(2, "0");
     if (key === "date_only") return iso ? new Date(iso) : "";
     if (key === "time_only") {
       if (!iso) return "";
-      const d = new Date(iso);
-      return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+      return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit", hour12: true });
     }
     const v = row?.[key];
     if (key === "order_no") return v == null ? "" : Number(v);
