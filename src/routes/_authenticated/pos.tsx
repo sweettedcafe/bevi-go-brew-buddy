@@ -247,7 +247,9 @@ function POSPage() {
   // the table is not in the realtime publication.
   useEffect(() => {
     const seen = new Set<string>();
-    const startedAt = new Date().toISOString();
+    const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
+    const startedAt = dayStart.toISOString();
+    let pendingCount = 0;
     let cancelled = false;
 
     const announce = (order: any) => {
@@ -267,8 +269,14 @@ function POSPage() {
         .eq("status", "on_hold")
         .gte("created_at", startedAt)
         .order("created_at", { ascending: true });
-      if (!cancelled) (data ?? []).forEach(announce);
+      if (cancelled) return;
+      pendingCount = (data ?? []).length;
+      (data ?? []).forEach(announce);
     };
+    // Keep reminding the barista with sound while customer orders wait in Held.
+    const reminder = window.setInterval(() => {
+      if (pendingCount > 0) playAttentionSound();
+    }, 20000);
 
     const channel = supabase.channel("pos-customer-order-alerts")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "orders" }, (event) => announce(event.new))
@@ -284,6 +292,7 @@ function POSPage() {
     return () => {
       cancelled = true;
       window.clearInterval(timer);
+      window.clearInterval(reminder);
       void supabase.removeChannel(channel);
     };
   }, []);
@@ -536,6 +545,20 @@ function POSPage() {
     setResumedOrderId(null);
   }
 
+  const [discountsToday, setDiscountsToday] = useState<number | null>(null);
+  async function loadDiscountsToday(customerId: string) {
+    setDiscountsToday(null);
+    const start = new Date(); start.setHours(0, 0, 0, 0);
+    const { data } = await db.from("orders")
+      .select("id,status,discount_total,discount_id,discount_label")
+      .eq("customer_id", customerId)
+      .gte("created_at", start.toISOString());
+    const n = (data ?? []).filter((o: any) =>
+      String(o.status) !== "voided" &&
+      (Number(o.discount_total) > 0 || o.discount_id || o.discount_label)).length;
+    setDiscountsToday(n);
+  }
+
   async function lookupCustomerByCode(raw: string) {
     const code = raw.trim();
     if (!code) return;
@@ -547,6 +570,7 @@ function POSPage() {
       const c = data as LoyaltyCustomer;
       setCustomer(c);
       setCustomerName(c.name);
+      void loadDiscountsToday(c.id);
       toast.success(`${c.name} · ${c.points} pts`);
     } finally {
       setScanBusy(false);
@@ -1207,6 +1231,9 @@ function POSPage() {
                 </div>
                 <Badge variant="secondary" className="gap-1">
                   <Star className="h-3 w-3" /> {customer.points} pts
+                </Badge>
+                <Badge variant={discountsToday ? "destructive" : "outline"} title="Discounts/promos used today">
+                  {discountsToday === null ? "…" : discountsToday} discount{discountsToday === 1 ? "" : "s"} today
                 </Badge>
                 <Button size="icon" variant="ghost" onClick={() => { setCustomer(null); setRedeem(""); setCustomerName(""); }}>
                   <X className="h-3 w-3" />
