@@ -62,6 +62,7 @@ export const GROUPS: NavGroup[] = [
       { to: "/sales-summary", label: "Sales Summary", icon: FileText, roles: ["developer", "admin"] },
       { to: "/analytics", label: "Analytics", icon: BarChart3, roles: ["developer", "admin"] },
       { to: "/expenses-report", label: "Expenses Report", icon: Wallet, roles: ["developer", "admin", "accountant"] },
+      { to: "/inventory-history", label: "Inventory History", icon: History, roles: ["developer", "admin", "accountant"] },
     ],
   },
   {
