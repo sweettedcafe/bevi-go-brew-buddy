@@ -18,6 +18,14 @@ import { ClipboardList, Plus, Trash2, RefreshCw, Share2, Copy, Camera } from "lu
 import { toPng } from "html-to-image";
 
 export const Route = createFileRoute("/_authenticated/end-of-shift")({
+  head: () => ({ meta: [
+    { title: "End of Shift — Bevi & Go" },
+    { name: "description", content: "Shift expenses, payment balances, and shareable daily summaries." },
+    { property: "og:title", content: "End of Shift — Bevi & Go" },
+    { property: "og:description", content: "Shift expenses, payment balances, and shareable daily summaries." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+  ] }),
   component: EndOfShiftPage,
 });
 
@@ -254,15 +262,7 @@ function EndOfShiftPage() {
     !e.payment_method_code || (!ownerOnlyCodes.has(e.payment_method_code) && (isAdmin || pms.some((m) => m.code === e.payment_method_code))));
   const visibleExpenseTotal = visibleExpenses.reduce((s, e) => s + Number(e.amount), 0);
 
-  const totalPayments = balances.length ? sumBy(balances, "sales") : (report?.payments ?? []).reduce((s, p) => s + Number(p.net), 0);
-  const cashRow = balances.find((b) => b.kind === "cash");
-  const cashNet = cashRow ? Number(cashRow.sales) : Number(report?.payments.find((p) => p.method === "cash")?.net ?? 0);
-  const expectedCash = report
-    ? (cashRow ? Number(cashRow.starting) + Number(cashRow.sales) - Number(cashRow.expenses)
-       : Number(report.shift.starting_cash) + cashNet - visibleExpenseTotal)
-    : 0;
-
-  const summaryText = report ? buildSummary(report, totalPayments, cashNet, expectedCash) : "";
+  const summaryText = report ? buildSummary(report, balances) : "";
   const receiptRef = useRef<HTMLDivElement>(null);
 
   const copySummary = async () => {
@@ -271,7 +271,7 @@ function EndOfShiftPage() {
   };
   const shareSummary = async () => {
     if (typeof navigator !== "undefined" && (navigator as Navigator & { share?: (d: ShareData) => Promise<void> }).share) {
-      try { await navigator.share!({ title: "End of Shift Report", text: summaryText }); }
+      try { await navigator.share({ title: "End of Shift Report", text: summaryText }); }
       catch { /* user cancelled */ }
     } else {
       void copySummary();
@@ -282,7 +282,7 @@ function EndOfShiftPage() {
     try {
       const dataUrl = await toPng(receiptRef.current, {
         pixelRatio: 2,
-        backgroundColor: "#ffffff",
+
         cacheBust: true,
       });
       const a = document.createElement("a");
@@ -318,10 +318,8 @@ function EndOfShiftPage() {
                 <div className="max-h-[70vh] overflow-y-auto -mx-2 px-2">
                   <ShiftReceipt
                     ref={receiptRef}
-                    report={report!}
-                    totalNet={totalPayments}
-                    cashNet={cashNet}
-                    expectedCash={expectedCash}
+                    report={report}
+                    balances={balances}
                   />
                 </div>
                 <DialogFooter className="gap-2 flex-wrap">
@@ -614,12 +612,6 @@ function EndOfShiftPage() {
             </CardContent>
           </Card>
 
-          <BalancesReport
-            balances={balances}
-            barista={report.user_email ?? "—"}
-            timeIn={fmtTime(report.shift.clock_in)}
-            timeOut={report.shift.clock_out ? fmtTime(report.shift.clock_out) : "In progress"}
-          />
         </>
       )}
 
@@ -654,50 +646,6 @@ function EndOfShiftPage() {
   );
 }
 
-function BalancesReport({ balances, barista, timeIn, timeOut }: {
-  balances: Balance[]; barista: string; timeIn: string; timeOut: string;
-}) {
-  const net = (b: Balance) => Number(b.sales) - Number(b.expenses);
-  const eod = (b: Balance) => Number(b.starting) + net(b);
-  const Section = ({ title, value, totalLabel }: { title: string; value: (b: Balance) => number; totalLabel: string }) => (
-    <div className="border border-dashed border-border rounded-sm p-2 mb-3">
-      <div className="font-semibold mb-1">{title}</div>
-      {balances.map((b) => (
-        <div key={b.code} className="flex justify-between"><span>{b.label}</span><span className="tabular-nums">{peso(value(b))}</span></div>
-      ))}
-      <div className="flex justify-between font-semibold border-t border-foreground mt-1 pt-1">
-        <span>{totalLabel}</span><span className="tabular-nums">{peso(balances.reduce((s, b) => s + value(b), 0))}</span>
-      </div>
-    </div>
-  );
-  return (
-    <Card>
-      <CardHeader><CardTitle className="text-center tracking-wide">END OF SHIFT REPORT</CardTitle></CardHeader>
-      <CardContent className="max-w-lg mx-auto text-sm">
-        <div className="grid grid-cols-2 gap-y-1 mb-4">
-          <span>Barista</span><span className="text-right">{barista}</span>
-          <span>Time in</span><span className="text-right">{timeIn}</span>
-          <span>Time out</span><span className="text-right">{timeOut}</span>
-        </div>
-        {balances.length === 0 ? (
-          <p className="text-muted-foreground">Balances are not available yet. Run supabase_phase53_schema.sql on your database.</p>
-        ) : (
-          <>
-            <Section title="Starting Balance" value={(b) => Number(b.starting)} totalLabel="Total Starting Balance" />
-            <Section title="Sales - Current day" value={(b) => Number(b.sales)} totalLabel="Total Sales" />
-            <Section title="Expenses - Current day" value={(b) => Number(b.expenses)} totalLabel="Total Expenses" />
-            <Section title="Net Sales - Current day" value={net} totalLabel="Total Net Sales - Current day" />
-            <Section title="EOD Balance" value={eod} totalLabel="Total EOD balance" />
-            <p className="text-xs text-muted-foreground">
-              Starting balance is yesterday's EOD balance. Cash starting balance uses the declared starting cash.
-            </p>
-          </>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div>
@@ -707,129 +655,56 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-function buildSummary(r: EOS, totalNet: number, cashNet: number, expectedCash: number): string {
-  const peso = (n: number | string) => `PHP ${Number(n).toFixed(2)}`;
-  const fmt = (iso: string | null) => iso
-    ? new Intl.DateTimeFormat("en-PH", { timeZone: "Asia/Manila", dateStyle: "medium", timeStyle: "short" }).format(new Date(iso))
-    : "—";
-  const lines: string[] = [];
-  lines.push("=== END OF SHIFT REPORT ===");
-  lines.push(`Barista: ${r.user_email ?? "—"}`);
-  lines.push(`Date: ${r.shift.business_date} (Manila)`);
-  lines.push(`Time in:  ${fmt(r.shift.clock_in)}`);
-  lines.push(`Time out: ${r.shift.clock_out ? fmt(r.shift.clock_out) : "in progress"}`);
-  lines.push(`Breaks:   ${(r.break_seconds / 60).toFixed(0)} min`);
-  lines.push(`Leave:    ${r.leave_hours_deducted} h (approved)`);
-  lines.push(`Worked:   ${r.net_worked_hours} h (net)`);
-  lines.push("");
-  lines.push("--- Net by payment method ---");
-  if (r.payments.length === 0) lines.push("(no paid orders)");
-  else r.payments.forEach((p) => lines.push(`${p.method.padEnd(10)} ${String(p.count).padStart(3)} orders   ${peso(p.net)}`));
-  lines.push(`TOTAL NET                 ${peso(totalNet)}`);
-  lines.push("");
-  lines.push("--- Cash drawer ---");
-  lines.push(`Starting cash:     ${peso(r.shift.starting_cash)}`);
-  lines.push(`Cash sales (net):  ${peso(cashNet)}`);
-  lines.push(`Expenses paid:     ${peso(r.total_expenses)}`);
-  lines.push(`Expected on hand:  ${peso(expectedCash)}`);
-  lines.push("");
-  lines.push("--- Expenses ---");
-  if (r.expenses.length === 0) lines.push("(none)");
-  else r.expenses.forEach((e) => lines.push(`- ${e.description}${e.category ? ` [${e.category}]` : ""}: ${peso(e.amount)}`));
+const balanceSections: Array<{ title: string; totalLabel: string; value: (b: Balance) => number }> = [
+  { title: "Starting Balance", totalLabel: "Total Starting Balance", value: (b) => Number(b.starting) },
+  { title: "Sales - Current day", totalLabel: "Total Sales", value: (b) => Number(b.sales) },
+  { title: "Expenses - Current day", totalLabel: "Total Expenses", value: (b) => Number(b.expenses) },
+  { title: "Net Sales - Current day", totalLabel: "Total Net Sales - Current day", value: (b) => Number(b.sales) - Number(b.expenses) },
+  { title: "EOD Balance", totalLabel: "Total EOD balance", value: (b) => Number(b.starting) + Number(b.sales) - Number(b.expenses) },
+];
+
+function buildSummary(r: EOS, balances: Balance[]): string {
+  const lines = ["END OF SHIFT REPORT", `Barista: ${r.user_email ?? "—"}`,
+    `Time in: ${fmtTime(r.shift.clock_in)}`,
+    `Time out: ${r.shift.clock_out ? fmtTime(r.shift.clock_out) : "In progress"}`];
+  if (!balances.length) lines.push("", "Balances are not available yet.");
+  else balanceSections.forEach(({ title, totalLabel, value }) => {
+    lines.push("", title);
+    balances.forEach((b) => lines.push(`${b.label}: ${peso(value(b))}`));
+    lines.push(`${totalLabel}: ${peso(balances.reduce((sum, b) => sum + value(b), 0))}`);
+  });
   return lines.join("\n");
 }
 
-type ReceiptProps = { report: EOS; totalNet: number; cashNet: number; expectedCash: number };
+type ReceiptProps = { report: EOS; balances: Balance[] };
 
 const ShiftReceipt = forwardRef<HTMLDivElement, ReceiptProps>(function ShiftReceipt(
-  { report: r, totalNet, cashNet, expectedCash }, ref,
+  { report, balances }, ref,
 ) {
-  const peso = (n: number | string) => `₱${Number(n).toFixed(2)}`;
-  const fmt = (iso: string | null) => iso
-    ? new Intl.DateTimeFormat("en-PH", { timeZone: "Asia/Manila", dateStyle: "medium", timeStyle: "short" }).format(new Date(iso))
-    : "—";
   return (
-    <div
-      ref={ref}
-      style={{ fontFamily: "ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif" }}
-      className="bg-white text-zinc-900 rounded-lg border border-zinc-200 shadow-sm p-6 w-full max-w-[420px] mx-auto"
-    >
-      <div className="text-center border-b border-dashed border-zinc-300 pb-3 mb-3">
-        <div className="text-base font-bold tracking-wide">BEVI &amp; GO</div>
-        <div className="text-xs text-zinc-500 mt-0.5">End of Shift Report</div>
-        <div className="text-[11px] text-zinc-500">{r.shift.business_date} · Manila</div>
+    <div ref={ref} className="bg-card text-card-foreground p-4 sm:p-6 w-full max-w-lg mx-auto text-sm font-sans">
+      <h2 className="text-center text-base font-semibold mb-6">END OF SHIFT REPORT</h2>
+      <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 mb-4">
+        <span>Barista</span><span className="text-right break-words">{report.user_email ?? "—"}</span>
+        <span>Time in</span><span className="text-right">{fmtTime(report.shift.clock_in)}</span>
+        <span>Time out</span><span className="text-right">{report.shift.clock_out ? fmtTime(report.shift.clock_out) : "In progress"}</span>
       </div>
-
-      <div className="text-[12px] space-y-1">
-        <Row label="Barista" value={r.user_email ?? "—"} />
-        <Row label="Time in" value={fmt(r.shift.clock_in)} />
-        <Row label="Time out" value={r.shift.clock_out ? fmt(r.shift.clock_out) : "in progress"} />
-        <Row label="Breaks" value={`${(r.break_seconds / 60).toFixed(0)} min`} />
-        <Row label="Leave" value={`${r.leave_hours_deducted} h (approved)`} />
-        <Row label="Worked" value={`${r.net_worked_hours} h (net)`} />
-      </div>
-
-      <SectionTitle>Net by payment method</SectionTitle>
-      <div className="text-[12px] space-y-1">
-        {r.payments.length === 0 ? (
-          <div className="text-zinc-500 italic">(no paid orders)</div>
-        ) : r.payments.map((p) => (
-          <div key={p.method} className="flex justify-between">
-            <span className="capitalize">{p.method} · {p.count} {p.count === 1 ? "order" : "orders"}</span>
-            <span className="tabular-nums">{peso(p.net)}</span>
-          </div>
+      {!balances.length ? <p className="text-muted-foreground">Balances are not available yet.</p> :
+        balanceSections.map(({ title, totalLabel, value }) => (
+          <section key={title} className="border border-dashed border-border rounded-sm p-2 mb-3">
+            <h3 className="font-sans font-semibold mb-1">{title}</h3>
+            {balances.map((b) => (
+              <div key={b.code} className="flex justify-between gap-3">
+                <span className="min-w-0 break-words">{b.label}</span>
+                <span className="tabular-nums shrink-0">{peso(value(b))}</span>
+              </div>
+            ))}
+            <div className="flex justify-between gap-3 font-semibold border-t border-foreground mt-1 pt-1">
+              <span className="min-w-0">{totalLabel}</span>
+              <span className="tabular-nums shrink-0">{peso(balances.reduce((sum, b) => sum + value(b), 0))}</span>
+            </div>
+          </section>
         ))}
-        <div className="flex justify-between border-t border-dashed border-zinc-300 pt-1 mt-1 font-semibold">
-          <span>TOTAL NET</span>
-          <span className="tabular-nums">{peso(totalNet)}</span>
-        </div>
-      </div>
-
-      <SectionTitle>Cash drawer</SectionTitle>
-      <div className="text-[12px] space-y-1">
-        <Row label="Starting cash" value={peso(r.shift.starting_cash)} mono />
-        <Row label="Cash sales (net)" value={peso(cashNet)} mono />
-        <Row label="Expenses paid" value={peso(r.total_expenses)} mono />
-        <div className="flex justify-between font-semibold border-t border-dashed border-zinc-300 pt-1 mt-1">
-          <span>Expected on hand</span>
-          <span className="tabular-nums">{peso(expectedCash)}</span>
-        </div>
-      </div>
-
-      <SectionTitle>Expenses</SectionTitle>
-      <div className="text-[12px] space-y-1">
-        {r.expenses.length === 0 ? (
-          <div className="text-zinc-500 italic">(none)</div>
-        ) : r.expenses.map((e) => (
-          <div key={e.id} className="flex justify-between gap-2">
-            <span className="truncate">
-              {e.description}{e.category ? ` · ${e.category}` : ""}
-            </span>
-            <span className="tabular-nums">{peso(e.amount)}</span>
-          </div>
-        ))}
-      </div>
-
-      <div className="text-center text-[10px] text-zinc-400 mt-4 pt-3 border-t border-dashed border-zinc-300">
-        Generated {new Intl.DateTimeFormat("en-PH", { timeZone: "Asia/Manila", dateStyle: "medium", timeStyle: "short" }).format(new Date())}
-      </div>
     </div>
   );
 });
-
-function Row({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
-  return (
-    <div className="flex justify-between gap-3">
-      <span className="text-zinc-500">{label}</span>
-      <span className={mono ? "tabular-nums" : ""}>{value}</span>
-    </div>
-  );
-}
-
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="text-[11px] uppercase tracking-wider text-zinc-500 mt-4 mb-1 border-b border-dashed border-zinc-300 pb-1">
-      {children}
-    </div>
-  );
-}
