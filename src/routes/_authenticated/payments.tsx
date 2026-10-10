@@ -29,6 +29,7 @@ type PM = {
   fee_fixed: number;
   is_active: boolean;
   sort_order: number;
+  owner_only?: boolean;
 };
 
 const db = supabase as any;
@@ -53,7 +54,7 @@ function PaymentMethodsPage() {
   function startNew() {
     setEditing({
       id: "", code: "", label: "", kind: "other",
-      fee_percent: 0, fee_fixed: 0, is_active: true,
+      fee_percent: 0, fee_fixed: 0, is_active: true, owner_only: false,
       sort_order: rows.length + 1,
     });
     setOpen(true);
@@ -68,12 +69,13 @@ function PaymentMethodsPage() {
       fee_fixed: Number(p.fee_fixed) || 0,
       is_active: p.is_active,
       sort_order: Number(p.sort_order) || 0,
+      owner_only: !!p.owner_only,
     };
     if (!payload.code || !payload.label) { toast.error("Code & label required"); return; }
     const { error } = p.id
       ? await db.from("payment_methods").update(payload).eq("id", p.id)
       : await db.from("payment_methods").insert(payload);
-    if (error) { toast.error(error.message); return; }
+    if (error) { toast.error(/owner_only/.test(error.message) ? "Run supabase_phase53_schema.sql first to enable owner-only methods." : error.message); return; }
     toast.success("Saved");
     setOpen(false);
     load();
@@ -119,6 +121,7 @@ function PaymentMethodsPage() {
                   <div className="flex items-center gap-2">
                     <span className="font-display text-lg">{p.label}</span>
                     {!p.is_active && <Badge variant="secondary">Inactive</Badge>}
+                    {p.owner_only && <Badge variant="outline">Owners only</Badge>}
                   </div>
                   <code className="text-xs bg-muted px-2 py-0.5 rounded">{p.code}</code>
                   <span className="text-xs text-muted-foreground ml-2 capitalize">{p.kind}</span>
@@ -222,6 +225,15 @@ function PMDialog({
             <div className="flex items-end gap-2">
               <Switch checked={p.is_active} onCheckedChange={(v) => setP({ ...p, is_active: v })} />
               <span className="text-sm pb-2">Active</span>
+            </div>
+          </div>
+          <div className="flex items-start gap-2 rounded-md border p-3">
+            <Switch checked={!!p.owner_only} onCheckedChange={(v) => setP({ ...p, owner_only: v })} />
+            <div>
+              <div className="text-sm font-medium">Visible to owners only</div>
+              <div className="text-xs text-muted-foreground">
+                Use for bank accounts. Only admins/developers see it, and it is left out of the End of Shift report.
+              </div>
             </div>
           </div>
         </div>
