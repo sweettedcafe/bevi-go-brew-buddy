@@ -27,7 +27,6 @@ export const Route = createFileRoute("/_authenticated/inventory-history")({
 const db = supabase as any;
 const pad = (n: number) => String(n).padStart(2, "0");
 const isoDay = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-const isoTime = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 const displayTime = (d: Date) => d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit", hour12: true });
 
 type Row = {
@@ -70,7 +69,7 @@ function InventoryHistoryPage() {
     const data = filtered.map((r) => {
       const d = new Date(r.created_at);
       return {
-        Date: isoDay(d), Time: isoTime(d), Quantity: Number(r.delta), Unit: r.unit ?? "",
+        Date: isoDay(d), Time: displayTime(d), Quantity: Number(r.delta), Unit: r.unit ?? "",
         "Name of Item": r.item_name ?? "", User: userOf(r), Type: r.entry_type, Reason: r.reason,
       };
     });
