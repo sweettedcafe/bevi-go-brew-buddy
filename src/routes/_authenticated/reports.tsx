@@ -18,8 +18,6 @@ import {
 import { toast } from "sonner";
 import { BarChart3, Download, Filter, Settings2, RotateCcw, XCircle, Eye, FileSpreadsheet, Tag, Upload, X } from "lucide-react";
 import { toCsv, downloadCsv } from "@/lib/csv";
-import { useServerFn } from "@tanstack/react-start";
-import { exportToGoogleSheets } from "@/lib/sheets.functions";
 import { OrderDetailSheet } from "@/components/orders/OrderDetailSheet";
 
 export const Route = createFileRoute("/_authenticated/reports")({
@@ -395,130 +393,37 @@ function ReportsPage() {
     await loadAll();
   }
 
+  // Export value in spreadsheet-friendly types: real date, 24h time, plain numbers.
+  function exportValue(row: any, key: string) {
+    const iso = row?.created_at;
+    const pad = (n: number) => String(n).padStart(2, "0");
+    if (key === "date_only") return iso ? new Date(iso) : "";
+    if (key === "time_only") {
+      if (!iso) return "";
+      const d = new Date(iso);
+      return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    }
+    const v = row?.[key];
+    if (key === "order_no") return v == null ? "" : Number(v);
+    if (["subtotal", "discount_total", "total", "fee_amount", "revenue", "gross_sale", "unit_price", "addon_total", "qty", "items_count"].includes(key))
+      return v == null || v === "" ? 0 : Number(v);
+    if (key === "txn_kind") return String(v ?? "sale");
+    return v ?? "";
+  }
+
   function exportCurrent() {
-    if (tab === "order") {
-      const rows = filteredOrders.map((o) => Object.fromEntries(PER_ORDER_COLS.map((c) => [c.key, fmt(o[c.key], c.key, o)])));
-      downloadCsv(`per-order-${todayIso()}.csv`, toCsv(rows, PER_ORDER_COLS.map((c) => c.label)));
-    } else if (tab === "item") {
-      const rows = itemRows.map((r) => Object.fromEntries(PER_ITEM_COLS.map((c) => [c.label, (r as any)[c.key]])));
-      downloadCsv(`per-item-${todayIso()}.csv`, toCsv(rows, PER_ITEM_COLS.map((c) => c.label)));
-    } else {
-      const rows = discountRows.map((o) => Object.fromEntries(DISCOUNT_COLS.map((c) => [c.label, fmt(o[c.key], c.key, o)])));
-      downloadCsv(`discounts-${todayIso()}.csv`, toCsv(rows, DISCOUNT_COLS.map((c) => c.label)));
-    }
+    const build = (list: any[], cols: { key: string; label: string }[]) =>
+      toCsv(list.map((r) => Object.fromEntries(cols.map((c) => [c.label, exportValue(r, c.key)]))), cols.map((c) => c.label));
+    const files: [string, string][] = [
+      [`per-order-${todayIso()}.csv`, build(filteredOrders, PER_ORDER_COLS)],
+      [`per-item-${todayIso()}.csv`, build(itemRows, PER_ITEM_COLS)],
+      [`discounts-promos-${todayIso()}.csv`, build(discountRows, DISCOUNT_COLS)],
+    ];
+    files.forEach(([name, csv], i) => setTimeout(() => downloadCsv(name, csv), i * 600));
+    toast.success("Exporting Per order, Per item and Discounts & promos (3 files)");
   }
 
-  // ---- CSV import: load an external sheet to review / reconcile in-app ----
-  const fileRef = useRef<HTMLInputElement>(null);
   const [imported, setImported] = useState<{ headers: string[]; rows: string[][] } | null>(null);
-
-  function parseCsv(text: string): { headers: string[]; rows: string[][] } {
-    const out: string[][] = [];
-    let row: string[] = [], cell = "", q = false;
-    for (let i = 0; i < text.length; i++) {
-      const ch = text[i];
-      if (q) {
-        if (ch === '"' && text[i + 1] === '"') { cell += '"'; i++; }
-        else if (ch === '"') q = false;
-        else cell += ch;
-      } else if (ch === '"') q = true;
-      else if (ch === ",") { row.push(cell); cell = ""; }
-      else if (ch === "\n") { row.push(cell); out.push(row); row = []; cell = ""; }
-      else if (ch !== "\r") cell += ch;
-    }
-    if (cell.length > 0 || row.length > 0) { row.push(cell); out.push(row); }
-    const clean = out.filter((r) => r.some((c) => c.trim() !== ""));
-    const headers = clean.shift() ?? [];
-    return { headers, rows: clean };
-  }
-
-  async function onImportFile(f: File | null) {
-    if (!f) return;
-    try {
-      const parsed = parseCsv(await f.text());
-      if (parsed.headers.length === 0) { toast.error("That file has no columns"); return; }
-      setImported(parsed);
-      toast.success(`Imported ${parsed.rows.length} rows from ${f.name}`);
-    } catch (e: any) {
-      toast.error(e?.message ?? "Could not read that CSV");
-    }
-  }
-
-  const exportSheets = useServerFn(exportToGoogleSheets);
-  const [sheetsBusy, setSheetsBusy] = useState(false);
-  const [autoSync, setAutoSync] = useState<boolean>(() => {
-    if (typeof window === "undefined") return true;
-    return localStorage.getItem("reports_sheet_autosync") !== "0";
-  });
-  async function openSheetsImport(silent = false) {
-    setSheetsBusy(true);
-    try {
-      const perOrder = {
-        title: "Per order",
-        headers: PER_ORDER_COLS.map((c) => c.label),
-        rows: filteredOrders.map((o) => PER_ORDER_COLS.map((c) => String(fmt(o[c.key], c.key, o)))),
-      };
-      const perItem = {
-        title: "Per item",
-        headers: PER_ITEM_COLS.map((c) => c.label),
-        rows: itemRows.map((r) => PER_ITEM_COLS.map((c) => {
-          const v = (r as any)[c.key];
-          if (["revenue", "gross_sale", "discount_total", "fee_amount", "unit_price", "addon_total"].includes(c.key))
-            return Number(v || 0).toFixed(2);
-          if (c.key === "created_at") return new Date((r as any).created_at).toLocaleString();
-          if (c.key === "date_only") return (r as any).created_at ? new Date((r as any).created_at).toLocaleDateString() : "";
-          if (c.key === "time_only") return (r as any).created_at ? new Date((r as any).created_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit", hour12: true }) : "";
-          if (c.key === "order_no") return `#${String(v).padStart(3, "0")}`;
-          return v == null ? "" : String(v);
-        })),
-      };
-      const discounts = {
-        title: "Discounts",
-        headers: DISCOUNT_COLS.map((c) => c.label),
-        rows: discountRows.map((o) => DISCOUNT_COLS.map((c) => String(fmt(o[c.key], c.key, o)))),
-      };
-      const res = await exportSheets({
-        data: {
-          title: `Bevi & Go Reports ${todayIso()}`,
-          sheets: [perOrder, perItem, discounts],
-        },
-      });
-      if (silent) {
-        if (res.appended > 0) {
-          toast.success(`Google Sheet updated — ${res.appended} new row${res.appended === 1 ? "" : "s"} appended`);
-        }
-        return;
-      }
-      toast.success(
-        `Synced to the shared Google Sheet — ${res.appended} new row${res.appended === 1 ? "" : "s"} added`,
-        {
-          description: res.skipped
-            ? `${res.skipped} row${res.skipped === 1 ? " was" : "s were"} already there and skipped.`
-            : "Records are appended to the same sheet, no download needed.",
-          action: { label: "Open sheet", onClick: () => window.open(res.url, "_blank") },
-          duration: 15000,
-        },
-      );
-    } catch (e: any) {
-      if (!silent) toast.error(e?.message ?? "Google Sheets export failed");
-      else console.error("Auto-append to Google Sheets failed", e);
-    } finally {
-      setSheetsBusy(false);
-    }
-  }
-
-  // Auto-append new records to the shared workbook whenever the loaded data changes.
-  const lastSyncSig = useRef("");
-  useEffect(() => {
-    if (!autoSync) return;
-    const sig = `${filteredOrders.length}|${itemRows.length}|${discountRows.length}|${filteredOrders[0]?.id ?? ""}`;
-    if (!filteredOrders.length && !itemRows.length) return;
-    if (sig === lastSyncSig.current) return;
-    lastSyncSig.current = sig;
-    const t = setTimeout(() => { void openSheetsImport(true); }, 1500);
-    return () => clearTimeout(t);
-  }, [autoSync, filteredOrders, itemRows, discountRows]);
-
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-4">
@@ -526,33 +431,10 @@ function ReportsPage() {
         <BarChart3 className="h-5 w-5 text-primary" />
         <h1 className="text-2xl font-display">Reports</h1>
         <div className="ml-auto flex gap-2">
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".csv,text/csv"
-            className="hidden"
-            onChange={(e) => { void onImportFile(e.target.files?.[0] ?? null); e.target.value = ""; }}
-          />
-          <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()}>
-            <Upload className="h-3 w-3 mr-1" /> Import CSV
-          </Button>
           <Button size="sm" variant="outline" onClick={exportCurrent}>
             <Download className="h-3 w-3 mr-1" /> Export CSV
           </Button>
-          <Button size="sm" onClick={() => void openSheetsImport(false)} disabled={sheetsBusy}>
-            <FileSpreadsheet className="h-3 w-3 mr-1" /> {sheetsBusy ? "Appending…" : "Append to Google Sheet"}
-          </Button>
-          <label className="flex items-center gap-1 text-xs text-muted-foreground">
-            <input
-              type="checkbox"
-              checked={autoSync}
-              onChange={(e) => {
-                setAutoSync(e.target.checked);
-                localStorage.setItem("reports_sheet_autosync", e.target.checked ? "1" : "0");
-              }}
-            />
-            Auto-append
-          </label>
+
 
         </div>
       </header>
