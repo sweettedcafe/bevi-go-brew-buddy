@@ -30,13 +30,13 @@ const isoDay = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d
 const displayTime = (d: Date) => d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit", hour12: true });
 
 type Row = {
-  id: number; created_at: string; inventory_item_id: string; item_name: string | null;
+  id: string; created_at: string; inventory_item_id: string; item_name: string | null;
   unit: string | null; delta: number; reason: string; user_name: string | null;
   user_email: string | null; entry_type: "Manual entry" | "Automatic entry";
 };
 
 function InventoryHistoryPage() {
-  const [from, setFrom] = useState(isoDay(new Date(Date.now() - 7 * 86400000)));
+  const [from, setFrom] = useState("2026-08-01");
   const [to, setTo] = useState(isoDay(new Date()));
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,12 +46,21 @@ function InventoryHistoryPage() {
 
   async function load() {
     setLoading(true);
-    const { data, error } = await db.rpc("inventory_history", {
-      p_from: new Date(`${from}T00:00:00`).toISOString(),
-      p_to: new Date(`${to}T23:59:59`).toISOString(),
-    });
+    // Page through results (the API returns at most 1000 rows per request).
+    const all: Row[] = [];
+    let error: { message: string } | null = null;
+    for (let start = 0; start < 100000; start += 1000) {
+      const res = await db.rpc("inventory_history", {
+        p_from: new Date(`${from}T00:00:00`).toISOString(),
+        p_to: new Date(`${to}T23:59:59`).toISOString(),
+      }).range(start, start + 999);
+      if (res.error) { error = res.error; break; }
+      all.push(...((res.data ?? []) as Row[]));
+      if (!res.data || res.data.length < 1000) break;
+    }
+    const data = all;
     if (error) toast.error(error.message.includes("inventory_history")
-      ? "Run supabase_phase52_schema.sql to enable this report" : error.message);
+      ? "Run supabase_phase54_schema.sql to enable this report" : error.message);
     setRows((data ?? []) as Row[]);
     setLoading(false);
   }
