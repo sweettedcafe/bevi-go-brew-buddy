@@ -396,7 +396,7 @@ function EndOfShiftPage() {
                 <Field label="Business date" value={report.shift.business_date} />
                 <Field label="Time in" value={fmtTime(report.shift.clock_in)} />
                 <Field label="Time out" value={report.shift.clock_out ? fmtTime(report.shift.clock_out) : <Badge variant="secondary">In progress</Badge>} />
-                <Field label="Starting cash" value={peso(report.shift.starting_cash)} />
+                <Field label="Starting balance (total)" value={peso(balances.reduce((s, b) => s + Number(b.starting || 0), 0))} />
                 <Field label="Breaks (total)" value={`${(report.break_seconds / 60).toFixed(0)} min`} />
                 <Field label="Approved leave deduction" value={`${report.leave_hours_deducted} h`} />
                 <Field label="Net worked hours" value={`${report.net_worked_hours} h`} />
