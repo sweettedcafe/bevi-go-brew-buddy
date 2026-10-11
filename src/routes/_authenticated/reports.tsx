@@ -117,6 +117,20 @@ function ReportsPage() {
   const [tab, setTab] = useState("order");
   const [loading, setLoading] = useState(false);
   const [orders, setOrders] = useState<AnyRow[]>([]);
+  // Menu item id -> variant name used when an order line was saved without a variant
+  // (default variant, or the first one by sort order, as set up in Menu & Recipes).
+  const [variantFallback, setVariantFallback] = useState<Map<string, string>>(new Map());
+  useEffect(() => {
+    void (async () => {
+      const { data } = await (supabase as any).from("menu_item_variants").select("*").order("sort_order");
+      const m = new Map<string, string>();
+      for (const v of (data ?? []) as any[]) {
+        if (!v.menu_item_id || !v.name) continue;
+        if (v.is_default || !m.has(v.menu_item_id)) m.set(v.menu_item_id, v.name);
+      }
+      setVariantFallback(m);
+    })();
+  }, []);
   const [staffEmails, setStaffEmails] = useState<Record<string, string>>({});
   const [detailId, setDetailId] = useState<string | null>(null);
 
@@ -292,7 +306,7 @@ function ReportsPage() {
       }
     }
     return rows;
-  }, [orders, staffEmails]);
+  }, [orders, staffEmails, variantFallback]);
 
   const categoryOptions = useMemo(() => {
     const s = new Set<string>();
