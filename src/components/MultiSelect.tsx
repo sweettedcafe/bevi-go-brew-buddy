@@ -49,7 +49,7 @@ export function MultiSelect({
             <div className="text-xs text-muted-foreground p-2">No matches</div>
           ) : shown.map((o) => (
             <label key={o.value} className="flex items-center gap-2 rounded px-1.5 py-1 text-sm hover:bg-muted cursor-pointer">
-              <input type="checkbox" className="h-4 w-4 accent-[hsl(var(--primary))]" checked={set.has(o.value)} onChange={() => toggle(o.value)} />
+              <input type="checkbox" className="h-4 w-4 accent-primary" checked={set.has(o.value)} onChange={() => toggle(o.value)} />
               <span className="truncate">{o.label}</span>
             </label>
           ))}
