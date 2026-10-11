@@ -9,7 +9,7 @@ import {
   LayoutDashboard, ShoppingCart, Package, BookOpen, Users, Tag,
   CreditCard, BarChart3, Clock, ShieldCheck, LogOut, Receipt, Printer, Menu,
   ClipboardList, FileText, ChevronDown, ChevronRight, Coffee, Wallet, Settings, Gift, History,
-  HelpCircle, Wrench, KeyRound,
+  HelpCircle, Wrench, KeyRound, Landmark,
 } from "lucide-react";
 import type { AppRole } from "@/integrations/supabase/client";
 import { LowStockAlert } from "@/components/LowStockAlert";
@@ -62,6 +62,7 @@ export const GROUPS: NavGroup[] = [
       { to: "/sales-summary", label: "Sales Summary", icon: FileText, roles: ["developer", "admin"] },
       { to: "/analytics", label: "Analytics", icon: BarChart3, roles: ["developer", "admin"] },
       { to: "/expenses-report", label: "Expenses Report", icon: Wallet, roles: ["developer", "admin", "accountant"] },
+      { to: "/deposit-report", label: "Deposit Report", icon: Landmark, roles: ["developer", "admin", "partner"] },
       { to: "/inventory-history", label: "Inventory History", icon: History, roles: ["developer", "admin", "accountant"] },
     ],
   },

@@ -21,6 +21,7 @@ import { Route as AuthenticatedAuditLogRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedBundlesRouteImport } from './routes/_authenticated/bundles'
 import { Route as AuthenticatedCustomersRouteImport } from './routes/_authenticated/customers'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedDepositReportRouteImport } from './routes/_authenticated/deposit-report'
 import { Route as AuthenticatedDeveloperRouteImport } from './routes/_authenticated/developer'
 import { Route as AuthenticatedDiscountsRouteImport } from './routes/_authenticated/discounts'
 import { Route as AuthenticatedEndOfShiftRouteImport } from './routes/_authenticated/end-of-shift'
@@ -108,6 +109,12 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedDepositReportRoute =
+  AuthenticatedDepositReportRouteImport.update({
+    id: '/deposit-report',
+    path: '/deposit-report',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedDeveloperRoute = AuthenticatedDeveloperRouteImport.update({
   id: '/developer',
   path: '/developer',
@@ -259,6 +266,7 @@ export interface FileRoutesByFullPath {
   '/bundles': typeof AuthenticatedBundlesRoute
   '/customers': typeof AuthenticatedCustomersRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/deposit-report': typeof AuthenticatedDepositReportRoute
   '/developer': typeof AuthenticatedDeveloperRoute
   '/discounts': typeof AuthenticatedDiscountsRoute
   '/end-of-shift': typeof AuthenticatedEndOfShiftRoute
@@ -298,6 +306,7 @@ export interface FileRoutesByTo {
   '/bundles': typeof AuthenticatedBundlesRoute
   '/customers': typeof AuthenticatedCustomersRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/deposit-report': typeof AuthenticatedDepositReportRoute
   '/developer': typeof AuthenticatedDeveloperRoute
   '/discounts': typeof AuthenticatedDiscountsRoute
   '/end-of-shift': typeof AuthenticatedEndOfShiftRoute
@@ -339,6 +348,7 @@ export interface FileRoutesById {
   '/_authenticated/bundles': typeof AuthenticatedBundlesRoute
   '/_authenticated/customers': typeof AuthenticatedCustomersRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/deposit-report': typeof AuthenticatedDepositReportRoute
   '/_authenticated/developer': typeof AuthenticatedDeveloperRoute
   '/_authenticated/discounts': typeof AuthenticatedDiscountsRoute
   '/_authenticated/end-of-shift': typeof AuthenticatedEndOfShiftRoute
@@ -380,6 +390,7 @@ export interface FileRouteTypes {
     | '/bundles'
     | '/customers'
     | '/dashboard'
+    | '/deposit-report'
     | '/developer'
     | '/discounts'
     | '/end-of-shift'
@@ -419,6 +430,7 @@ export interface FileRouteTypes {
     | '/bundles'
     | '/customers'
     | '/dashboard'
+    | '/deposit-report'
     | '/developer'
     | '/discounts'
     | '/end-of-shift'
@@ -459,6 +471,7 @@ export interface FileRouteTypes {
     | '/_authenticated/bundles'
     | '/_authenticated/customers'
     | '/_authenticated/dashboard'
+    | '/_authenticated/deposit-report'
     | '/_authenticated/developer'
     | '/_authenticated/discounts'
     | '/_authenticated/end-of-shift'
@@ -587,6 +600,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/deposit-report': {
+      id: '/_authenticated/deposit-report'
+      path: '/deposit-report'
+      fullPath: '/deposit-report'
+      preLoaderRoute: typeof AuthenticatedDepositReportRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/developer': {
@@ -781,6 +801,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedBundlesRoute: typeof AuthenticatedBundlesRoute
   AuthenticatedCustomersRoute: typeof AuthenticatedCustomersRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedDepositReportRoute: typeof AuthenticatedDepositReportRoute
   AuthenticatedDeveloperRoute: typeof AuthenticatedDeveloperRoute
   AuthenticatedDiscountsRoute: typeof AuthenticatedDiscountsRoute
   AuthenticatedEndOfShiftRoute: typeof AuthenticatedEndOfShiftRoute
@@ -809,6 +830,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedBundlesRoute: AuthenticatedBundlesRoute,
   AuthenticatedCustomersRoute: AuthenticatedCustomersRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedDepositReportRoute: AuthenticatedDepositReportRoute,
   AuthenticatedDeveloperRoute: AuthenticatedDeveloperRoute,
   AuthenticatedDiscountsRoute: AuthenticatedDiscountsRoute,
   AuthenticatedEndOfShiftRoute: AuthenticatedEndOfShiftRoute,
