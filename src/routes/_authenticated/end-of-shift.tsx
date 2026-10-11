@@ -63,6 +63,19 @@ const sumBy = (rows: Balance[], k: "starting" | "sales" | "expenses") => rows.re
 
 type ExpenseCategory = { id: string; name: string; sort_order: number; is_active: boolean };
 
+type ReqKey = "description" | "invoice_number" | "quantity" | "unit_price" | "category" | "payment_method" | "reason" | "receipt";
+type ReqFields = Record<ReqKey, boolean>;
+const LOCKED_REQ: Partial<ReqFields> = { description: true, quantity: true, unit_price: true };
+const DEFAULT_REQ: ReqFields = {
+  description: true, invoice_number: false, quantity: true, unit_price: true,
+  category: false, payment_method: true, reason: false, receipt: false,
+};
+const REQ_LABELS: Array<[ReqKey, string]> = [
+  ["description", "Item / description"], ["invoice_number", "Invoice #"], ["quantity", "Quantity"],
+  ["unit_price", "Unit price"], ["category", "Category"], ["payment_method", "Payment method"],
+  ["reason", "Reason"], ["receipt", "Receipt photo"],
+];
+
 function EndOfShiftPage() {
   const { primaryRole } = useAuth();
   const isAdmin = primaryRole === "admin" || primaryRole === "developer";
@@ -93,6 +106,20 @@ function EndOfShiftPage() {
   // admin-managed expense categories
   const [expCats, setExpCats] = useState<ExpenseCategory[]>([]);
   const [catDialog, setCatDialog] = useState(false);
+  // admin-chosen required expense fields
+  const [reqFields, setReqFields] = useState<ReqFields>(DEFAULT_REQ);
+  const [reqDialog, setReqDialog] = useState(false);
+  const loadReq = async () => {
+    const { data } = await (supabase as any).from("app_settings").select("value").eq("key", "expense_required_fields").maybeSingle();
+    if (data?.value) setReqFields({ ...DEFAULT_REQ, ...data.value, ...LOCKED_REQ });
+  };
+  useEffect(() => { void loadReq(); }, []);
+  const saveReq = async (next: ReqFields) => {
+    setReqFields(next);
+    const { error } = await (supabase as any).from("app_settings")
+      .upsert({ key: "expense_required_fields", value: next, updated_at: new Date().toISOString() });
+    if (error) toast.error(/app_settings/.test(error.message) ? "Please run supabase_phase56_schema.sql first." : error.message);
+  };
   const [newCat, setNewCat] = useState("");
 
   const loadCats = async () => {
@@ -232,7 +259,13 @@ function EndOfShiftPage() {
     if (!desc.trim()) { toast.error("Description required"); return; }
     if (!Number.isFinite(q) || q === 0) { toast.error("Quantity cannot be 0"); return; }
     if (!Number.isFinite(up)) { toast.error("Enter a unit price"); return; }
-    if (!expMethod) { toast.error("Pick a payment method"); return; }
+    const missing: string[] = [];
+    if (reqFields.invoice_number && !invoiceNo.trim()) missing.push("Invoice #");
+    if (reqFields.category && !category.trim()) missing.push("Category");
+    if (reqFields.payment_method && !expMethod) missing.push("Payment method");
+    if (reqFields.reason && !reason.trim()) missing.push("Reason");
+    if (reqFields.receipt && !receiptFile) missing.push("Receipt");
+    if (missing.length) { toast.error(`Please fill in: ${missing.join(", ")}`); return; }
     if (q * up < 0 && !reason.trim()) { toast.error("Reason is required for a negative entry"); return; }
     let receiptUrl: string | null = null;
     if (receiptFile) {
@@ -471,9 +504,14 @@ function EndOfShiftPage() {
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Expenses</CardTitle>
               {isAdmin && (
-                <Button size="sm" variant="outline" onClick={() => setCatDialog(true)}>
-                  Manage categories
-                </Button>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => setReqDialog(true)}>
+                    Required fields
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setCatDialog(true)}>
+                    Manage categories
+                  </Button>
+                </div>
               )}
             </CardHeader>
             <CardContent className="space-y-4">
@@ -482,19 +520,19 @@ function EndOfShiftPage() {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-2 items-end">
                   <div className="md:col-span-3">
-                    <Label htmlFor="exp-desc">Item / description</Label>
+                    <Label htmlFor="exp-desc">Item / description{reqFields.description && <span className="text-destructive"> *</span>}</Label>
                     <Input id="exp-desc" value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="e.g. Whole milk 1L" />
                   </div>
                   <div className="md:col-span-2">
-                    <Label htmlFor="exp-inv">Invoice #</Label>
+                    <Label htmlFor="exp-inv">Invoice #{reqFields.invoice_number && <span className="text-destructive"> *</span>}</Label>
                     <Input id="exp-inv" value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)} placeholder="OR / SI #" />
                   </div>
                   <div className="md:col-span-1">
-                    <Label htmlFor="exp-qty">Qty</Label>
+                    <Label htmlFor="exp-qty">Qty{reqFields.quantity && <span className="text-destructive"> *</span>}</Label>
                     <Input id="exp-qty" type="number" step="0.01" value={qty} onChange={(e) => setQty(e.target.value)} />
                   </div>
                   <div className="md:col-span-2">
-                    <Label htmlFor="exp-unit">Unit price (₱)</Label>
+                    <Label htmlFor="exp-unit">Unit price (₱){reqFields.unit_price && <span className="text-destructive"> *</span>}</Label>
                     <Input id="exp-unit" type="number" step="0.01" value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} />
                   </div>
                   <div className="md:col-span-1">
@@ -504,7 +542,7 @@ function EndOfShiftPage() {
                     </div>
                   </div>
                   <div className="md:col-span-1">
-                    <Label htmlFor="exp-cat">Category</Label>
+                    <Label htmlFor="exp-cat">Category{reqFields.category && <span className="text-destructive"> *</span>}</Label>
                     <Select value={category} onValueChange={setCategory}>
                       <SelectTrigger id="exp-cat"><SelectValue placeholder="Pick" /></SelectTrigger>
                       <SelectContent>
@@ -515,7 +553,7 @@ function EndOfShiftPage() {
                     </Select>
                   </div>
                   <div className="md:col-span-2">
-                    <Label htmlFor="exp-pm">Payment method</Label>
+                    <Label htmlFor="exp-pm">Payment method{reqFields.payment_method && <span className="text-destructive"> *</span>}</Label>
                     <Select value={expMethod} onValueChange={setExpMethod}>
                       <SelectTrigger id="exp-pm"><SelectValue placeholder="Pick" /></SelectTrigger>
                       <SelectContent>
@@ -528,12 +566,12 @@ function EndOfShiftPage() {
                     </Select>
                   </div>
                   <div className="md:col-span-3">
-                    <Label htmlFor="exp-reason">Reason</Label>
+                    <Label htmlFor="exp-reason">Reason{reqFields.reason && <span className="text-destructive"> *</span>}</Label>
                     <Input id="exp-reason" value={reason} onChange={(e) => setReason(e.target.value)}
                       placeholder="Required for negative / correction entries" />
                   </div>
                   <div className="md:col-span-2">
-                    <Label htmlFor="exp-img" className="text-xs">Receipt</Label>
+                    <Label htmlFor="exp-img" className="text-xs">Receipt{reqFields.receipt && <span className="text-destructive"> *</span>}</Label>
                     <Input id="exp-img" type="file" accept="image/*"
                       onChange={(e) => setReceiptFile(e.target.files?.[0] ?? null)} />
                   </div>
@@ -613,6 +651,26 @@ function EndOfShiftPage() {
 
         </>
       )}
+
+      <Dialog open={reqDialog} onOpenChange={setReqDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Required expense fields</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">Ticked fields must be filled in before anyone can save an expense.</p>
+          <div className="space-y-2">
+            {REQ_LABELS.map(([k, label]) => (
+              <label key={k} className="flex items-center gap-2 text-sm">
+                <input type="checkbox" className="h-4 w-4 accent-primary" checked={!!reqFields[k]}
+                  disabled={k in LOCKED_REQ}
+                  onChange={(e) => void saveReq({ ...reqFields, [k]: e.target.checked })} />
+                {label}{k in LOCKED_REQ && <span className="text-xs text-muted-foreground">(always required)</span>}
+              </label>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReqDialog(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={catDialog} onOpenChange={setCatDialog}>
         <DialogContent className="max-w-md">
