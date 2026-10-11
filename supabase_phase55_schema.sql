@@ -53,8 +53,8 @@ as $$
              else coalesce((a.after_data->>'stock_qty')::numeric, 0)
                 - coalesce((a.before_data->>'stock_qty')::numeric, 0)
            end as delta
-      from public.admin_audit_logs a, gate
-     where gate.ok
+      from public.admin_audit_logs a
+     where (select g.ok from gate g)
        and a.target_table = 'inventory_items'
        and a.created_at >= p_from and a.created_at <= p_to
   ),
@@ -107,11 +107,11 @@ as $$
            case when coalesce(m.ref_table,'') in ('orders','order_items','refunds','voids')
                   or m.reason in ('order','refund','void','sale')
                 then 'Automatic entry' else 'Manual entry' end as entry_type
-      from gate cross join public.inventory_movements m
+      from public.inventory_movements m
       left join public.inventory_items i on i.id = m.inventory_item_id
       left join auth.users u on u.id = m.actor_id
       left join public.profiles p on p.id = m.actor_id
-     where gate.ok
+     where (select g.ok from gate g)
        and m.created_at >= p_from and m.created_at <= p_to
        and m.created_at < coalesce((select ts from first_audit), 'infinity'::timestamptz)
   )
