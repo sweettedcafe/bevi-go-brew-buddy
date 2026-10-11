@@ -21,6 +21,7 @@ import { MenuOptionsEditor } from "@/components/menu/MenuOptionsEditor";
 import { emptyOptions, hasAnyCustomization, type MenuOptions } from "@/lib/menu-options";
 import { toCsv, downloadCsv } from "@/lib/csv";
 import { useRef } from "react";
+import { MultiSelect } from "@/components/MultiSelect";
 
 export const Route = createFileRoute("/_authenticated/menu")({
   component: MenuPage,
@@ -65,6 +66,8 @@ function MenuPage() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Item | null>(null);
   const [deleting, setDeleting] = useState<Item | null>(null);
+  const [fCats, setFCats] = useState<string[]>([]);
+  const [fOwners, setFOwners] = useState<string[]>([]);
 
   async function load() {
     setLoading(true);
@@ -92,6 +95,9 @@ function MenuPage() {
   const ownerName = (id: string | null) => owners.find((o) => o.id === id)?.name ?? null;
   const itemRecipes = (id: string) => recipes.filter((r) => r.menu_item_id === id);
   const invName = (id: string) => invs.find((i) => i.id === id);
+  const shownItems = items.filter((it) =>
+    (fCats.length === 0 || fCats.includes(it.category_id ?? "__none__")) &&
+    (fOwners.length === 0 || fOwners.includes(it.owner_id ?? "__none__")));
 
   async function toggleActive(it: Item) {
     const { error } = await db.from("menu_items")
@@ -145,7 +151,8 @@ function MenuPage() {
               <Plus className="h-3 w-3 mr-1" /> Category
             </Button>
             <ImportExportButtons
-              items={items} cats={cats} invs={invs} recipes={recipes}
+              items={items} exportItems={shownItems} cats={cats} owners={owners} invs={invs} recipes={recipes}
+              variants={variants} vrecipes={vrecipes}
               onImported={() => void load()}
             />
             <Button size="sm" onClick={() => setEditing({
@@ -199,13 +206,23 @@ function MenuPage() {
         </Card>
       )}
 
+      <Card className="p-3 mb-4 flex flex-wrap items-end gap-3">
+        <div><label className="text-xs text-muted-foreground block mb-1">Category</label>
+          <MultiSelect allLabel="All categories" selected={fCats} onChange={setFCats}
+            options={[...cats.map((c) => ({ value: c.id, label: c.name })), { value: "__none__", label: "(Uncategorized)" }]} /></div>
+        <div><label className="text-xs text-muted-foreground block mb-1">Owner</label>
+          <MultiSelect allLabel="All owners" selected={fOwners} onChange={setFOwners}
+            options={[...owners.map((o) => ({ value: o.id, label: o.name })), { value: "__none__", label: "(No owner)" }]} /></div>
+        <div className="text-xs text-muted-foreground pb-2">Showing {shownItems.length} of {items.length} items</div>
+      </Card>
+
       {loading ? (
         <div className="text-muted-foreground text-sm">Loading…</div>
-      ) : items.length === 0 ? (
+      ) : shownItems.length === 0 ? (
         <div className="text-muted-foreground text-sm">No menu items.</div>
       ) : (
         <div className="grid gap-3">
-          {items.map((it) => {
+          {shownItems.map((it) => {
             const rs = itemRecipes(it.id);
             const vs = variants.filter((v) => v.menu_item_id === it.id).sort((a,b) => a.sort_order - b.sort_order);
             return (
@@ -749,219 +766,280 @@ function EditMenuDialog({
 }
 
 // ============ CSV import/export ============
+// One item = a base row followed by detail rows:
+//  - ingredient rows (variant blank)            -> recipe per serving of the item
+//  - variant rows (variant + variant_price)      -> custom variant
+//  - ingredient rows with variant filled         -> recipe per serving of that variant
+//  - option rows (option_group/label/price)      -> customization options
+//  - options_json on the base row keeps the full customization setup for exact re-import.
+// Import updates only what the file contains: blank base fields keep current values,
+// and recipes are only replaced for items/variants that have ingredient rows.
 const MENU_CSV_COLS = [
-  "product_code","name","category","price","description","is_active","sort_order",
+  "product_code","name","category","owner","price","description","is_active","has_variants","sort_order",
+  "variant","variant_price","variant_active",
   "ingredient","qty_per_unit","unit",
   "option_group","option_label","option_price","option_default",
+  "options_json",
 ];
 
 const EMPTY_SUB = {
+  variant: "", variant_price: "", variant_active: "",
   ingredient: "", qty_per_unit: "", unit: "",
   option_group: "", option_label: "", option_price: "", option_default: "",
 };
 const EMPTY_BASE = {
-  product_code: "", name: "", category: "", price: "", description: "", is_active: "", sort_order: "",
+  product_code: "", name: "", category: "", owner: "", price: "", description: "", is_active: "",
+  has_variants: "", sort_order: "", options_json: "",
 };
+const truthy = (v: unknown) => /^(true|1|yes|y)$/i.test(String(v ?? "").trim());
 
 function ImportExportButtons({
-  items, cats, invs, recipes, onImported,
+  items, exportItems, cats, owners, invs, recipes, variants, vrecipes, onImported,
 }: {
-  items: Item[]; cats: Cat[]; invs: Inv[]; recipes: Recipe[]; onImported: () => void;
+  items: Item[]; exportItems: Item[]; cats: Cat[]; owners: Owner[]; invs: Inv[]; recipes: Recipe[];
+  variants: Variant[]; vrecipes: VariantRecipe[]; onImported: () => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
 
   function handleExport() {
     const catName = (id: string | null) => cats.find((c) => c.id === id)?.name ?? "";
+    const ownerName = (id: string | null) => owners.find((o) => o.id === id)?.name ?? "";
+    const ingRow = (iid: string, qty: number, variant = "") => {
+      const ing = invs.find((i) => i.id === iid);
+      return { ...EMPTY_SUB, variant, ingredient: ing?.name ?? "", qty_per_unit: Number(qty), unit: ing?.unit ?? "" };
+    };
     const rows: Record<string, any>[] = [];
-    for (const it of items) {
-      const rcs = recipes.filter((r) => r.menu_item_id === it.id);
+    for (const it of exportItems) {
       const base = {
-        product_code: it.product_code ?? "",
-        name: it.name,
-        category: catName(it.category_id),
-        price: it.price,
-        description: it.description ?? "",
-        is_active: it.is_active ? "true" : "false",
-        sort_order: it.sort_order,
+        product_code: it.product_code ?? "", name: it.name, category: catName(it.category_id),
+        owner: ownerName(it.owner_id), price: Number(it.price), description: it.description ?? "",
+        is_active: it.is_active ? "true" : "false", has_variants: it.has_variants ? "true" : "false",
+        sort_order: it.sort_order, options_json: it.options ? JSON.stringify(it.options) : "",
       };
-
-      const subRows: Record<string, any>[] = [];
-      for (const r of rcs) {
-        const ing = invs.find((i) => i.id === r.inventory_item_id);
-        subRows.push({
-          ...EMPTY_SUB,
-          ingredient: ing?.name ?? "",
-          qty_per_unit: r.qty_per_unit,
-          unit: ing?.unit ?? "",
-        });
+      const sub: Record<string, any>[] = [];
+      for (const r of recipes.filter((r) => r.menu_item_id === it.id)) sub.push(ingRow(r.inventory_item_id, r.qty_per_unit));
+      const vs = variants.filter((v) => v.menu_item_id === it.id).sort((a, b) => a.sort_order - b.sort_order);
+      for (const v of vs) {
+        sub.push({ ...EMPTY_SUB, variant: v.name, variant_price: Number(v.price), variant_active: v.is_active ? "true" : "false" });
+        for (const r of vrecipes.filter((x) => x.variant_id === v.id)) sub.push(ingRow(r.inventory_item_id, r.qty_per_unit, v.name));
       }
       const o = it.options ?? {};
-      const optList: Array<[string, any[]]> = [
+      const lists: Array<[string, any[]]> = [
         ["size", o.sizes ?? []], ["milk", o.milks ?? []], ["extra", o.extras ?? []],
+        ["flavor", o.flavors ?? []], ["other", o.others ?? []],
+        ...((o.groups ?? []).map((g) => [`group:${g.name}`, g.options ?? []] as [string, any[]])),
       ];
-      for (const [group, list] of optList) {
-        for (const opt of list) {
-          subRows.push({
-            ...EMPTY_SUB,
-            option_group: group,
-            option_label: opt.label,
-            option_price: opt.price_delta,
-            option_default: opt.is_default ? "true" : "",
-          });
-        }
+      for (const [group, list] of lists) for (const opt of list) sub.push({
+        ...EMPTY_SUB, option_group: group, option_label: opt.label,
+        option_price: Number(opt.price_delta) || 0, option_default: opt.is_default ? "true" : "",
+      });
+      for (const k of ["allow_other", "allow_notes", "size_required"] as const) {
+        if (o[k]) sub.push({ ...EMPTY_SUB, option_group: "flag", option_label: k, option_price: "true" });
       }
-      const flags: Array<[string, boolean | undefined]> = [
-        ["allow_other", o.allow_other],
-        ["allow_notes", o.allow_notes],
-        ["size_required", o.size_required],
-      ];
-      for (const [k, v] of flags) {
-        if (v) subRows.push({
-          ...EMPTY_SUB, option_group: "flag", option_label: k, option_price: "true",
-        });
-      }
-
-      if (subRows.length === 0) {
-        rows.push({ ...base, ...EMPTY_SUB });
-      } else {
-        subRows.forEach((s, i) => {
-          rows.push({ ...(i === 0 ? base : EMPTY_BASE), ...s });
-        });
-      }
+      if (sub.length === 0) rows.push({ ...base, ...EMPTY_SUB });
+      else sub.forEach((s, i) => rows.push({ ...(i === 0 ? base : EMPTY_BASE), ...s }));
     }
-    downloadCsv(`menu-export-${new Date().toISOString().slice(0,10)}.csv`,
-      toCsv(rows, MENU_CSV_COLS));
-    toast.success(`Exported ${items.length} item(s)`);
+    downloadCsv(`menu-export-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(rows, MENU_CSV_COLS));
+    toast.success(`Exported ${exportItems.length} item(s) with variants and recipes`);
   }
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
+    setBusy(true);
     try {
-      const text = await file.text();
-      const parsed = parseCsv(text);
+      const parsed = parseCsv(await file.text());
       if (parsed.length === 0) return toast.error("CSV is empty");
 
-      // Forward-fill name + product_code so option/ingredient rows can be blank.
-      let lastName = "";
-      let lastCode = "";
+      type VGroup = { price: string; active: string; ings: { name: string; qty: number }[]; seen: boolean };
       type Group = {
-        base: Record<string, any> | null;
-        ings: { name: string; qty: number }[];
-        sizes: any[]; milks: any[]; extras: any[];
-        allow_other?: boolean; allow_notes?: boolean; size_required?: boolean;
+        base: Record<string, string>; ings: { name: string; qty: number }[];
+        variants: Map<string, VGroup>; variantOrder: string[];
+        lists: Record<string, any[]>; groups: Map<string, any[]>; flags: Record<string, boolean>; hasOptRows: boolean;
       };
       const groups = new Map<string, Group>();
-
+      let lastName = "", lastCode = "";
       for (const r of parsed) {
         const rowCode = String(r.product_code ?? "").trim();
         const rowName = String(r.name ?? "").trim();
-        if (rowCode) lastCode = rowCode;
-        if (rowName) lastName = rowName;
+        if (rowCode || rowName) { lastCode = rowCode; lastName = rowName || (rowCode ? "" : lastName); }
         if (!lastName && !lastCode) continue;
         const key = (lastCode || lastName).toLowerCase();
         let g = groups.get(key);
         if (!g) {
-          g = { base: null, ings: [], sizes: [], milks: [], extras: [] };
+          g = { base: { name: lastName, product_code: lastCode }, ings: [], variants: new Map(), variantOrder: [],
+            lists: { size: [], milk: [], extra: [], flavor: [], other: [] }, groups: new Map(), flags: {}, hasOptRows: false };
           groups.set(key, g);
         }
-        if (!g.base && (rowName || r.price || r.category || r.description || r.is_active || r.sort_order || rowCode)) {
-          g.base = { ...r, name: lastName, product_code: lastCode };
+        for (const k of Object.keys(EMPTY_BASE)) {
+          const v = String(r[k] ?? "").trim();
+          if (v && !g.base[k]) g.base[k] = v;
+        }
+        const vName = String(r.variant ?? "").trim();
+        let vg: VGroup | undefined;
+        if (vName) {
+          vg = g.variants.get(vName.toLowerCase());
+          if (!vg) { vg = { price: "", active: "", ings: [], seen: true }; g.variants.set(vName.toLowerCase(), vg); g.variantOrder.push(vName); }
+          if (String(r.variant_price ?? "").trim()) vg.price = String(r.variant_price).trim();
+          if (String(r.variant_active ?? "").trim()) vg.active = String(r.variant_active).trim();
         }
         const ingName = String(r.ingredient ?? "").trim();
         if (ingName && Number(r.qty_per_unit) > 0) {
-          g.ings.push({ name: ingName, qty: Number(r.qty_per_unit) });
+          (vg ? vg.ings : g.ings).push({ name: ingName, qty: Number(r.qty_per_unit) });
         }
-        const grp = String(r.option_group ?? "").trim().toLowerCase();
+        const grp = String(r.option_group ?? "").trim();
         const lbl = String(r.option_label ?? "").trim();
         if (grp && lbl) {
-          if (grp === "flag") {
-            const val = /^(true|1|yes)$/i.test(String(r.option_price ?? "true"));
-            if (lbl === "allow_other") g.allow_other = val;
-            else if (lbl === "allow_notes") g.allow_notes = val;
-            else if (lbl === "size_required") g.size_required = val;
-          } else {
-            const opt = {
-              label: lbl,
-              price_delta: Number(r.option_price) || 0,
-              is_default: /^(true|1|yes)$/i.test(String(r.option_default ?? "")),
-            };
-            if (grp === "size") g.sizes.push(opt);
-            else if (grp === "milk") g.milks.push(opt);
-            else if (grp === "extra") g.extras.push(opt);
+          g.hasOptRows = true;
+          const gl = grp.toLowerCase();
+          if (gl === "flag") g.flags[lbl] = truthy(r.option_price || "true");
+          else {
+            const opt = { label: lbl, price_delta: Number(r.option_price) || 0, is_default: truthy(r.option_default) };
+            if (gl.startsWith("group:")) {
+              const n = grp.slice(6).trim();
+              if (!g.groups.has(n)) g.groups.set(n, []);
+              g.groups.get(n)!.push(opt);
+            } else if (g.lists[gl]) g.lists[gl].push(opt);
           }
         }
       }
 
       const catByName = new Map(cats.map((c) => [c.name.toLowerCase(), c.id]));
+      const ownerByName = new Map(owners.map((o) => [o.name.toLowerCase(), o.id]));
       const invByName = new Map(invs.map((i) => [i.name.toLowerCase(), i.id]));
       const itemByName = new Map(items.map((i) => [i.name.toLowerCase(), i]));
       const itemByCode = new Map(items.filter((i) => i.product_code).map((i) => [i.product_code!.toLowerCase(), i]));
+      const toIng = (list: { name: string; qty: number }[], unknown: Set<string>) => {
+        // Same ingredient listed twice -> quantities are added together.
+        const m = new Map<string, number>();
+        for (const x of list) {
+          const iid = invByName.get(x.name.toLowerCase());
+          if (!iid) { unknown.add(x.name); continue; }
+          m.set(iid, (m.get(iid) ?? 0) + x.qty);
+        }
+        return [...m.entries()];
+      };
 
-      let created = 0, updated = 0, skipped = 0;
+      let created = 0, updated = 0, recipesSet = 0;
+      const failed: string[] = [];
       const unknownIngs = new Set<string>();
+      const unknownCats = new Set<string>();
 
       for (const [, g] of groups) {
-        const baseRow = g.base ?? {};
-        const name = String(baseRow.name ?? "").trim();
-        const code = String(baseRow.product_code ?? "").trim();
-        if (!name && !code) { skipped++; continue; }
-        const catId = catByName.get(String(baseRow.category ?? "").toLowerCase()) ?? null;
+        const b = g.base;
+        const name = String(b.name ?? "").trim();
+        const code = String(b.product_code ?? "").trim();
+        const label = name || code;
+        try {
+          const existing = (code && itemByCode.get(code.toLowerCase())) || (name && itemByName.get(name.toLowerCase())) || null;
+          const payload: any = {};
+          if (name) payload.name = name;
+          if (b.description) payload.description = b.description;
+          if (b.price !== undefined && b.price !== "") payload.price = Number(b.price) || 0;
+          if (b.category) {
+            const cid = catByName.get(b.category.toLowerCase());
+            if (cid) payload.category_id = cid; else unknownCats.add(b.category);
+          }
+          if (b.owner) {
+            const oid = ownerByName.get(b.owner.toLowerCase());
+            if (oid) payload.owner_id = oid;
+          }
+          if (b.is_active) payload.is_active = truthy(b.is_active);
+          if (b.sort_order) payload.sort_order = Number(b.sort_order) || 0;
+          if (b.has_variants) payload.has_variants = truthy(b.has_variants);
+          else if (g.variants.size > 0) payload.has_variants = true;
+          let opts: MenuOptions | null = null;
+          if (b.options_json) { try { opts = JSON.parse(b.options_json); } catch { opts = null; } }
+          if (!opts && g.hasOptRows) {
+            opts = {
+              ...emptyOptions(), sizes: g.lists.size, milks: g.lists.milk, extras: g.lists.extra,
+              flavors: g.lists.flavor, others: g.lists.other,
+              groups: [...g.groups.entries()].map(([n, options]) => ({ name: n, select: "multi" as const, options })),
+              allow_other: g.flags.allow_other ?? false, allow_notes: g.flags.allow_notes ?? false,
+              size_required: g.flags.size_required ?? false,
+              upsell_item_ids: existing?.options?.upsell_item_ids ?? [],
+            };
+          }
+          if (opts) payload.options = opts;
 
-        const opts: MenuOptions = {
-          sizes: g.sizes,
-          milks: g.milks,
-          extras: g.extras,
-          allow_other: g.allow_other ?? false,
-          allow_notes: g.allow_notes ?? true,
-          size_required: g.size_required ?? false,
-        };
-        const hasOpts = g.sizes.length || g.milks.length || g.extras.length
-          || g.allow_other || g.size_required;
+          let id: string;
+          if (existing) {
+            if (Object.keys(payload).length) {
+              const { error } = await db.from("menu_items").update(payload).eq("id", existing.id);
+              if (error) throw error;
+            }
+            id = existing.id; updated++;
+          } else {
+            if (!name) throw new Error("new item needs a name");
+            const ins = { price: 0, is_active: true, options: emptyOptions(), sort_order: items.length + created + 1, ...payload, ...(code ? { product_code: code } : {}) };
+            const { data, error } = await db.from("menu_items").insert(ins).select("id").single();
+            if (error) throw error;
+            id = data.id; created++;
+          }
 
-        const payload: any = {
-          name: name || (code ? code : "Unnamed"),
-          description: String(baseRow.description ?? "").trim() || null,
-          price: Number(baseRow.price) || 0,
-          category_id: catId,
-          is_active: /^(true|1|yes)$/i.test(String(baseRow.is_active ?? "true")),
-          sort_order: Number(baseRow.sort_order) || 0,
-          options: hasOpts ? opts : emptyOptions(),
-        };
-        // Match by product_code first, then by name
-        const existing = (code && itemByCode.get(code.toLowerCase()))
-          || (name && itemByName.get(name.toLowerCase())) || null;
-        let id: string;
-        if (existing) {
-          const { error } = await db.from("menu_items").update(payload).eq("id", existing.id);
-          if (error) { skipped++; continue; }
-          id = existing.id;
-          updated++;
-        } else {
-          // Preserve incoming product_code if provided (must be unique)
-          const insertPayload = code ? { ...payload, product_code: code } : payload;
-          const { data, error } = await db.from("menu_items").insert(insertPayload).select("id").single();
-          if (error) { skipped++; continue; }
-          id = data.id;
-          created++;
+          if (g.ings.length) {
+            const list = toIng(g.ings, unknownIngs);
+            await db.from("recipes").delete().eq("menu_item_id", id);
+            if (list.length) {
+              const { error } = await db.from("recipes").insert(list.map(([iid, q]) => ({ menu_item_id: id, inventory_item_id: iid, qty_per_unit: q })));
+              if (error) throw error;
+            }
+            recipesSet++;
+          }
+
+          if (g.variants.size) {
+            const curVs = variants.filter((v) => v.menu_item_id === id);
+            for (let i = 0; i < g.variantOrder.length; i++) {
+              const vName = g.variantOrder[i];
+              const vg = g.variants.get(vName.toLowerCase())!;
+              const cur = curVs.find((v) => v.name.toLowerCase() === vName.toLowerCase());
+              let vid: string;
+              const vp: any = {};
+              if (vg.price !== "") vp.price = Number(vg.price) || 0;
+              if (vg.active !== "") vp.is_active = truthy(vg.active);
+              if (cur) {
+                vid = cur.id;
+                if (Object.keys(vp).length) {
+                  const { error } = await db.from("menu_item_variants").update(vp).eq("id", vid);
+                  if (error) throw error;
+                }
+              } else {
+                const { data, error } = await db.from("menu_item_variants")
+                  .insert({ menu_item_id: id, name: vName, price: 0, is_active: true, sort_order: curVs.length + i + 1, ...vp })
+                  .select("id").single();
+                if (error) throw error;
+                vid = data.id;
+              }
+              if (vg.ings.length) {
+                const list = toIng(vg.ings, unknownIngs);
+                await db.from("variant_recipes").delete().eq("variant_id", vid);
+                if (list.length) {
+                  const { error } = await db.from("variant_recipes").insert(list.map(([iid, q]) => ({ variant_id: vid, inventory_item_id: iid, qty_per_unit: q })));
+                  if (error) throw error;
+                }
+                recipesSet++;
+              }
+            }
+          }
+        } catch (err: any) {
+          failed.push(`${label}: ${err?.message ?? err}`);
         }
-        await db.from("recipes").delete().eq("menu_item_id", id);
-        const validIngs = g.ings
-          .map((x) => {
-            const iid = invByName.get(x.name.toLowerCase());
-            if (!iid) { unknownIngs.add(x.name); return null; }
-            return { menu_item_id: id, inventory_item_id: iid, qty_per_unit: x.qty };
-          })
-          .filter(Boolean) as any[];
-        if (validIngs.length) await db.from("recipes").insert(validIngs);
       }
 
-      toast.success(`Import done: ${created} new, ${updated} updated, ${skipped} skipped` +
-        (unknownIngs.size ? ` (unknown ingredients: ${[...unknownIngs].join(", ")})` : ""));
+      const notes: string[] = [];
+      if (unknownIngs.size) notes.push(`Unknown ingredients skipped: ${[...unknownIngs].join(", ")}`);
+      if (unknownCats.size) notes.push(`Unknown categories ignored: ${[...unknownCats].join(", ")}`);
+      if (failed.length) notes.push(`Failed: ${failed.slice(0, 5).join("; ")}${failed.length > 5 ? ` (+${failed.length - 5} more)` : ""}`);
+      const msg = `Import done: ${created} new, ${updated} updated, ${recipesSet} recipe(s) replaced`;
+      if (notes.length) toast.warning(msg, { description: notes.join("\n"), duration: 15000 });
+      else toast.success(msg);
       onImported();
     } catch (err: any) {
       toast.error(`Import failed: ${err?.message ?? err}`);
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -970,14 +1048,13 @@ function ImportExportButtons({
       <Button size="sm" variant="outline" onClick={handleExport}>
         <Download className="h-3 w-3 mr-1" /> Export CSV
       </Button>
-      <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()}>
-        <Upload className="h-3 w-3 mr-1" /> Import CSV
+      <Button size="sm" variant="outline" disabled={busy} onClick={() => fileRef.current?.click()}>
+        <Upload className="h-3 w-3 mr-1" /> {busy ? "Importing…" : "Import CSV"}
       </Button>
       <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleFile} />
     </>
   );
 }
-
 
 function parseCsv(text: string): Record<string, string>[] {
   const lines: string[][] = [];

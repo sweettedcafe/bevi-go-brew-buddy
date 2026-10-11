@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Download, History } from "lucide-react";
 import { toast } from "sonner";
 import { toCsv, downloadCsv } from "@/lib/csv";
+import { MultiSelect } from "@/components/MultiSelect";
 
 export const Route = createFileRoute("/_authenticated/inventory-history")({
   head: () => ({
@@ -40,7 +41,7 @@ function InventoryHistoryPage() {
   const [to, setTo] = useState(isoDay(new Date()));
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
-  const [item, setItem] = useState("");
+  const [selItems, setSelItems] = useState<string[]>([]);
   const [user, setUser] = useState("");
   const [type, setType] = useState("");
 
@@ -70,8 +71,8 @@ function InventoryHistoryPage() {
   const items = useMemo(() => [...new Set(rows.map((r) => r.item_name ?? ""))].filter(Boolean).sort(), [rows]);
   const users = useMemo(() => [...new Set(rows.map(userOf))].sort(), [rows]);
   const filtered = useMemo(() => rows.filter((r) =>
-    (!item || r.item_name === item) && (!user || userOf(r) === user) && (!type || r.entry_type === type),
-  ), [rows, item, user, type]);
+    (selItems.length === 0 || selItems.includes(r.item_name ?? "")) && (!user || userOf(r) === user) && (!type || r.entry_type === type),
+  ), [rows, selItems, user, type]);
 
   function exportCsv() {
     const cols = ["Date", "Time", "Quantity", "Unit", "Name of Item", "User", "Type", "Reason"];
@@ -102,9 +103,8 @@ function InventoryHistoryPage() {
           <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></div>
         <Button size="sm" onClick={load}>Apply dates</Button>
         <div><label className="text-xs text-muted-foreground block">Item</label>
-          <select className={sel} value={item} onChange={(e) => setItem(e.target.value)}>
-            <option value="">All items</option>{items.map((i) => <option key={i}>{i}</option>)}
-          </select></div>
+          <MultiSelect options={items.map((i) => ({ value: i, label: i }))} selected={selItems}
+            onChange={setSelItems} allLabel="All items" /></div>
         <div><label className="text-xs text-muted-foreground block">User</label>
           <select className={sel} value={user} onChange={(e) => setUser(e.target.value)}>
             <option value="">All users</option>{users.map((u) => <option key={u}>{u}</option>)}
