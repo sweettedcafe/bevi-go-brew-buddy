@@ -266,7 +266,9 @@ function ReportsPage() {
           txn_kind: o.txn_kind ?? "sale",
           status: o.status,
           name: it.name_snapshot,
-          variant: it.menu_item_variants?.name ?? c?.size?.label ?? "—",
+          variant: it.menu_item_variants?.name ?? c?.size?.label
+            ?? (String(it.name_snapshot ?? "").includes(" — ") ? String(it.name_snapshot).split(" — ").pop() : null)
+            ?? variantFallback.get(it.menu_item_id) ?? "—",
           extras: listOf(c?.extras) || "—",
           flavors: listOf(c?.flavors) || "—",
           other: other || "—",
