@@ -149,8 +149,19 @@ function ReportsPage() {
       }
     }
 
-    const [{ data: o }, { data: emails }] = await Promise.all([
-      q,
+    // Page through orders (the API caps each response at 1000 rows).
+    const fetchOrders = async () => {
+      const all: any[] = [];
+      for (let from = 0; from < 50000; from += 1000) {
+        const { data, error } = await q.range(from, from + 999);
+        if (error) { toast.error("Could not load orders: " + error.message); break; }
+        all.push(...(data ?? []));
+        if (!data || data.length < 1000) break;
+      }
+      return all;
+    };
+    const [o, { data: emails }] = await Promise.all([
+      fetchOrders(),
       db.rpc("staff_emails"),
     ]);
 
@@ -165,9 +176,27 @@ function ReportsPage() {
     }
     const ids = list.map((r) => r.id);
     if (ids.length) {
-      const [{ data: items }, { data: pays }, { data: pms }] = await Promise.all([
-        db.from("order_items").select("id,order_id,qty,unit_price,addon_total,line_total,menu_item_id,name_snapshot,is_upsell,notes,customization,variant_id,menu_item_variants(name),menu_items(category_id,owner_id,categories(name),owners(name))").in("order_id", ids),
-        db.from("order_payments").select("order_id,method,method_code,amount,fee_amount,change_due").in("order_id", ids),
+      // Fetch child rows in chunks so long date ranges don't overflow the request URL or row cap.
+      const chunk = async (table: string, cols: string) => {
+        const out: any[] = [];
+        const parts: string[][] = [];
+        for (let i = 0; i < ids.length; i += 100) parts.push(ids.slice(i, i + 100));
+        const results = await Promise.all(parts.map(async (part) => {
+          const acc: any[] = [];
+          for (let from = 0; ; from += 1000) {
+            const { data, error } = await db.from(table).select(cols).in("order_id", part).range(from, from + 999);
+            if (error) { toast.error(`Could not load ${table}: ${error.message}`); break; }
+            acc.push(...(data ?? []));
+            if (!data || data.length < 1000) break;
+          }
+          return acc;
+        }));
+        results.forEach((r) => out.push(...r));
+        return out;
+      };
+      const [items, pays, { data: pms }] = await Promise.all([
+        chunk("order_items", "id,order_id,qty,unit_price,addon_total,line_total,menu_item_id,name_snapshot,is_upsell,notes,customization,variant_id,menu_item_variants(name),menu_items(category_id,owner_id,categories(name),owners(name))"),
+        chunk("order_payments", "order_id,method,method_code,amount,fee_amount,change_due"),
         db.from("payment_methods").select("code,label"),
       ]);
       const pmLabel = new Map<string, string>(((pms ?? []) as any[]).map((p) => [p.code, p.label]));
