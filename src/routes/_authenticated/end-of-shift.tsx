@@ -61,6 +61,21 @@ type Balance = { code: string; label: string; kind: string; starting: number; sa
 type PMOpt = { code: string; label: string; kind: string; is_active: boolean; owner_only?: boolean };
 const sumBy = (rows: Balance[], k: "starting" | "sales" | "expenses") => rows.reduce((s, r) => s + Number(r[k] ?? 0), 0);
 
+// Back-tracking: a past business date's summary comes from tc_eos_day_report.
+type DayShift = { user_email: string | null; clock_in: string; clock_out: string | null };
+type DayReport = { business_date: string; shifts: DayShift[]; balances: Balance[] };
+type Summary = {
+  date: string;        // business date (YYYY-MM-DD)
+  suffix: string;      // "Current day" for the live shift, the date for a past day
+  baristas: string;
+  time_in: string;
+  time_out: string;
+  balances: Balance[];
+};
+const manilaToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: MANILA_TZ }).format(new Date());
+const fmtDay = (d: string) => new Intl.DateTimeFormat("en-PH", { timeZone: MANILA_TZ, dateStyle: "medium" })
+  .format(new Date(`${d}T12:00:00Z`));
+
 type ExpenseCategory = { id: string; name: string; sort_order: number; is_active: boolean };
 
 type ReqKey = "description" | "invoice_number" | "quantity" | "unit_price" | "category" | "payment_method" | "reason" | "receipt";
@@ -229,6 +244,34 @@ function EndOfShiftPage() {
   };
   useEffect(() => { void refresh(); }, []);
 
+  // Shift summary date filter: browse a past business date's summary.
+  const [viewDate, setViewDate] = useState("");
+  const [dayReport, setDayReport] = useState<DayReport | null>(null);
+  const [dayLoading, setDayLoading] = useState(false);
+  const [dayError, setDayError] = useState<string | null>(null);
+  const bizDate = report?.shift.business_date ?? "";
+  const picked = viewDate && viewDate !== bizDate ? viewDate : "";
+
+  useEffect(() => {
+    if (!picked) { setDayReport(null); setDayError(null); setDayLoading(false); return; }
+    let alive = true;
+    setDayLoading(true); setDayError(null);
+    (async () => {
+      const { data, error } = await (supabase as any).rpc("tc_eos_day_report", { p_date: picked });
+      if (!alive) return;
+      setDayLoading(false);
+      if (error) {
+        setDayReport(null);
+        setDayError(/does not exist|schema cache|tc_eos_day_report/i.test(error.message)
+          ? "Please run supabase_phase60_schema.sql to enable viewing past days."
+          : error.message);
+        return;
+      }
+      setDayReport((data ?? { business_date: picked, shifts: [], balances: [] }) as DayReport);
+    })();
+    return () => { alive = false; };
+  }, [picked]);
+
   async function uploadReceipt(file: File): Promise<string | null> {
     setUploadingReceipt(true);
     try {
@@ -308,7 +351,10 @@ function EndOfShiftPage() {
     !e.payment_method_code || (!ownerOnlyCodes.has(e.payment_method_code) && (isAdmin || pms.some((m) => m.code === e.payment_method_code))));
   const visibleExpenseTotal = visibleExpenses.reduce((s, e) => s + Number(e.amount), 0);
 
-  const summaryText = report ? buildSummary(report, balances) : "";
+  const summary: Summary | null = picked
+    ? (dayReport ? summaryFromDay(dayReport) : null)
+    : (report ? summaryFromShift(report, balances) : null);
+  const summaryText = summary ? buildSummary(summary) : "";
   const receiptRef = useRef<HTMLDivElement>(null);
 
   const copySummary = async () => {
@@ -332,7 +378,7 @@ function EndOfShiftPage() {
         cacheBust: true,
       });
       const a = document.createElement("a");
-      const date = report?.shift.clock_in ? new Date(report.shift.clock_in).toISOString().slice(0, 10) : "shift";
+      const date = summary?.date ?? "shift";
       a.href = dataUrl;
       a.download = `shift-summary-${date}.png`;
       document.body.appendChild(a);
@@ -361,17 +407,29 @@ function EndOfShiftPage() {
               </DialogTrigger>
               <DialogContent className="max-w-md">
                 <DialogHeader><DialogTitle>Shift summary</DialogTitle></DialogHeader>
+                <div className="flex items-end gap-2 border-b pb-3">
+                  <div className="flex-1">
+                    <Label htmlFor="summary-date">Show summary for</Label>
+                    <Input id="summary-date" type="date" max={manilaToday()}
+                      value={viewDate || bizDate}
+                      onChange={(e) => setViewDate(e.target.value)} />
+                  </div>
+                  <Button size="sm" variant="outline" disabled={!picked}
+                    onClick={() => setViewDate("")}>Latest shift</Button>
+                </div>
                 <div className="max-h-[70vh] overflow-y-auto -mx-2 px-2">
-                  <ShiftReceipt
-                    ref={receiptRef}
-                    report={report}
-                    balances={balances}
-                  />
+                  {dayLoading ? (
+                    <div className="py-10 text-center text-sm text-muted-foreground">Loading…</div>
+                  ) : dayError ? (
+                    <p className="py-10 text-center text-sm text-destructive">{dayError}</p>
+                  ) : summary ? (
+                    <ShiftReceipt ref={receiptRef} summary={summary} />
+                  ) : null}
                 </div>
                 <DialogFooter className="gap-2 flex-wrap">
-                  <Button variant="outline" onClick={copySummary} className="gap-2"><Copy className="h-4 w-4" /> Copy text</Button>
-                  <Button variant="outline" onClick={shareSummary} className="gap-2"><Share2 className="h-4 w-4" /> Share</Button>
-                  <Button onClick={saveAsImage} className="gap-2"><Camera className="h-4 w-4" /> Save image</Button>
+                  <Button variant="outline" onClick={copySummary} disabled={!summary} className="gap-2"><Copy className="h-4 w-4" /> Copy text</Button>
+                  <Button variant="outline" onClick={shareSummary} disabled={!summary} className="gap-2"><Share2 className="h-4 w-4" /> Share</Button>
+                  <Button onClick={saveAsImage} disabled={!summary} className="gap-2"><Camera className="h-4 w-4" /> Save image</Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
@@ -712,45 +770,72 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-const balanceSections: Array<{ title: string; totalLabel: string; value: (b: Balance) => number }> = [
+const balanceSections = (suffix: string): Array<{ title: string; totalLabel: string; value: (b: Balance) => number }> => [
   { title: "Starting Balance", totalLabel: "Total Starting Balance", value: (b) => Number(b.starting) },
-  { title: "Sales - Current day", totalLabel: "Total Sales", value: (b) => Number(b.sales) },
-  { title: "Expenses - Current day", totalLabel: "Total Expenses", value: (b) => Number(b.expenses) },
-  { title: "Net Sales - Current day", totalLabel: "Total Net Sales - Current day", value: (b) => Number(b.sales) - Number(b.expenses) },
+  { title: `Sales - ${suffix}`, totalLabel: "Total Sales", value: (b) => Number(b.sales) },
+  { title: `Expenses - ${suffix}`, totalLabel: "Total Expenses", value: (b) => Number(b.expenses) },
+  { title: `Net Sales - ${suffix}`, totalLabel: `Total Net Sales - ${suffix}`, value: (b) => Number(b.sales) - Number(b.expenses) },
   { title: "EOD Balance", totalLabel: "Total EOD balance", value: (b) => Number(b.starting) + Number(b.sales) - Number(b.expenses) },
 ];
 
-function buildSummary(r: EOS, balances: Balance[]): string {
-  const lines = ["END OF SHIFT REPORT", `Barista: ${r.user_email ?? "—"}`,
-    `Time in: ${fmtTime(r.shift.clock_in)}`,
-    `Time out: ${r.shift.clock_out ? fmtTime(r.shift.clock_out) : "In progress"}`];
-  if (!balances.length) lines.push("", "Balances are not available yet.");
-  else balanceSections.forEach(({ title, totalLabel, value }) => {
+function buildSummary(s: Summary): string {
+  const lines = ["END OF SHIFT REPORT", `Date: ${fmtDay(s.date)}`, `Barista: ${s.baristas}`,
+    `Time in: ${s.time_in}`, `Time out: ${s.time_out}`];
+  if (!s.balances.length) lines.push("", "Balances are not available yet.");
+  else balanceSections(s.suffix).forEach(({ title, totalLabel, value }) => {
     lines.push("", title);
-    balances.forEach((b) => lines.push(`${b.label}: ${peso(value(b))}`));
-    lines.push(`${totalLabel}: ${peso(balances.reduce((sum, b) => sum + value(b), 0))}`);
+    s.balances.forEach((b) => lines.push(`${b.label}: ${peso(value(b))}`));
+    lines.push(`${totalLabel}: ${peso(s.balances.reduce((sum, b) => sum + value(b), 0))}`);
   });
   return lines.join("\n");
 }
 
-type ReceiptProps = { report: EOS; balances: Balance[] };
+function summaryFromShift(r: EOS, balances: Balance[]): Summary {
+  return {
+    date: r.shift.business_date,
+    suffix: "Current day",
+    baristas: r.user_email ?? "—",
+    time_in: fmtTime(r.shift.clock_in),
+    time_out: r.shift.clock_out ? fmtTime(r.shift.clock_out) : "In progress",
+    balances,
+  };
+}
 
-const ShiftReceipt = forwardRef<HTMLDivElement, ReceiptProps>(function ShiftReceipt(
-  { report, balances }, ref,
+function summaryFromDay(d: DayReport): Summary {
+  const inTimes = d.shifts.map((s) => s.clock_in).filter(Boolean).sort();
+  const outTimes = d.shifts.map((s) => s.clock_out).filter(Boolean).sort();
+  const open = d.shifts.some((s) => !s.clock_out);
+  const emails = Array.from(new Set(d.shifts.map((s) => s.user_email).filter(Boolean) as string[]));
+  return {
+    date: d.business_date,
+    suffix: fmtDay(d.business_date),
+    baristas: (emails.join(", ") || "—") + (d.shifts.length > 1 ? ` (${d.shifts.length} shifts)` : ""),
+    time_in: inTimes.length ? fmtTime(inTimes[0]) : "—",
+    time_out: open ? "In progress" : outTimes.length ? fmtTime(outTimes[outTimes.length - 1]) : "—",
+    balances: d.balances,
+  };
+}
+
+const ShiftReceipt = forwardRef<HTMLDivElement, { summary: Summary }>(function ShiftReceipt(
+  { summary }, ref,
 ) {
+  const sections = balanceSections(summary.suffix);
+  const total = (value: (b: Balance) => number) =>
+    peso(summary.balances.reduce((sum, b) => sum + value(b), 0));
   return (
     <div ref={ref} className="bg-card text-card-foreground p-4 sm:p-6 w-full max-w-lg mx-auto text-sm font-sans">
       <h2 className="text-center text-base font-semibold mb-6">END OF SHIFT REPORT</h2>
       <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 mb-4">
-        <span>Barista</span><span className="text-right break-words">{report.user_email ?? "—"}</span>
-        <span>Time in</span><span className="text-right">{fmtTime(report.shift.clock_in)}</span>
-        <span>Time out</span><span className="text-right">{report.shift.clock_out ? fmtTime(report.shift.clock_out) : "In progress"}</span>
+        <span>Date</span><span className="text-right">{fmtDay(summary.date)}</span>
+        <span>Barista</span><span className="text-right break-words">{summary.baristas}</span>
+        <span>Time in</span><span className="text-right">{summary.time_in}</span>
+        <span>Time out</span><span className="text-right">{summary.time_out}</span>
       </div>
-      {!balances.length ? <p className="text-muted-foreground">Balances are not available yet.</p> :
-        balanceSections.map(({ title, totalLabel, value }) => (
+      {!summary.balances.length ? <p className="text-muted-foreground">Balances are not available yet.</p> :
+        sections.map(({ title, totalLabel, value }) => (
           <section key={title} className="border border-dashed border-border rounded-sm p-2 mb-3">
             <h3 className="font-sans font-semibold mb-1">{title}</h3>
-            {balances.map((b) => (
+            {summary.balances.map((b) => (
               <div key={b.code} className="flex justify-between gap-3">
                 <span className="min-w-0 break-words">{b.label}</span>
                 <span className="tabular-nums shrink-0">{peso(value(b))}</span>
@@ -758,7 +843,7 @@ const ShiftReceipt = forwardRef<HTMLDivElement, ReceiptProps>(function ShiftRece
             ))}
             <div className="flex justify-between gap-3 font-semibold border-t border-foreground mt-1 pt-1">
               <span className="min-w-0">{totalLabel}</span>
-              <span className="tabular-nums shrink-0">{peso(balances.reduce((sum, b) => sum + value(b), 0))}</span>
+              <span className="tabular-nums shrink-0">{total(value)}</span>
             </div>
           </section>
         ))}
