@@ -169,7 +169,7 @@ function POSPage() {
       setStaffList(list);
       setActiveBarista((cur) => {
         if (cur && list.some((s) => s.user_id === cur.id)) return cur;
-        const me = list.find((s) => s.user_id === user?.id);
+        const me = list.find((s) => s.user_id === user?.id && s.role === "barista");
         return me ? { id: me.user_id, name: me.full_name } : cur;
       });
     })();

@@ -193,6 +193,16 @@ function DeveloperPage() {
         successLabel="Deleted shifts"
       />
 
+      <DangerCard
+        title="Danger Zone — Wipe Deposit Report"
+        description="Hard-deletes every expense with a Deposit category, so the Deposit Report is emptied. Other expenses are untouched."
+        confirmPhrase="WIPE DEPOSITS"
+        buttonLabel="Wipe deposits now"
+        rpc="dev_wipe_deposits"
+        successKey="deleted_deposits"
+        successLabel="Deleted deposits"
+      />
+
       <PasswordResetCard />
     </div>
   );

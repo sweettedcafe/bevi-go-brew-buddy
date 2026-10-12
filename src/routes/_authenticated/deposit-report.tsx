@@ -32,7 +32,7 @@ const isDepositCategory = (c?: string | null) => (c ?? "").toLowerCase().include
 
 type Row = {
   id: string; category: string | null; amount: number; created_at: string;
-  cashier_email: string | null; payment_method_code?: string | null; description?: string;
+  cashier_email: string | null; payment_method_code?: string | null; description?: string; receipt_url?: string | null;
 };
 
 function DepositReportPage() {
@@ -55,10 +55,10 @@ function DepositReportPage() {
     const { data, error } = await db.rpc("admin_list_expenses", { p_from: startIso, p_to: endIso });
     if (error) { toast.error(error.message); setLoading(false); return; }
     const deps = ((data ?? []) as Row[]).filter((r) => isDepositCategory(r.category));
-    const details = await db.from("shift_expenses").select("id, payment_method_code")
+    const details = await db.from("shift_expenses").select("id, payment_method_code, receipt_url")
       .in("id", deps.map((d) => d.id).slice(0, 500).length ? deps.map((d) => d.id) : ["00000000-0000-0000-0000-000000000000"]);
-    const byId = new Map<string, string | null>((details.data ?? []).map((d: any) => [d.id, d.payment_method_code]));
-    setRows(deps.map((r) => ({ ...r, payment_method_code: byId.get(r.id) ?? null })));
+    const byId = new Map<string, any>((details.data ?? []).map((d: any) => [d.id, d]));
+    setRows(deps.map((r) => ({ ...r, payment_method_code: byId.get(r.id)?.payment_method_code ?? null, receipt_url: byId.get(r.id)?.receipt_url ?? null })));
     setLoading(false);
   }
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, []);
@@ -73,12 +73,12 @@ function DepositReportPage() {
   }, [shown, methods]);
 
   function exportCsv() {
-    const cols = ["deposit_id", "date", "time", "category", "payment_method", "user", "amount"];
+    const cols = ["deposit_id", "date", "time", "category", "payment_method", "user", "amount", "attachment"];
     downloadCsv(`deposits_${from}_to_${to}.csv`, toCsv(shown.map((r) => ({
       deposit_id: r.id.slice(0, 8).toUpperCase(),
       date: fmtDate(r.created_at), time: fmtTime(r.created_at),
       category: r.category ?? "", payment_method: label(r.payment_method_code),
-      user: r.cashier_email ?? "", amount: Number(r.amount).toFixed(2),
+      user: r.cashier_email ?? "", amount: Number(r.amount).toFixed(2), attachment: r.receipt_url ?? "",
     })), cols));
   }
 
@@ -128,7 +128,7 @@ function DepositReportPage() {
               <TableHeader><TableRow>
                 <TableHead>Deposit ID</TableHead><TableHead>Date</TableHead><TableHead>Time</TableHead>
                 <TableHead>Category</TableHead><TableHead>Payment Method</TableHead><TableHead>User</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
+                <TableHead className="text-right">Amount</TableHead><TableHead>Attachment</TableHead>
               </TableRow></TableHeader>
               <TableBody>
                 {shown.map((r) => (
@@ -140,6 +140,14 @@ function DepositReportPage() {
                     <TableCell>{label(r.payment_method_code)}</TableCell>
                     <TableCell className="text-xs">{r.cashier_email ?? "—"}</TableCell>
                     <TableCell className={`text-right font-medium ${Number(r.amount) < 0 ? "text-destructive" : ""}`}>{peso(r.amount)}</TableCell>
+                    <TableCell className="text-xs whitespace-nowrap">
+                      {r.receipt_url ? (
+                        <span className="flex gap-2">
+                          <a href={r.receipt_url} target="_blank" rel="noreferrer" className="text-primary underline">View</a>
+                          <a href={r.receipt_url} download target="_blank" rel="noreferrer" className="text-primary underline">Download</a>
+                        </span>
+                      ) : "—"}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

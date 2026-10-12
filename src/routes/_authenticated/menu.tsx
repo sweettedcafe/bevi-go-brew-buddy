@@ -55,7 +55,7 @@ const db = supabase as any;
 
 function MenuPage() {
   const { primaryRole } = useAuth();
-  const isAdmin = primaryRole === "admin" || primaryRole === "developer";
+  const isAdmin = primaryRole === "admin" || primaryRole === "developer" || primaryRole === "partner";
   const [items, setItems] = useState<Item[]>([]);
   const [cats, setCats] = useState<Cat[]>([]);
   const [owners, setOwners] = useState<Owner[]>([]);
