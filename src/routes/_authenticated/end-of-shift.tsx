@@ -400,7 +400,7 @@ function EndOfShiftPage() {
           <p className="text-sm text-muted-foreground">Latest shift summary in Manila time.</p>
         </div>
         <div className="flex gap-2">
-          {report && (
+          {(
             <Dialog>
               <DialogTrigger asChild>
                 <Button size="sm" className="gap-2"><Share2 className="h-4 w-4" /> Share summary</Button>
@@ -433,7 +433,6 @@ function EndOfShiftPage() {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
-          )}
           <Button variant="outline" size="sm" onClick={refresh} className="gap-2">
             <RefreshCw className="h-4 w-4" /> Refresh
           </Button>
@@ -587,11 +586,19 @@ function EndOfShiftPage() {
                   </div>
                   <div className="md:col-span-1">
                     <Label htmlFor="exp-qty">Qty{reqFields.quantity && <span className="text-destructive"> *</span>}</Label>
-                    <Input id="exp-qty" type="number" step="0.01" value={qty} onChange={(e) => setQty(e.target.value)} />
+                    <div className="flex gap-1">
+                      <Button type="button" size="sm" variant={Number(qty) < 0 ? "destructive" : "outline"} className="h-9 px-2 shrink-0"
+                        title="Make negative / positive" aria-label="Toggle negative quantity"
+                        onClick={() => setQty((v) => { const t = v.trim(); if (!t) return "-"; return t.startsWith("-") ? t.slice(1) : `-${t}`; })}>
+                        ±
+                      </Button>
+                      <Input id="exp-qty" type="text" inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value.replace(/[^0-9.\-]/g, ""))} />
+                    </div>
                   </div>
                   <div className="md:col-span-2">
                     <Label htmlFor="exp-unit">Unit price (₱){reqFields.unit_price && <span className="text-destructive"> *</span>}</Label>
                     <Input id="exp-unit" type="number" step="0.01" value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} />
+
                   </div>
                   <div className="md:col-span-1">
                     <Label>Total</Label>
