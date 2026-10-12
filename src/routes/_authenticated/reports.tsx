@@ -175,7 +175,15 @@ function ReportsPage() {
         const orig = sign * (v.price + addon);
         return withBundle(it, orig, { _variant: v.name, unit_price: orig });
       });
-      return { ...o, _items: items };
+      const bundle = items.reduce((sum: number, x: any) => sum + Number(x._bundleDisc || 0), 0);
+      if (!bundle) return { ...o, _items: items };
+      return {
+        ...o, _items: items,
+        _orderDisc: Number(o.discount_total || 0),
+        discount_total: Number(o.discount_total || 0) + bundle,
+        subtotal: Number(o.subtotal || 0) + bundle,
+        discount_label: [o.discount_label, "Bundle discount"].filter(Boolean).join(" + "),
+      };
     });
   }, [ordersRaw, variantFallback, basePrice]);
   const orders = ordersFixed;
@@ -301,7 +309,7 @@ function ReportsPage() {
       // Order-level discount and payment fee, prorated across the lines by gross value.
       const grossOf = (x: any) => Number(x.unit_price || 0) * Number(x.qty || 0);
       const grossSum = lines.reduce((s, x) => s + grossOf(x), 0);
-      const orderDisc = Number(o.discount_total || 0);
+      const orderDisc = Number(o._orderDisc ?? o.discount_total ?? 0);
       const orderFee = Number(o.fee_amount || 0);
       for (const it of lines) {
         const c = (it.customization ?? null) as any;
@@ -345,7 +353,7 @@ function ReportsPage() {
           addon_total: Number(it.addon_total || 0),
           gross_sale: gross,
           discount_total: lineDisc,
-          discount_label: [o.discount_label, bDisc ? "Bundle discount" : null].filter(Boolean).join(" + ") || "—",
+          discount_label: [o._orderDisc != null ? (o.discount_label ?? "").replace(/ \+ Bundle discount$|^Bundle discount$/, "") || null : o.discount_label, bDisc ? "Bundle discount" : null].filter(Boolean).join(" + ") || "—",
           payment_label: o.payment_label ?? "—",
           fee_amount: lineFee,
           // Net sale = gross sale − discount − fee
@@ -451,7 +459,7 @@ function ReportsPage() {
         : lines;
       const scopedGross = scoped.reduce((s, x) => s + grossOf(x), 0);
       const share = grossSum !== 0 ? scopedGross / grossSum : (owner ? 0 : 1);
-      const oDisc = Number(o.discount_total || 0) * share
+      const oDisc = Number(o._orderDisc ?? o.discount_total ?? 0) * share
         + scoped.reduce((s, x) => s + Number(x._bundleDisc || 0), 0);
       const oFee = Number(o.fee_amount || 0) * share;
       if (st === "on_hold" || st === "open") {
