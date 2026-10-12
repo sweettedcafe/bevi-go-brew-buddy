@@ -117,20 +117,30 @@ function ReportsPage() {
   const [tab, setTab] = useState("order");
   const [loading, setLoading] = useState(false);
   const [orders, setOrders] = useState<AnyRow[]>([]);
-  // Menu item id -> variant name used when an order line was saved without a variant
-  // (default variant, or the first one by sort order, as set up in Menu & Recipes).
-  const [variantFallback, setVariantFallback] = useState<Map<string, string>>(new Map());
+  // Menu item id -> variants from Menu & Recipes. Used when an order line was saved
+  // without a variant: pick the variant whose price matches the charged price, else
+  // the default / first variant.
+  const [variantFallback, setVariantFallback] = useState<Map<string, { name: string; price: number; is_default: boolean }[]>>(new Map());
   useEffect(() => {
     void (async () => {
       const { data } = await (supabase as any).from("menu_item_variants").select("*").order("sort_order");
-      const m = new Map<string, string>();
+      const m = new Map<string, { name: string; price: number; is_default: boolean }[]>();
       for (const v of (data ?? []) as any[]) {
         if (!v.menu_item_id || !v.name) continue;
-        if (v.is_default || !m.has(v.menu_item_id)) m.set(v.menu_item_id, v.name);
+        const arr = m.get(v.menu_item_id) ?? [];
+        arr.push({ name: v.name, price: Number(v.price || 0), is_default: !!v.is_default });
+        m.set(v.menu_item_id, arr);
       }
       setVariantFallback(m);
     })();
   }, []);
+  const guessVariant = (menuItemId: string, basePrice: number): string | null => {
+    const list = variantFallback.get(menuItemId);
+    if (!list?.length) return null;
+    const exact = list.find((v) => Math.abs(v.price - basePrice) < 0.005);
+    if (exact) return exact.name;
+    return (list.find((v) => v.is_default) ?? list[0]).name;
+  };
   const [staffEmails, setStaffEmails] = useState<Record<string, string>>({});
   const [detailId, setDetailId] = useState<string | null>(null);
 
@@ -282,7 +292,7 @@ function ReportsPage() {
           name: it.name_snapshot,
           variant: it.menu_item_variants?.name ?? c?.size?.label
             ?? (String(it.name_snapshot ?? "").includes(" — ") ? String(it.name_snapshot).split(" — ").pop() : null)
-            ?? variantFallback.get(it.menu_item_id) ?? "—",
+            ?? guessVariant(it.menu_item_id, Number(it.unit_price || 0) - Number(it.addon_total || 0)) ?? "—",
           extras: listOf(c?.extras) || "—",
           flavors: listOf(c?.flavors) || "—",
           other: other || "—",
