@@ -412,7 +412,7 @@ function EndOfShiftPage() {
                   <div className="flex-1">
                     <Label htmlFor="summary-date">Show summary for</Label>
                     <Input id="summary-date" type="date" max={manilaToday()}
-                      value={viewDate || bizDate}
+                      value={viewDate || bizDate || manilaToday()}
                       onChange={(e) => setViewDate(e.target.value)} />
                   </div>
                   <Button size="sm" variant="outline" disabled={!picked}
