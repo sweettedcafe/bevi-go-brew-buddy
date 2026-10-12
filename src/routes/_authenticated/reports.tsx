@@ -63,6 +63,7 @@ const PER_ITEM_COLS = [
   { key: "time_only", label: "Time" },
   { key: "txn_kind", label: "Type" },
   { key: "name", label: "Item" },
+  { key: "customer_name", label: "Customer" },
   { key: "variant", label: "Variant" },
   { key: "extras", label: "Extras" },
   { key: "flavors", label: "Flavors" },
@@ -336,6 +337,7 @@ function ReportsPage() {
           created_at: o.created_at,
           txn_kind: o.txn_kind ?? "sale",
           status: o.status,
+          customer_name: o.customer_name || "Walk-in",
           name: it.name_snapshot,
           variant: it._variant ?? it.menu_item_variants?.name ?? c?.size?.label
             ?? (String(it.name_snapshot ?? "").includes(" — ") ? String(it.name_snapshot).split(" — ").pop() : null) ?? "—",
