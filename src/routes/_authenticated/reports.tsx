@@ -137,9 +137,9 @@ function ReportsPage() {
   const normName = (x: unknown) => String(x ?? "").toLowerCase().replace(/[\s_-]+/g, "");
   // Menu & Recipes is the source of truth: resolve each line's variant from the menu
   // (by saved variant, then saved size label, then charged price) and use its price.
-  const ordersFixed = useMemo(() => {
+  const ordersFixed = useMemo((): AnyRow[] => {
     if (!variantFallback.size) return ordersRaw;
-    return ordersRaw.map((o) => {
+    return ordersRaw.map((o): AnyRow => {
       const items = ((o._items ?? []) as any[]).map((it) => {
         const list = variantFallback.get(it.menu_item_id);
         if (!list?.length) return it;
