@@ -250,7 +250,9 @@ function EndOfShiftPage() {
   const [dayLoading, setDayLoading] = useState(false);
   const [dayError, setDayError] = useState<string | null>(null);
   const bizDate = report?.shift.business_date ?? "";
-  const picked = viewDate && viewDate !== bizDate ? viewDate : "";
+  const picked = !report
+    ? (viewDate || manilaToday())
+    : (viewDate && viewDate !== bizDate ? viewDate : "");
 
   useEffect(() => {
     if (!picked) { setDayReport(null); setDayError(null); setDayLoading(false); return; }
@@ -400,7 +402,6 @@ function EndOfShiftPage() {
           <p className="text-sm text-muted-foreground">Latest shift summary in Manila time.</p>
         </div>
         <div className="flex gap-2">
-          {(
             <Dialog>
               <DialogTrigger asChild>
                 <Button size="sm" className="gap-2"><Share2 className="h-4 w-4" /> Share summary</Button>
