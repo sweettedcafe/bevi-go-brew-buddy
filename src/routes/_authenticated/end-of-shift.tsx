@@ -415,7 +415,7 @@ function EndOfShiftPage() {
                       value={viewDate || bizDate || manilaToday()}
                       onChange={(e) => setViewDate(e.target.value)} />
                   </div>
-                  <Button size="sm" variant="outline" disabled={!picked}
+                  <Button size="sm" variant="outline" disabled={!picked || !report}
                     onClick={() => setViewDate("")}>Latest shift</Button>
                 </div>
                 <div className="max-h-[70vh] overflow-y-auto -mx-2 px-2">
