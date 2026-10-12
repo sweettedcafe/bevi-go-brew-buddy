@@ -1,7 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 
-const SUPABASE_URL = "https://ewwtxzoruibaxalffyli.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_kOSj2qrRQ_S_a34In7uV0w_GBEufPWW";
+export const SUPABASE_URL = "https://ewwtxzoruibaxalffyli.supabase.co";
+export const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_kOSj2qrRQ_S_a34In7uV0w_GBEufPWW";
 
 // If a tablet sleeps, the login token can expire before the auto-refresh runs.
 // When a data request comes back "JWT expired", refresh the session once and retry.
