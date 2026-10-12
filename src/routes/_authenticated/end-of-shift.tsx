@@ -91,6 +91,32 @@ const REQ_LABELS: Array<[ReqKey, string]> = [
   ["reason", "Reason"], ["receipt", "Receipt photo"],
 ];
 
+// Keep only digits plus one decimal point, with an optional leading minus.
+const decimalText = (raw: string) => {
+  const neg = raw.trim().startsWith("-");
+  let out = raw.replace(/[^0-9.]/g, "");
+  const dot = out.indexOf(".");
+  if (dot >= 0) out = out.slice(0, dot + 1) + out.slice(dot + 1).replace(/\./g, "");
+  return (neg ? "-" : "") + out;
+};
+
+const toggleSign = (v: string) => {
+  const t = v.trim();
+  if (!t || t === "-") return "-";
+  return t.startsWith("-") ? t.slice(1) : `-${t}`;
+};
+
+function SignToggle({ value, onToggle, label }: { value: string; onToggle: () => void; label: string }) {
+  return (
+    <Button type="button" size="sm"
+      variant={value.trim().startsWith("-") ? "destructive" : "outline"}
+      className="h-9 min-w-10 shrink-0 px-0 text-base font-semibold leading-none"
+      title="Make negative / positive" aria-label={label} onClick={onToggle}>
+      ±
+    </Button>
+  );
+}
+
 function EndOfShiftPage() {
   const { primaryRole } = useAuth();
   const isAdmin = primaryRole === "admin" || primaryRole === "developer";
@@ -576,38 +602,36 @@ function EndOfShiftPage() {
               {report.shift.clock_out ? (
                 <p className="text-xs text-muted-foreground">Shift is closed — expenses are read-only.</p>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-2 items-end">
-                  <div className="md:col-span-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-2 items-end">
+                  <div className="sm:col-span-2 lg:col-span-3">
                     <Label htmlFor="exp-desc">Item / description{reqFields.description && <span className="text-destructive"> *</span>}</Label>
                     <Input id="exp-desc" value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="e.g. Whole milk 1L" />
                   </div>
-                  <div className="md:col-span-2">
+                  <div className="lg:col-span-2">
                     <Label htmlFor="exp-inv">Invoice #{reqFields.invoice_number && <span className="text-destructive"> *</span>}</Label>
                     <Input id="exp-inv" value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)} placeholder="OR / SI #" />
                   </div>
-                  <div className="md:col-span-1">
+                  <div className="lg:col-span-2">
                     <Label htmlFor="exp-qty">Qty{reqFields.quantity && <span className="text-destructive"> *</span>}</Label>
                     <div className="flex gap-1">
-                      <Button type="button" size="sm" variant={Number(qty) < 0 ? "destructive" : "outline"} className="h-9 px-2 shrink-0"
-                        title="Make negative / positive" aria-label="Toggle negative quantity"
-                        onClick={() => setQty((v) => { const t = v.trim(); if (!t) return "-"; return t.startsWith("-") ? t.slice(1) : `-${t}`; })}>
-                        ±
-                      </Button>
-                      <Input id="exp-qty" type="text" inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value.replace(/[^0-9.\-]/g, ""))} />
+                      <SignToggle value={qty} label="Toggle negative quantity" onToggle={() => setQty((v) => toggleSign(v))} />
+                      <Input id="exp-qty" type="text" inputMode="decimal" autoComplete="off" className="min-w-0" value={qty} onChange={(e) => setQty(decimalText(e.target.value))} />
                     </div>
                   </div>
-                  <div className="md:col-span-2">
+                  <div className="lg:col-span-2">
                     <Label htmlFor="exp-unit">Unit price (₱){reqFields.unit_price && <span className="text-destructive"> *</span>}</Label>
-                    <Input id="exp-unit" type="number" step="0.01" value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} />
-
+                    <div className="flex gap-1">
+                      <SignToggle value={unitPrice} label="Toggle negative unit price" onToggle={() => setUnitPrice((v) => toggleSign(v))} />
+                      <Input id="exp-unit" type="text" inputMode="decimal" autoComplete="off" className="min-w-0" placeholder="0.00" value={unitPrice} onChange={(e) => setUnitPrice(decimalText(e.target.value))} />
+                    </div>
                   </div>
-                  <div className="md:col-span-1">
+                  <div className="lg:col-span-1">
                     <Label>Total</Label>
                     <div className="h-9 flex items-center px-3 rounded-md border bg-muted/30 text-sm font-medium">
                       {peso((Number(qty) || 0) * (Number(unitPrice) || 0))}
                     </div>
                   </div>
-                  <div className="md:col-span-1">
+                  <div className="lg:col-span-2">
                     <Label htmlFor="exp-cat">Category{reqFields.category && <span className="text-destructive"> *</span>}</Label>
                     <Select value={category} onValueChange={setCategory}>
                       <SelectTrigger id="exp-cat"><SelectValue placeholder="Pick" /></SelectTrigger>
@@ -618,7 +642,7 @@ function EndOfShiftPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="md:col-span-2">
+                  <div className="lg:col-span-2">
                     <Label htmlFor="exp-pm">Payment method{reqFields.payment_method && <span className="text-destructive"> *</span>}</Label>
                     <Select value={expMethod} onValueChange={setExpMethod}>
                       <SelectTrigger id="exp-pm"><SelectValue placeholder="Pick" /></SelectTrigger>
@@ -631,20 +655,20 @@ function EndOfShiftPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="md:col-span-3">
+                  <div className="sm:col-span-2 lg:col-span-4">
                     <Label htmlFor="exp-reason">Reason{reqFields.reason && <span className="text-destructive"> *</span>}</Label>
                     <Input id="exp-reason" value={reason} onChange={(e) => setReason(e.target.value)}
                       placeholder="Required for negative / correction entries" />
                   </div>
-                  <div className="md:col-span-2">
+                  <div className="sm:col-span-2 lg:col-span-3">
                     <Label htmlFor="exp-img" className="text-xs">Receipt{reqFields.receipt && <span className="text-destructive"> *</span>}</Label>
                     <Input id="exp-img" type="file" accept="image/*"
                       onChange={(e) => setReceiptFile(e.target.files?.[0] ?? null)} />
                   </div>
-                  <p className="md:col-span-12 text-xs text-muted-foreground">
-                    To cancel a wrong entry, add the same item with a negative quantity or price and write the reason.
+                  <p className="sm:col-span-2 lg:col-span-12 text-xs text-muted-foreground">
+                    To cancel a wrong entry, tap ± beside Qty or Unit price to make it negative, then write the reason.
                   </p>
-                  <div className="md:col-span-1">
+                  <div className="sm:col-span-2 lg:col-span-3">
                     <Button onClick={addExpense} disabled={uploadingReceipt} className="w-full gap-1">
                       <Plus className="h-4 w-4" />
                     </Button>
