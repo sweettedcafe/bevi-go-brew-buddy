@@ -121,6 +121,7 @@ function ReportsPage() {
   // without a variant: pick the variant whose price matches the charged price, else
   // the default / first variant.
   const [variantFallback, setVariantFallback] = useState<Map<string, { id: string; name: string; price: number; is_default: boolean }[]>>(new Map());
+  const [basePrice, setBasePrice] = useState<Map<string, number>>(new Map());
   useEffect(() => {
     void (async () => {
       const { data } = await (supabase as any).from("menu_item_variants").select("*").order("sort_order");
@@ -132,17 +133,35 @@ function ReportsPage() {
         m.set(v.menu_item_id, arr);
       }
       setVariantFallback(m);
+      const { data: mi } = await (supabase as any).from("menu_items").select("id,price");
+      const bp = new Map<string, number>();
+      for (const x of (mi ?? []) as any[]) bp.set(x.id, Number(x.price || 0));
+      setBasePrice(bp);
     })();
   }, []);
   const normName = (x: unknown) => String(x ?? "").toLowerCase().replace(/[\s_-]+/g, "");
   // Menu & Recipes is the source of truth: resolve each line's variant from the menu
   // (by saved variant, then saved size label, then charged price) and use its price.
   const ordersFixed = useMemo((): AnyRow[] => {
-    if (!variantFallback.size) return ordersRaw;
+    if (!variantFallback.size && !basePrice.size) return ordersRaw;
+    // Bundle / line-level discounts: when a line was charged below its Menu & Recipes
+    // price, unit price shows the original and the difference becomes a line discount.
+    const withBundle = (it: any, origUnit: number, extra: Record<string, unknown> = {}) => {
+      const charged = Number(it.unit_price || 0);
+      const qty = Number(it.qty || 0);
+      const diff = Math.abs(origUnit) - Math.abs(charged);
+      const bundleDisc = diff > 0.005 ? diff * Math.abs(qty) * (charged < 0 || qty < 0 ? -1 : 1) : 0;
+      return { ...it, ...extra, unit_price: diff > 0.005 ? origUnit : (extra.unit_price ?? charged), _bundleDisc: bundleDisc };
+    };
     return ordersRaw.map((o): AnyRow => {
       const items = ((o._items ?? []) as any[]).map((it) => {
         const list = variantFallback.get(it.menu_item_id);
-        if (!list?.length) return it;
+        if (!list?.length) {
+          const bp = basePrice.get(it.menu_item_id);
+          if (bp == null || bp <= 0) return it;
+          const sign = Number(it.unit_price || 0) < 0 ? -1 : 1;
+          return withBundle(it, sign * (bp + Number(it.addon_total || 0)));
+        }
         const c = (it.customization ?? null) as any;
         const addon = Number(it.addon_total || 0);
         const label = it.menu_item_variants?.name ?? c?.size?.label
@@ -153,11 +172,20 @@ function ReportsPage() {
           || list.find((x) => Math.abs(x.price - (Number(it.unit_price || 0) - addon)) < 0.005)
           || list.find((x) => x.is_default) || list[0];
         const sign = Number(it.unit_price || 0) < 0 ? -1 : 1;
-        return { ...it, _variant: v.name, unit_price: sign * (v.price + addon) };
+        const orig = sign * (v.price + addon);
+        return withBundle(it, orig, { _variant: v.name, unit_price: orig });
       });
-      return { ...o, _items: items };
+      const bundle = items.reduce((sum: number, x: any) => sum + Number(x._bundleDisc || 0), 0);
+      if (!bundle) return { ...o, _items: items };
+      return {
+        ...o, _items: items,
+        _orderDisc: Number(o.discount_total || 0),
+        discount_total: Number(o.discount_total || 0) + bundle,
+        subtotal: Number(o.subtotal || 0) + bundle,
+        discount_label: [o.discount_label, "Bundle discount"].filter(Boolean).join(" + "),
+      };
     });
-  }, [ordersRaw, variantFallback]);
+  }, [ordersRaw, variantFallback, basePrice]);
   const orders = ordersFixed;
   const [staffEmails, setStaffEmails] = useState<Record<string, string>>({});
   const [detailId, setDetailId] = useState<string | null>(null);
@@ -281,7 +309,7 @@ function ReportsPage() {
       // Order-level discount and payment fee, prorated across the lines by gross value.
       const grossOf = (x: any) => Number(x.unit_price || 0) * Number(x.qty || 0);
       const grossSum = lines.reduce((s, x) => s + grossOf(x), 0);
-      const orderDisc = Number(o.discount_total || 0);
+      const orderDisc = Number(o._orderDisc ?? o.discount_total ?? 0);
       const orderFee = Number(o.fee_amount || 0);
       for (const it of lines) {
         const c = (it.customization ?? null) as any;
@@ -297,7 +325,8 @@ function ReportsPage() {
           .filter(Boolean).join(" | ");
         const gross = grossOf(it);
         const share = grossSum !== 0 ? gross / grossSum : (lines.length ? 1 / lines.length : 0);
-        const lineDisc = orderDisc * share;
+        const bDisc = Number(it._bundleDisc || 0);
+        const lineDisc = orderDisc * share + bDisc;
         const lineFee = orderFee * share;
         rows.push({
           id: it.id,
@@ -324,7 +353,7 @@ function ReportsPage() {
           addon_total: Number(it.addon_total || 0),
           gross_sale: gross,
           discount_total: lineDisc,
-          discount_label: o.discount_label ?? "—",
+          discount_label: [o._orderDisc != null ? (o.discount_label ?? "").replace(/ \+ Bundle discount$|^Bundle discount$/, "") || null : o.discount_label, bDisc ? "Bundle discount" : null].filter(Boolean).join(" + ") || "—",
           payment_label: o.payment_label ?? "—",
           fee_amount: lineFee,
           // Net sale = gross sale − discount − fee
@@ -430,7 +459,8 @@ function ReportsPage() {
         : lines;
       const scopedGross = scoped.reduce((s, x) => s + grossOf(x), 0);
       const share = grossSum !== 0 ? scopedGross / grossSum : (owner ? 0 : 1);
-      const oDisc = Number(o.discount_total || 0) * share;
+      const oDisc = Number(o._orderDisc ?? o.discount_total ?? 0) * share
+        + scoped.reduce((s, x) => s + Number(x._bundleDisc || 0), 0);
       const oFee = Number(o.fee_amount || 0) * share;
       if (st === "on_hold" || st === "open") {
         held += scopedGross; heldCount++;
