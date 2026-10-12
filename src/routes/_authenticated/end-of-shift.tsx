@@ -250,7 +250,9 @@ function EndOfShiftPage() {
   const [dayLoading, setDayLoading] = useState(false);
   const [dayError, setDayError] = useState<string | null>(null);
   const bizDate = report?.shift.business_date ?? "";
-  const picked = viewDate && viewDate !== bizDate ? viewDate : "";
+  const picked = !report
+    ? (viewDate || manilaToday())
+    : (viewDate && viewDate !== bizDate ? viewDate : "");
 
   useEffect(() => {
     if (!picked) { setDayReport(null); setDayError(null); setDayLoading(false); return; }
@@ -400,7 +402,6 @@ function EndOfShiftPage() {
           <p className="text-sm text-muted-foreground">Latest shift summary in Manila time.</p>
         </div>
         <div className="flex gap-2">
-          {report && (
             <Dialog>
               <DialogTrigger asChild>
                 <Button size="sm" className="gap-2"><Share2 className="h-4 w-4" /> Share summary</Button>
@@ -411,10 +412,10 @@ function EndOfShiftPage() {
                   <div className="flex-1">
                     <Label htmlFor="summary-date">Show summary for</Label>
                     <Input id="summary-date" type="date" max={manilaToday()}
-                      value={viewDate || bizDate}
+                      value={viewDate || bizDate || manilaToday()}
                       onChange={(e) => setViewDate(e.target.value)} />
                   </div>
-                  <Button size="sm" variant="outline" disabled={!picked}
+                  <Button size="sm" variant="outline" disabled={!picked || !report}
                     onClick={() => setViewDate("")}>Latest shift</Button>
                 </div>
                 <div className="max-h-[70vh] overflow-y-auto -mx-2 px-2">
@@ -433,7 +434,6 @@ function EndOfShiftPage() {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
-          )}
           <Button variant="outline" size="sm" onClick={refresh} className="gap-2">
             <RefreshCw className="h-4 w-4" /> Refresh
           </Button>
@@ -587,11 +587,19 @@ function EndOfShiftPage() {
                   </div>
                   <div className="md:col-span-1">
                     <Label htmlFor="exp-qty">Qty{reqFields.quantity && <span className="text-destructive"> *</span>}</Label>
-                    <Input id="exp-qty" type="number" step="0.01" value={qty} onChange={(e) => setQty(e.target.value)} />
+                    <div className="flex gap-1">
+                      <Button type="button" size="sm" variant={Number(qty) < 0 ? "destructive" : "outline"} className="h-9 px-2 shrink-0"
+                        title="Make negative / positive" aria-label="Toggle negative quantity"
+                        onClick={() => setQty((v) => { const t = v.trim(); if (!t) return "-"; return t.startsWith("-") ? t.slice(1) : `-${t}`; })}>
+                        ±
+                      </Button>
+                      <Input id="exp-qty" type="text" inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value.replace(/[^0-9.\-]/g, ""))} />
+                    </div>
                   </div>
                   <div className="md:col-span-2">
                     <Label htmlFor="exp-unit">Unit price (₱){reqFields.unit_price && <span className="text-destructive"> *</span>}</Label>
                     <Input id="exp-unit" type="number" step="0.01" value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} />
+
                   </div>
                   <div className="md:col-span-1">
                     <Label>Total</Label>
