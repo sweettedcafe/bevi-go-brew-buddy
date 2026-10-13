@@ -336,7 +336,7 @@ function ReportsPage() {
           order_no: o.order_no,
           created_at: o.created_at,
           txn_kind: o.txn_kind ?? "sale",
-          status: o.status,
+          status: o.txn_kind === "void" ? "voided" : o.txn_kind === "refund" ? "refunded" : o.status,
           customer_name: o.customer_name || "Walk-in",
           name: it.name_snapshot,
           variant: it._variant ?? it.menu_item_variants?.name ?? c?.size?.label
