@@ -510,7 +510,7 @@ function ReportsPage() {
     if (key === "order_no") return v == null ? "" : Number(v);
     if (["subtotal", "discount_total", "total", "fee_amount", "revenue", "gross_sale", "unit_price", "addon_total", "qty", "items_count"].includes(key))
       return v == null || v === "" ? 0 : Number(v);
-    if (key === "txn_kind") return String(v ?? "sale");
+    if (key === "txn_kind") return txnLabel(row);
     return v ?? "";
   }
 
@@ -690,7 +690,7 @@ function ReportsPage() {
             rows={filteredOrders}
             render={(row, key) => {
               if (key === "status") return <StatusBadge s={row.status} k={row.txn_kind ?? "sale"} />;
-              if (key === "txn_kind") return <TxnBadge k={row.txn_kind ?? "sale"} />;
+              if (key === "txn_kind") return <TxnBadge k={row.txn_kind ?? "sale"} label={txnLabel(row)} />;
               if (key === "total" || key === "subtotal" || key === "discount_total") {
                 const n = Number(row[key]);
                 return <span className={n < 0 ? "text-destructive" : ""}>{`₱${n.toFixed(2)}`}</span>;
@@ -743,7 +743,7 @@ function ReportsPage() {
                 const n = Number(row.qty);
                 return <span className={n < 0 ? "text-destructive" : ""}>{n}</span>;
               }
-              if (key === "txn_kind") return <TxnBadge k={row.txn_kind ?? "sale"} />;
+              if (key === "txn_kind") return <TxnBadge k={row.txn_kind ?? "sale"} label={txnLabel(row)} />;
               if (key === "created_at") return new Date(row.created_at).toLocaleString();
               if (key === "date_only") return row.created_at ? new Date(row.created_at).toLocaleDateString() : "—";
               if (key === "time_only") return row.created_at ? new Date(row.created_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit", hour12: true }) : "—";
@@ -811,13 +811,23 @@ function fmt(v: any, key: string, row?: any) {
   if (key === "subtotal" || key === "discount_total" || key === "total" || key === "fee_amount")
     return `₱${Number(v).toFixed(2)}`;
   if (key === "order_no") return `#${String(v).padStart(3, "0")}`;
-  if (key === "txn_kind") return String(v ?? "sale");
+  if (key === "txn_kind") return txnLabel(row);
   return String(v);
 }
 
-function TxnBadge({ k }: { k: string }) {
+// A sale that was later cancelled keeps its +qty row (the void row carries the −qty),
+// but is labelled so it isn't mistaken for a normal sale.
+function txnLabel(row: any): string {
+  const k = row?.txn_kind ?? "sale";
+  if (k === "sale" && row?.status === "voided") return "Voided sale";
+  if (k === "sale" && row?.status === "refunded") return "Refunded sale";
+  return String(k);
+}
+
+function TxnBadge({ k, label }: { k: string; label?: string }) {
   const map: Record<string, string> = { sale: "default", void: "destructive", refund: "outline" };
-  return <Badge variant={(map[k] ?? "secondary") as any} className="capitalize">{k}</Badge>;
+  const variant = label && label !== k ? "secondary" : (map[k] ?? "secondary");
+  return <Badge variant={variant as any} className="capitalize">{label ?? k}</Badge>;
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
