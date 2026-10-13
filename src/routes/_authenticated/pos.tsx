@@ -146,6 +146,12 @@ function POSPage() {
   const [scanInput, setScanInput] = useState("");
   const [scanBusy, setScanBusy] = useState(false);
   const [redeem, setRedeem] = useState<string>("");
+  const [redeemApplied, setRedeemApplied] = useState(0);
+  const [loyaltyCfg, setLoyaltyCfg] = useState<{ is_active: boolean; redeem_threshold: number; redeem_value: number } | null>(null);
+  useEffect(() => {
+    void (supabase as any).from("loyalty_settings").select("is_active, redeem_threshold, redeem_value").eq("id", 1).maybeSingle()
+      .then(({ data }: any) => { if (data) setLoyaltyCfg({ is_active: !!data.is_active, redeem_threshold: Number(data.redeem_threshold) || 0, redeem_value: Number(data.redeem_value) || 0 }); });
+  }, []);
   const [cameraOpen, setCameraOpen] = useState(false);
   const scanRef = useRef<HTMLInputElement>(null);
 
@@ -394,7 +400,10 @@ function POSPage() {
   }, [appliedPromo, manual, subtotal, itemPromoAmount, promoScopeIds]);
 
   const discountAmount = itemPromoAmount + orderDiscountAmount;
-  const total = Math.max(0, subtotal - discountAmount);
+  const redeemAmountRaw = loyaltyCfg && loyaltyCfg.redeem_threshold > 0 && customer
+    ? Math.round((redeemApplied / loyaltyCfg.redeem_threshold) * loyaltyCfg.redeem_value * 100) / 100 : 0;
+  const redeemAmount = Math.min(redeemAmountRaw, Math.max(0, subtotal - discountAmount));
+  const total = Math.max(0, subtotal - discountAmount - redeemAmount);
 
   // Per-line discount allocation — ONLY for item-scoped promos.
   const lineDiscounts = useMemo(() => {
@@ -542,7 +551,7 @@ function POSPage() {
   function clearAll() {
     setCart([]); setCustomerName("");
     setPromoCode(""); setAppliedPromo(null); setManual(null);
-    setCustomer(null); setRedeem(""); setScanInput("");
+    setCustomer(null); setRedeem(""); setRedeemApplied(0); setScanInput("");
     setResumedOrderId(null);
   }
 
@@ -1236,7 +1245,7 @@ function POSPage() {
                 <Badge variant={discountsToday ? "destructive" : "outline"} title="Discounts/promos used today">
                   {discountsToday === null ? "…" : discountsToday} discount{discountsToday === 1 ? "" : "s"} today
                 </Badge>
-                <Button size="icon" variant="ghost" onClick={() => { setCustomer(null); setRedeem(""); setCustomerName(""); }}>
+                <Button size="icon" variant="ghost" onClick={() => { setCustomer(null); setRedeem(""); setRedeemApplied(0); setCustomerName(""); }}>
                   <X className="h-3 w-3" />
                 </Button>
               </div>
@@ -1245,11 +1254,32 @@ function POSPage() {
                 <div className="flex items-center gap-2">
                   <label className="text-[11px] text-muted-foreground whitespace-nowrap">Redeem pts</label>
                   <Input
-                    type="number" min={0} max={customer.points}
+                    type="text" inputMode="numeric"
                     value={redeem}
-                    onChange={(e) => setRedeem(e.target.value)}
+                    onChange={(e) => setRedeem(e.target.value.replace(/[^0-9]/g, ""))}
                     placeholder="0" className="h-7"
                   />
+                  <Button size="sm" className="h-7" type="button" onClick={() => {
+                    const n = parseInt(redeem || "0", 10) || 0;
+                    const th = loyaltyCfg?.redeem_threshold ?? 0;
+                    if (!loyaltyCfg?.is_active) { toast.error("Loyalty program is turned off"); return; }
+                    if (n <= 0) { setRedeemApplied(0); return; }
+                    if (n > customer.points) { toast.error(`Only ${customer.points} pts available`); return; }
+                    if (th > 0 && n % th !== 0) { toast.error(`Redeem in multiples of ${th} pts`); return; }
+                    setRedeemApplied(n);
+                    toast.success(`Redeemed ${n} pts`);
+                  }}>Redeem</Button>
+                  {redeemApplied > 0 && (
+                    <Button size="sm" variant="ghost" className="h-7 px-2" type="button" onClick={() => { setRedeemApplied(0); setRedeem(""); }}>
+                      <X className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
+              )}
+              {customer.points > 0 && loyaltyCfg && loyaltyCfg.redeem_threshold > 0 && (
+                <div className="text-[11px] text-muted-foreground">
+                  {loyaltyCfg.redeem_threshold} pts = {fmt(loyaltyCfg.redeem_value)} off
+                  {redeemApplied > 0 && <> · Remaining after order: <b>{customer.points - redeemApplied} pts</b></>}
                 </div>
               )}
 
@@ -1461,6 +1491,12 @@ function POSPage() {
               <span>−{fmt(discountAmount)}</span>
             </div>
           )}
+          {redeemAmount > 0 && (
+            <div className="flex justify-between text-sm text-primary">
+              <span>Points redeemed ({redeemApplied} pts)</span>
+              <span>−{fmt(redeemAmount)}</span>
+            </div>
+          )}
           <div className="flex justify-between font-display text-xl">
             <span>Total</span>
             <span className="text-primary">{fmt(total)}</span>
@@ -1499,7 +1535,7 @@ function POSPage() {
           if (payments.length === 1 && payments[0].method === "cash") {
             payments[0].change_due = Math.max(0, payments[0].amount - total);
           }
-          const redeemPts = customer ? Math.max(0, parseInt(redeem || "0", 10) || 0) : 0;
+          const redeemPts = customer ? redeemApplied : 0;
           const payload: any = {
             order_type: orderType,
             customer_id: customer?.id ?? null,
@@ -1536,7 +1572,8 @@ function POSPage() {
           const r = data as { order_no: number; points_earned?: number; points_redeemed?: number };
           const changeTotal = payments.reduce((s, p) => s + p.change_due, 0);
           autoPrint({ orderNo: r.order_no, splits, change: changeTotal });
-          const pointsMsg = r.points_earned ? ` · +${r.points_earned} pts` : "";
+          const remaining = customer ? customer.points - (r.points_redeemed ?? 0) + (r.points_earned ?? 0) : null;
+          const pointsMsg = (r.points_redeemed ? ` · −${r.points_redeemed} pts redeemed` : "") + (r.points_earned ? ` · +${r.points_earned} pts` : "") + (remaining !== null ? ` · Balance ${remaining} pts` : "");
           toast.success(`Order #${String(r.order_no).padStart(3, "0")} completed${pointsMsg}`);
           clearAll();
           setCheckoutOpen(false);

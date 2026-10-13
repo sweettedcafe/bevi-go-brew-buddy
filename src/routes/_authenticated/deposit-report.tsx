@@ -58,7 +58,8 @@ function DepositReportPage() {
     const details = await db.from("shift_expenses").select("id, payment_method_code, receipt_url")
       .in("id", deps.map((d) => d.id).slice(0, 500).length ? deps.map((d) => d.id) : ["00000000-0000-0000-0000-000000000000"]);
     const byId = new Map<string, any>((details.data ?? []).map((d: any) => [d.id, d]));
-    setRows(deps.map((r) => ({ ...r, payment_method_code: byId.get(r.id)?.payment_method_code ?? null, receipt_url: byId.get(r.id)?.receipt_url ?? null })));
+    // Deposit sign is the opposite of the expense: a negative expense adds to deposits, a positive one deducts.
+    setRows(deps.map((r) => ({ ...r, amount: -Number(r.amount || 0), payment_method_code: byId.get(r.id)?.payment_method_code ?? null, receipt_url: byId.get(r.id)?.receipt_url ?? null })));
     setLoading(false);
   }
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, []);
@@ -92,8 +93,8 @@ function DepositReportPage() {
         </Button>
       </header>
       <p className="text-xs text-muted-foreground">
-        Deposits come from End of Shift expenses with a "Deposit" category. Each deposit is deducted from the payment
-        method chosen (e.g. E-Wallet). To fix a wrong amount, add another Deposit expense with a positive or negative value.
+        Deposits come from End of Shift expenses with a "Deposit" category. A negative expense amount counts as a positive
+        deposit here, and a positive expense amount is deducted from the deposit total. To fix a wrong amount, add another Deposit expense.
       </p>
       <Card className="p-4 grid gap-3 items-end sm:grid-cols-2 lg:grid-cols-[auto,auto,1fr,auto,auto]">
         <div><Label className="text-xs">From</Label><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></div>

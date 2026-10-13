@@ -378,6 +378,8 @@ function EndOfShiftPage() {
   const visibleExpenses = (report?.expenses ?? []).filter((e) =>
     !e.payment_method_code || (!ownerOnlyCodes.has(e.payment_method_code) && (isAdmin || pms.some((m) => m.code === e.payment_method_code))));
   const visibleExpenseTotal = visibleExpenses.reduce((s, e) => s + Number(e.amount), 0);
+  const canExpenseWithoutShift = isAdmin || primaryRole === "partner";
+  const shiftClosed = !!report?.shift.clock_out;
 
   const summary: Summary | null = picked
     ? (dayReport ? summaryFromDay(dayReport) : null)
@@ -418,172 +420,7 @@ function EndOfShiftPage() {
     }
   };
 
-  return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-display flex items-center gap-2">
-            <ClipboardList className="h-6 w-6" /> End of Shift Report
-          </h1>
-          <p className="text-sm text-muted-foreground">Latest shift summary in Manila time.</p>
-        </div>
-        <div className="flex gap-2">
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button size="sm" className="gap-2"><Share2 className="h-4 w-4" /> Share summary</Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-md">
-                <DialogHeader><DialogTitle>Shift summary</DialogTitle></DialogHeader>
-                <div className="flex items-end gap-2 border-b pb-3">
-                  <div className="flex-1">
-                    <Label htmlFor="summary-date">Show summary for</Label>
-                    <Input id="summary-date" type="date" max={manilaToday()}
-                      value={viewDate || bizDate || manilaToday()}
-                      onChange={(e) => setViewDate(e.target.value)} />
-                  </div>
-                  <Button size="sm" variant="outline" disabled={!picked || !report}
-                    onClick={() => setViewDate("")}>Latest shift</Button>
-                </div>
-                <div className="max-h-[70vh] overflow-y-auto -mx-2 px-2">
-                  {dayLoading ? (
-                    <div className="py-10 text-center text-sm text-muted-foreground">Loading…</div>
-                  ) : dayError ? (
-                    <p className="py-10 text-center text-sm text-destructive">{dayError}</p>
-                  ) : summary ? (
-                    <ShiftReceipt ref={receiptRef} summary={summary} />
-                  ) : null}
-                </div>
-                <DialogFooter className="gap-2 flex-wrap">
-                  <Button variant="outline" onClick={copySummary} disabled={!summary} className="gap-2"><Copy className="h-4 w-4" /> Copy text</Button>
-                  <Button variant="outline" onClick={shareSummary} disabled={!summary} className="gap-2"><Share2 className="h-4 w-4" /> Share</Button>
-                  <Button onClick={saveAsImage} disabled={!summary} className="gap-2"><Camera className="h-4 w-4" /> Save image</Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          <Button variant="outline" size="sm" onClick={refresh} className="gap-2">
-            <RefreshCw className="h-4 w-4" /> Refresh
-          </Button>
-        </div>
-      </div>
-
-      {loading ? (
-        <div className="text-sm text-muted-foreground">Loading…</div>
-      ) : !report ? (
-        <Card><CardContent className="py-8 text-sm text-muted-foreground">No shift found. Time in from the Timeclock page to start one.</CardContent></Card>
-      ) : (
-        <>
-          <Card>
-            <CardHeader><CardTitle>Shift details</CardTitle></CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                <Field label="Barista" value={report.user_email ?? "—"} />
-                <Field label="Business date" value={report.shift.business_date} />
-                <Field label="Time in" value={fmtTime(report.shift.clock_in)} />
-                <Field label="Time out" value={report.shift.clock_out ? fmtTime(report.shift.clock_out) : <Badge variant="secondary">In progress</Badge>} />
-                <Field label="Starting balance (total)" value={peso(balances.reduce((s, b) => s + Number(b.starting || 0), 0))} />
-                <Field label="Breaks (total)" value={`${(report.break_seconds / 60).toFixed(0)} min`} />
-                <Field label="Approved leave deduction" value={`${report.leave_hours_deducted} h`} />
-                <Field label="Net worked hours" value={`${report.net_worked_hours} h`} />
-                <Field
-                  label="Upsell rate"
-                  value={
-                    upsellStats && upsellStats.offers > 0
-                      ? `${((upsellStats.added / upsellStats.offers) * 100).toFixed(1)}% (${upsellStats.added}/${upsellStats.offers})`
-                      : "—"
-                  }
-                />
-                <Field
-                  label="Skip rate"
-                  value={
-                    upsellStats && upsellStats.offers > 0
-                      ? `${((upsellStats.skipped / upsellStats.offers) * 100).toFixed(1)}%`
-                      : "—"
-                  }
-                />
-              </div>
-              {isAdmin ? (
-                <div className="mt-4 rounded-md border p-3 space-y-2">
-                  <Label htmlFor="edit-start-cash">
-                    Edit starting cash for {report.shift.business_date} (currently {peso(report.shift.starting_cash)})
-                  </Label>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Input id="edit-start-cash" type="number" min="0" step="0.01" className="w-40"
-                      placeholder={Number(report.shift.starting_cash).toFixed(2)}
-                      value={cashInput} onChange={(e) => setCashInput(e.target.value)} />
-                    {prevClosing != null && (
-                      <Button size="sm" variant="outline" onClick={() => setCashInput(prevClosing.toFixed(2))}>
-                        Use yesterday's closing ({peso(prevClosing)})
-                      </Button>
-                    )}
-                    <Button size="sm" onClick={editStartingCash} disabled={savingCash}>Update</Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Starting cash is filled in automatically from yesterday's closing. Only admins and developers
-                    can correct it here if there's an issue.
-                  </p>
-                </div>
-              ) : (
-                <p className="mt-4 text-xs text-muted-foreground">
-                  Starting cash is set automatically from yesterday's closing
-                  {prevClosing != null ? ` (${peso(prevClosing)})` : ""}. Ask an admin if it needs correcting.
-                </p>
-              )}
-
-
-
-              {report.breaks.length > 0 && (
-                <div className="mt-4">
-                  <div className="text-xs text-muted-foreground mb-1">Breaks</div>
-                  <div className="flex flex-wrap gap-2">
-                    {report.breaks.map((b) => (
-                      <Badge key={b.id} variant="outline" className="capitalize">
-                        {b.type}: {fmtTime(b.started_at)} → {b.ended_at ? fmtTime(b.ended_at) : "ongoing"}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Net by payment method · {report.shift.business_date}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {balances.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No payment methods set up yet (Settings → Payment Methods).</p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Method</TableHead>
-                      <TableHead className="text-right">Sales</TableHead>
-                      <TableHead className="text-right">Expenses</TableHead>
-                      <TableHead className="text-right">Net</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {balances.map((b) => (
-                      <TableRow key={b.code}>
-                        <TableCell className="font-medium">{b.label}</TableCell>
-                        <TableCell className="text-right">{peso(b.sales)}</TableCell>
-                        <TableCell className="text-right">{peso(b.expenses)}</TableCell>
-                        <TableCell className="text-right font-semibold">{peso(Number(b.sales) - Number(b.expenses))}</TableCell>
-                      </TableRow>
-                    ))}
-                    <TableRow>
-                      <TableCell className="text-right font-semibold">Total</TableCell>
-                      <TableCell className="text-right font-semibold">{peso(sumBy(balances, "sales"))}</TableCell>
-                      <TableCell className="text-right font-semibold">{peso(sumBy(balances, "expenses"))}</TableCell>
-                      <TableCell className="text-right font-semibold">{peso(sumBy(balances, "sales") - sumBy(balances, "expenses"))}</TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-
+  const expensesCard = (
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Expenses</CardTitle>
@@ -599,7 +436,7 @@ function EndOfShiftPage() {
               )}
             </CardHeader>
             <CardContent className="space-y-4">
-              {report.shift.clock_out ? (
+              {shiftClosed ? (
                 <p className="text-xs text-muted-foreground">Shift is closed — expenses are read-only.</p>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-2 items-end">
@@ -720,7 +557,7 @@ function EndOfShiftPage() {
                           )}
                         </TableCell>
                         <TableCell className="text-right">
-                          {!report.shift.clock_out && (
+                          {!shiftClosed && (
                             <Button size="icon" variant="ghost" onClick={() => deleteExpense(e.id)}>
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -738,7 +575,181 @@ function EndOfShiftPage() {
               )}
             </CardContent>
           </Card>
+  );
 
+  return (
+    <div className="p-6 max-w-5xl mx-auto space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-display flex items-center gap-2">
+            <ClipboardList className="h-6 w-6" /> End of Shift Report
+          </h1>
+          <p className="text-sm text-muted-foreground">Latest shift summary in Manila time.</p>
+        </div>
+        <div className="flex gap-2">
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button size="sm" className="gap-2"><Share2 className="h-4 w-4" /> Share summary</Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md">
+                <DialogHeader><DialogTitle>Shift summary</DialogTitle></DialogHeader>
+                <div className="flex items-end gap-2 border-b pb-3">
+                  <div className="flex-1">
+                    <Label htmlFor="summary-date">Show summary for</Label>
+                    <Input id="summary-date" type="date" max={manilaToday()}
+                      value={viewDate || bizDate || manilaToday()}
+                      onChange={(e) => setViewDate(e.target.value)} />
+                  </div>
+                  <Button size="sm" variant="outline" disabled={!picked || !report}
+                    onClick={() => setViewDate("")}>Latest shift</Button>
+                </div>
+                <div className="max-h-[70vh] overflow-y-auto -mx-2 px-2">
+                  {dayLoading ? (
+                    <div className="py-10 text-center text-sm text-muted-foreground">Loading…</div>
+                  ) : dayError ? (
+                    <p className="py-10 text-center text-sm text-destructive">{dayError}</p>
+                  ) : summary ? (
+                    <ShiftReceipt ref={receiptRef} summary={summary} />
+                  ) : null}
+                </div>
+                <DialogFooter className="gap-2 flex-wrap">
+                  <Button variant="outline" onClick={copySummary} disabled={!summary} className="gap-2"><Copy className="h-4 w-4" /> Copy text</Button>
+                  <Button variant="outline" onClick={shareSummary} disabled={!summary} className="gap-2"><Share2 className="h-4 w-4" /> Share</Button>
+                  <Button onClick={saveAsImage} disabled={!summary} className="gap-2"><Camera className="h-4 w-4" /> Save image</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          <Button variant="outline" size="sm" onClick={refresh} className="gap-2">
+            <RefreshCw className="h-4 w-4" /> Refresh
+          </Button>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="text-sm text-muted-foreground">Loading…</div>
+      ) : !report ? (
+        <>
+          <Card><CardContent className="py-8 text-sm text-muted-foreground">
+            {canExpenseWithoutShift
+              ? "You haven't timed in — you can still record expenses below. They're added to today's business day."
+              : "No shift found. Time in from the Timeclock page to start one."}
+          </CardContent></Card>
+          {canExpenseWithoutShift && expensesCard}
+        </>
+      ) : (
+        <>
+          <Card>
+            <CardHeader><CardTitle>Shift details</CardTitle></CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <Field label="Barista" value={report.user_email ?? "—"} />
+                <Field label="Business date" value={report.shift.business_date} />
+                <Field label="Time in" value={fmtTime(report.shift.clock_in)} />
+                <Field label="Time out" value={report.shift.clock_out ? fmtTime(report.shift.clock_out) : <Badge variant="secondary">In progress</Badge>} />
+                <Field label="Starting balance (total)" value={peso(balances.reduce((s, b) => s + Number(b.starting || 0), 0))} />
+                <Field label="Breaks (total)" value={`${(report.break_seconds / 60).toFixed(0)} min`} />
+                <Field label="Approved leave deduction" value={`${report.leave_hours_deducted} h`} />
+                <Field label="Net worked hours" value={`${report.net_worked_hours} h`} />
+                <Field
+                  label="Upsell rate"
+                  value={
+                    upsellStats && upsellStats.offers > 0
+                      ? `${((upsellStats.added / upsellStats.offers) * 100).toFixed(1)}% (${upsellStats.added}/${upsellStats.offers})`
+                      : "—"
+                  }
+                />
+                <Field
+                  label="Skip rate"
+                  value={
+                    upsellStats && upsellStats.offers > 0
+                      ? `${((upsellStats.skipped / upsellStats.offers) * 100).toFixed(1)}%`
+                      : "—"
+                  }
+                />
+              </div>
+              {isAdmin ? (
+                <div className="mt-4 rounded-md border p-3 space-y-2">
+                  <Label htmlFor="edit-start-cash">
+                    Edit starting cash for {report.shift.business_date} (currently {peso(report.shift.starting_cash)})
+                  </Label>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Input id="edit-start-cash" type="number" min="0" step="0.01" className="w-40"
+                      placeholder={Number(report.shift.starting_cash).toFixed(2)}
+                      value={cashInput} onChange={(e) => setCashInput(e.target.value)} />
+                    {prevClosing != null && (
+                      <Button size="sm" variant="outline" onClick={() => setCashInput(prevClosing.toFixed(2))}>
+                        Use yesterday's closing ({peso(prevClosing)})
+                      </Button>
+                    )}
+                    <Button size="sm" onClick={editStartingCash} disabled={savingCash}>Update</Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Starting cash is filled in automatically from yesterday's closing. Only admins and developers
+                    can correct it here if there's an issue.
+                  </p>
+                </div>
+              ) : (
+                <p className="mt-4 text-xs text-muted-foreground">
+                  Starting cash is set automatically from yesterday's closing
+                  {prevClosing != null ? ` (${peso(prevClosing)})` : ""}. Ask an admin if it needs correcting.
+                </p>
+              )}
+
+
+
+              {report.breaks.length > 0 && (
+                <div className="mt-4">
+                  <div className="text-xs text-muted-foreground mb-1">Breaks</div>
+                  <div className="flex flex-wrap gap-2">
+                    {report.breaks.map((b) => (
+                      <Badge key={b.id} variant="outline" className="capitalize">
+                        {b.type}: {fmtTime(b.started_at)} → {b.ended_at ? fmtTime(b.ended_at) : "ongoing"}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Net by payment method · {report.shift.business_date}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {balances.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No payment methods set up yet (Settings → Payment Methods).</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Method</TableHead>
+                      <TableHead className="text-right">Sales</TableHead>
+                      <TableHead className="text-right">Expenses</TableHead>
+                      <TableHead className="text-right">Net</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {balances.map((b) => (
+                      <TableRow key={b.code}>
+                        <TableCell className="font-medium">{b.label}</TableCell>
+                        <TableCell className="text-right">{peso(b.sales)}</TableCell>
+                        <TableCell className="text-right">{peso(b.expenses)}</TableCell>
+                        <TableCell className="text-right font-semibold">{peso(Number(b.sales) - Number(b.expenses))}</TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow>
+                      <TableCell className="text-right font-semibold">Total</TableCell>
+                      <TableCell className="text-right font-semibold">{peso(sumBy(balances, "sales"))}</TableCell>
+                      <TableCell className="text-right font-semibold">{peso(sumBy(balances, "expenses"))}</TableCell>
+                      <TableCell className="text-right font-semibold">{peso(sumBy(balances, "sales") - sumBy(balances, "expenses"))}</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+          {expensesCard}
         </>
       )}
 
