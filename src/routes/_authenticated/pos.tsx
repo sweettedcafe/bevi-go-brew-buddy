@@ -1508,6 +1508,7 @@ function POSPage() {
         total={total}
         methods={pms}
         onConfirm={async (splits) => {
+          if (!activeBarista) { toast.error("Enter your barista PIN first"); setBaristaOpen(true); return; }
           const payments = splits.map((s) => {
             const pm = pms.find((x) => x.code === s.method_code)!;
             const amt = Number(s.amount) || 0;
