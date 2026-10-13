@@ -175,6 +175,39 @@ function POSPage() {
     return () => { alive = false; };
   }, [user?.id]);
 
+  // Auto-lock: after 5 minutes without use, or when the tablet sleeps / the app is
+  // hidden for 5+ minutes, the barista must re-enter their PIN.
+  useEffect(() => {
+    const IDLE_MS = 5 * 60 * 1000;
+    let last = Date.now();
+    let hiddenAt: number | null = null;
+    const lock = () => {
+      setActiveBarista((cur) => {
+        if (cur) toast.message("POS locked — enter your PIN to continue");
+        return null;
+      });
+      setBaristaOpen(true);
+    };
+    const touch = () => { last = Date.now(); };
+    const onVis = () => {
+      if (document.hidden) { hiddenAt = Date.now(); return; }
+      if (hiddenAt && Date.now() - hiddenAt >= IDLE_MS) lock();
+      hiddenAt = null; last = Date.now();
+    };
+    const evs = ["pointerdown", "keydown", "touchstart", "wheel"] as const;
+    evs.forEach((e) => window.addEventListener(e, touch, { passive: true }));
+    document.addEventListener("visibilitychange", onVis);
+    // Timers pause while a tablet sleeps, so compare wall-clock time on every tick.
+    const t = window.setInterval(() => {
+      if (Date.now() - last >= IDLE_MS) { last = Date.now(); lock(); }
+    }, 15000);
+    return () => {
+      evs.forEach((e) => window.removeEventListener(e, touch));
+      document.removeEventListener("visibilitychange", onVis);
+      window.clearInterval(t);
+    };
+  }, []);
+
 
 
   useEffect(() => {
