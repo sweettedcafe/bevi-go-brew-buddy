@@ -350,7 +350,7 @@ function ReportsPage() {
           cashier_email: cashierEmail,
           placed_by: placedByCustomer ? "Customer" : "Cashier",
           upsell: it.is_upsell ? "Yes" : "No",
-          qty: Number(it.qty || 0),
+          qty: (o.txn_kind ?? "sale") !== "sale" ? -Math.abs(Number(it.qty || 0)) : Number(it.qty || 0),
           unit_price: Number(it.unit_price || 0),
           addon_total: Number(it.addon_total || 0),
           gross_sale: gross,
@@ -473,7 +473,7 @@ function ReportsPage() {
       disc += oDisc;
       fee += oFee;
       net += scopedGross - oDisc - oFee;
-      qty += scoped.reduce((s, x) => s + Number(x.qty || 0), 0);
+      qty += scoped.reduce((s, x) => s + ((o.txn_kind ?? "sale") !== "sale" ? -Math.abs(Number(x.qty || 0)) : Number(x.qty || 0)), 0);
       if ((o.txn_kind ?? "sale") === "sale" && st !== "voided" && st !== "refunded") count++;
     }
     return { gross, disc, fee, net, qty, count, held, heldCount };
