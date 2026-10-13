@@ -749,8 +749,7 @@ function EndOfShiftPage() {
               )}
             </CardContent>
           </Card>
-
-
+          {expensesCard}
         </>
       )}
 
