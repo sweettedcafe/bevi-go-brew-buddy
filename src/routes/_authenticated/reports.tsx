@@ -511,6 +511,7 @@ function ReportsPage() {
     if (["subtotal", "discount_total", "total", "fee_amount", "revenue", "gross_sale", "unit_price", "addon_total", "qty", "items_count"].includes(key))
       return v == null || v === "" ? 0 : Number(v);
     if (key === "txn_kind") return txnLabel(row);
+    if (key === "status") return row?.txn_kind === "void" ? "voided" : row?.txn_kind === "refund" ? "refunded" : (v ?? "");
     return v ?? "";
   }
 
