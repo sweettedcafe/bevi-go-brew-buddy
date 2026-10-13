@@ -271,6 +271,7 @@ function InventoryPage() {
 
 function AddPacksDialog({ item, onClose, onDone }: { item: Inv; onClose: () => void; onDone: () => void }) {
   const [packs, setPacks] = useState("1");
+  const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const packSize = Number(item.pack_size) || 0;
   const n = Number(packs) || 0;
@@ -278,8 +279,9 @@ function AddPacksDialog({ item, onClose, onDone }: { item: Inv; onClose: () => v
   async function go() {
     if (packSize <= 0) return toast.error("Pack size not configured for this item");
     if (n <= 0) return toast.error("Enter a positive number of packs");
+    if (!note.trim()) return toast.error("Please add a note explaining this stock adjustment");
     setBusy(true);
-    const { error } = await db.rpc("inventory_add_packs", { p_item_id: item.id, p_packs: n });
+    const { error } = await db.rpc("inventory_add_packs", { p_item_id: item.id, p_packs: n, p_note: note.trim() });
     setBusy(false);
     if (error) return toast.error(error.message);
     toast.success(`Added ${n} ${item.pack_label || "pack"}${n === 1 ? "" : "s"} (${addedUnits} ${item.unit})`);
@@ -297,6 +299,8 @@ function AddPacksDialog({ item, onClose, onDone }: { item: Inv; onClose: () => v
         <div className="space-y-2">
           <label className="text-xs text-muted-foreground">Number of {item.pack_label || "pack"}s received</label>
           <Input type="number" min={1} step={1} value={packs} onChange={(e) => setPacks(e.target.value)} autoFocus />
+          <label className="text-xs text-muted-foreground">Note (required)</label>
+          <Input placeholder="delivery from supplier, recount, transfer in…" value={note} onChange={(e) => setNote(e.target.value)} />
           {n > 0 && packSize > 0 && (
             <div className="text-xs text-muted-foreground">
               Adds <b>{addedUnits.toLocaleString()} {item.unit}</b> to current stock.
@@ -323,6 +327,7 @@ function DeductPacksDialog({ item, onClose, onDone }: { item: Inv; onClose: () =
   async function go() {
     if (packSize <= 0) return toast.error("Pack size not configured for this item");
     if (n <= 0) return toast.error("Enter a positive number of packs");
+    if (!reason.trim()) return toast.error("Please add a note explaining this stock adjustment");
     if (units > stock) return toast.error(`Only ${stock.toLocaleString()} ${item.unit} in stock`);
     setBusy(true);
     const { error } = await db.rpc("inventory_remove_packs", {
@@ -345,7 +350,7 @@ function DeductPacksDialog({ item, onClose, onDone }: { item: Inv; onClose: () =
         <div className="space-y-2">
           <label className="text-xs text-muted-foreground">Number of {item.pack_label || "pack"}s to deduct</label>
           <Input type="number" min={1} step={1} value={packs} onChange={(e) => setPacks(e.target.value)} autoFocus />
-          <label className="text-xs text-muted-foreground">Reason (optional)</label>
+          <label className="text-xs text-muted-foreground">Note (required)</label>
           <Input placeholder="spoilage, spillage, transfer…" value={reason} onChange={(e) => setReason(e.target.value)} />
           {n > 0 && packSize > 0 && (
             <div className="text-xs text-muted-foreground">
