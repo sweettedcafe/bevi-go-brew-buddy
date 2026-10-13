@@ -743,7 +743,6 @@ function EndOfShiftPage() {
                       <TableCell className="text-right font-semibold">{peso(sumBy(balances, "sales"))}</TableCell>
                       <TableCell className="text-right font-semibold">{peso(sumBy(balances, "expenses"))}</TableCell>
                       <TableCell className="text-right font-semibold">{peso(sumBy(balances, "sales") - sumBy(balances, "expenses"))}</TableCell>
-          {expensesCard}
                     </TableRow>
                   </TableBody>
                 </Table>
