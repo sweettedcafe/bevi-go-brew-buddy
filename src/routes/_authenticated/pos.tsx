@@ -159,32 +159,22 @@ function POSPage() {
   type StaffRow = { user_id: string; email: string; full_name: string; role: string | null };
   const [staffList, setStaffList] = useState<StaffRow[]>([]);
   const [baristaOpen, setBaristaOpen] = useState(false);
-  const [activeBarista, setActiveBarista] = useState<{ id: string; name: string } | null>(() => {
-    try {
-      const raw = localStorage.getItem("bevi.pos.barista");
-      return raw ? JSON.parse(raw) : null;
-    } catch { return null; }
-  });
+  // Barista on duty must always be unlocked with their PIN — never restored or auto-picked.
+  const [activeBarista, setActiveBarista] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     let alive = true;
+    try { localStorage.removeItem("bevi.pos.barista"); } catch { /* ignore */ }
     void (async () => {
       const { data } = await db.rpc("pos_staff_list");
       if (!alive) return;
-      const list = ((data ?? []) as StaffRow[]);
+      const list = ((data ?? []) as StaffRow[]).filter((s) => s.role === "barista");
       setStaffList(list);
-      setActiveBarista((cur) => {
-        if (cur && list.some((s) => s.user_id === cur.id)) return cur;
-        const me = list.find((s) => s.user_id === user?.id && s.role === "barista");
-        return me ? { id: me.user_id, name: me.full_name } : cur;
-      });
+      setBaristaOpen(true);
     })();
     return () => { alive = false; };
   }, [user?.id]);
 
-  useEffect(() => {
-    if (activeBarista) localStorage.setItem("bevi.pos.barista", JSON.stringify(activeBarista));
-  }, [activeBarista]);
 
 
   useEffect(() => {
