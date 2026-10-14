@@ -147,10 +147,13 @@ function POSPage() {
   const [scanBusy, setScanBusy] = useState(false);
   const [redeem, setRedeem] = useState<string>("");
   const [redeemApplied, setRedeemApplied] = useState(0);
-  const [loyaltyCfg, setLoyaltyCfg] = useState<{ is_active: boolean; redeem_threshold: number; redeem_value: number } | null>(null);
+  const [loyaltyCfg, setLoyaltyCfg] = useState<{ is_active: boolean; redeem_threshold: number; redeem_value: number; show_to_barista: boolean } | null>(null);
   useEffect(() => {
-    void (supabase as any).from("loyalty_settings").select("is_active, redeem_threshold, redeem_value").eq("id", 1).maybeSingle()
-      .then(({ data }: any) => { if (data) setLoyaltyCfg({ is_active: !!data.is_active, redeem_threshold: Number(data.redeem_threshold) || 0, redeem_value: Number(data.redeem_value) || 0 }); });
+    void (supabase as any).from("loyalty_settings").select("*").eq("id", 1).maybeSingle()
+      .then(({ data }: any) => { if (data) setLoyaltyCfg({ is_active: !!data.is_active, redeem_threshold: Number(data.redeem_threshold) || 0, redeem_value: Number(data.redeem_value) || 0, show_to_barista: data.show_to_barista !== false }); });
+  }, []);
+  const hidePoints = primaryRole === "barista" && loyaltyCfg?.show_to_barista === false;
+  useEffect(() => {
   }, []);
   const [cameraOpen, setCameraOpen] = useState(false);
   const scanRef = useRef<HTMLInputElement>(null);
@@ -604,7 +607,7 @@ function POSPage() {
       setCustomer(c);
       setCustomerName(c.name);
       void loadDiscountsToday(c.id);
-      toast.success(`${c.name} · ${c.points} pts`);
+      toast.success(hidePoints ? c.name : `${c.name} · ${c.points} pts`);
     } finally {
       setScanBusy(false);
       setScanInput("");
@@ -1262,9 +1265,11 @@ function POSPage() {
                     #{customer.code}{customer.phone ? ` · ${customer.phone}` : ""}
                   </div>
                 </div>
+                {!hidePoints && (
                 <Badge variant="secondary" className="gap-1">
                   <Star className="h-3 w-3" /> {customer.points} pts
                 </Badge>
+                )}
                 <Badge variant={discountsToday ? "destructive" : "outline"} title="Discounts/promos used today">
                   {discountsToday === null ? "…" : discountsToday} discount{discountsToday === 1 ? "" : "s"} today
                 </Badge>
@@ -1273,7 +1278,7 @@ function POSPage() {
                 </Button>
               </div>
 
-              {customer.points > 0 && (
+              {!hidePoints && customer.points > 0 && (
                 <div className="flex items-center gap-2">
                   <label className="text-[11px] text-muted-foreground whitespace-nowrap">Redeem pts</label>
                   <Input
@@ -1299,7 +1304,7 @@ function POSPage() {
                   )}
                 </div>
               )}
-              {customer.points > 0 && loyaltyCfg && loyaltyCfg.redeem_threshold > 0 && (
+              {!hidePoints && customer.points > 0 && loyaltyCfg && loyaltyCfg.redeem_threshold > 0 && (
                 <div className="text-[11px] text-muted-foreground">
                   {loyaltyCfg.redeem_threshold} pts = {fmt(loyaltyCfg.redeem_value)} off
                   {redeemApplied > 0 && <> · Remaining after order: <b>{customer.points - redeemApplied} pts</b></>}

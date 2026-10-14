@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { Users, QrCode, Plus, Search, Star, Printer, Save, ExternalLink, Trash2, Undo2 } from "lucide-react";
+import { Users, QrCode, Plus, Search, Star, Printer, Save, ExternalLink, Trash2, Undo2, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { QrCanvas, BarcodeSvg } from "@/components/customers/CodeRenderers";
 import { useAuth } from "@/lib/auth-context";
@@ -30,6 +30,7 @@ type Customer = {
 type Loyalty = {
   is_active: boolean; earn_rate: number;
   redeem_threshold: number; redeem_value: number;
+  show_to_barista?: boolean;
 };
 
 function CustomersPage() {
@@ -163,7 +164,20 @@ function CustomersPage() {
 function LoyaltyCard({ loyalty, onSaved }: { loyalty: Loyalty; onSaved: () => void }) {
   const [l, setL] = useState(loyalty);
   const [saving, setSaving] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const { hasRole } = useAuth();
+  const canManage = hasRole("admin") || hasRole("developer") || hasRole("partner" as any);
   useEffect(() => setL(loyalty), [loyalty]);
+  async function resetAll() {
+    if (!confirm("Reset ALL customers' loyalty points to 0? This cannot be undone.")) return;
+    if (prompt('Type RESET to confirm') !== "RESET") return;
+    setResetting(true);
+    const { data, error } = await db.rpc("loyalty_reset_all_points");
+    setResetting(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success(`Points reset to 0 for ${data ?? 0} customer(s)`);
+    onSaved();
+  }
   async function save() {
     setSaving(true);
     const { error } = await db.from("loyalty_settings").update({
@@ -171,6 +185,7 @@ function LoyaltyCard({ loyalty, onSaved }: { loyalty: Loyalty; onSaved: () => vo
       earn_rate: Number(l.earn_rate) || 0,
       redeem_threshold: Number(l.redeem_threshold) || 0,
       redeem_value: Number(l.redeem_value) || 0,
+      show_to_barista: l.show_to_barista !== false,
       updated_at: new Date().toISOString(),
     }).eq("id", 1);
     setSaving(false);
@@ -207,7 +222,21 @@ function LoyaltyCard({ loyalty, onSaved }: { loyalty: Loyalty; onSaved: () => vo
         Example: at {l.earn_rate} pt/₱, a ₱150 order earns {Math.floor(150 * Number(l.earn_rate))} pts.
         Redeem {l.redeem_threshold} pts for ₱{Number(l.redeem_value).toFixed(2)} off.
       </div>
-      <div><Button size="sm" onClick={save} disabled={saving}><Save className="h-3 w-3 mr-1" />Save</Button></div>
+      {canManage && (
+        <div className="flex items-center gap-2">
+          <Switch checked={l.show_to_barista !== false}
+            onCheckedChange={(v) => setL({ ...l, show_to_barista: v })} />
+          <Label className="text-sm">Show loyalty points to baristas in POS</Label>
+        </div>
+      )}
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" onClick={save} disabled={saving}><Save className="h-3 w-3 mr-1" />Save</Button>
+        {canManage && (
+          <Button size="sm" variant="destructive" className="ml-auto" onClick={resetAll} disabled={resetting}>
+            <RotateCcw className="h-3 w-3 mr-1" /> Reset all points to 0
+          </Button>
+        )}
+      </div>
     </Card>
   );
 }
