@@ -11,3 +11,6 @@
 - [x] Required note on add/deduct stock
 - [x] POS Redeem points button, discount line, remaining balance
 - [ ] User runs supabase_phase62_schema.sql
+# Phase 65
+- [x] Allow negative expenses; Starting Balance = yesterday EOD per method
+- [ ] User runs supabase_phase65_schema.sql
