@@ -153,8 +153,6 @@ function POSPage() {
       .then(({ data }: any) => { if (data) setLoyaltyCfg({ is_active: !!data.is_active, redeem_threshold: Number(data.redeem_threshold) || 0, redeem_value: Number(data.redeem_value) || 0, show_to_barista: data.show_to_barista !== false }); });
   }, []);
   const hidePoints = primaryRole === "barista" && loyaltyCfg?.show_to_barista === false;
-  useEffect(() => {
-  }, []);
   const [cameraOpen, setCameraOpen] = useState(false);
   const scanRef = useRef<HTMLInputElement>(null);
 
