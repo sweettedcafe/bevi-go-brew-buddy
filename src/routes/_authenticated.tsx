@@ -46,7 +46,7 @@ export const GROUPS: NavGroup[] = [
   {
     id: "customers", label: "Customers", icon: Users, items: [
       { to: "/customers", label: "Customers", icon: Users, roles: ["developer", "admin"] },
-      { to: "/discounts", label: "Discounts", icon: Tag, roles: ["developer", "admin"] },
+      { to: "/discounts", label: "Discounts", icon: Tag, roles: ["developer", "admin", "partner"] },
     ],
   },
   {
