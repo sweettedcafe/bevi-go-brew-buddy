@@ -14,3 +14,7 @@
 # Phase 65
 - [x] Allow negative expenses; Starting Balance = yesterday EOD per method
 - [ ] User runs supabase_phase65_schema.sql
+# Phase 67
+- [x] Partner can edit Inventory (menu, page controls, SQL policy + CSV import)
+- [x] Access Control: removed Default roles column; ticked boxes = access
+- [ ] User runs supabase_phase67_schema.sql
