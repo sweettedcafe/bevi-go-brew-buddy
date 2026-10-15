@@ -44,7 +44,7 @@ import { Check } from "lucide-react";
 
 function DiscountsPage() {
   const { primaryRole } = useAuth();
-  const isAdmin = primaryRole === "admin" || primaryRole === "developer";
+  const isAdmin = primaryRole === "admin" || primaryRole === "developer" || primaryRole === "partner";
   const [rows, setRows] = useState<Discount[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Discount | null>(null);
