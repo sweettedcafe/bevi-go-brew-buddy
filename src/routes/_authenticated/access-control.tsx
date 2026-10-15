@@ -4,7 +4,6 @@ import { supabase, type AppRole } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { GROUPS } from "@/routes/_authenticated";
 import { PasswordResetCard } from "@/components/PasswordResetCard";
@@ -81,7 +80,7 @@ function AccessControlPage() {
       <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground mb-2">Settings</p>
       <h1 className="text-4xl font-display mb-2">Access Control</h1>
       <p className="text-sm text-muted-foreground mb-6">
-        Grant additional menu access to non-developer roles. Developer Tools cannot be shared.
+        Tick the menu items each role can open. Whatever is ticked is exactly what that role can access. Developer Tools cannot be shared.
       </p>
 
       <Card>
@@ -97,7 +96,6 @@ function AccessControlPage() {
                 <thead>
                   <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground border-b">
                     <th className="py-2 pr-4">Menu item</th>
-                    <th className="py-2 pr-4">Default roles</th>
                     {GRANTABLE_ROLES.map((r) => (
                       <th key={r} className="py-2 px-3 capitalize text-center">{r}</th>
                     ))}
@@ -110,13 +108,6 @@ function AccessControlPage() {
                         <div className="font-medium">{row.label}</div>
                         <div className="text-xs text-muted-foreground">
                           {row.groupLabel} · <code>{row.path}</code>
-                        </div>
-                      </td>
-                      <td className="py-2 pr-4">
-                        <div className="flex flex-wrap gap-1">
-                          {row.defaults.map((r) => (
-                            <Badge key={r} variant="secondary" className="capitalize text-[10px]">{r}</Badge>
-                          ))}
                         </div>
                       </td>
                       {GRANTABLE_ROLES.map((r) => {
@@ -140,7 +131,7 @@ function AccessControlPage() {
                 </tbody>
               </table>
               <p className="text-xs text-muted-foreground mt-4">
-                Every box can be switched on or off, including default access. Changes take effect the next time
+                Every box can be switched on or off. Changes take effect the next time
                 that user reloads the app. Admins always keep access to this page.
               </p>
             </div>

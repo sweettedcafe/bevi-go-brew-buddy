@@ -51,8 +51,8 @@ function stateOf(it: Inv): "ok" | "low" | "critical" {
 
 function InventoryPage() {
   const { roles, primaryRole } = useAuth();
-  const isAdmin = roles.includes("admin") || roles.includes("developer")
-    || primaryRole === "admin" || primaryRole === "developer";
+  const isAdmin = roles.includes("admin") || roles.includes("developer") || roles.includes("partner" as any)
+    || primaryRole === "admin" || primaryRole === "developer" || primaryRole === "partner";
   // Baristas may adjust pack counts, but not edit/create items.
   const canAdjustPacks = isAdmin || roles.includes("barista") || primaryRole === "barista";
   const isDeveloper = roles.includes("developer") || primaryRole === "developer";
@@ -218,7 +218,7 @@ function InventoryPage() {
                       {isAdmin && (
                         <Switch checked={r.is_active} onCheckedChange={() => toggleActive(r)} />
                       )}
-                      {isDeveloper && (
+                      {(isDeveloper || isAdmin) && (
                         <Button size="icon" variant="ghost" onClick={() => setEditing(r)}>
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
