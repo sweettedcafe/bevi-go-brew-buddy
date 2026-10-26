@@ -127,6 +127,19 @@ function AuthenticatedLayout() {
     );
   }
 
+  if (roles.length === 0) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background px-4">
+        <div className="max-w-sm text-center space-y-4">
+          <img src={logo} alt="Bevi & Go" className="h-12 w-auto mx-auto" />
+          <h1 className="text-2xl font-display">No staff access</h1>
+          <p className="text-sm text-muted-foreground">This account is not a Bevi &amp; Go staff member. Ask an admin for access.</p>
+          <Button onClick={async () => { await signOut(); navigate({ to: "/login", replace: true }); }} className="w-full">Sign out</Button>
+        </div>
+      </div>
+    );
+  }
+
   const effectiveRoles: AppRole[] = roles.length > 0 ? roles : [primaryRole ?? "barista"];
   const grantedPaths = new Set(
     grants.filter((g) => g.allowed && effectiveRoles.includes(g.role)).map((g) => g.path),

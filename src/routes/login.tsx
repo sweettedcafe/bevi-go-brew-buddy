@@ -98,23 +98,9 @@ function LoginPage() {
             </Button>
           </form>
 
-          <div className="mt-6 text-center text-sm text-muted-foreground">
-            {mode === "signin" ? (
-              <>New here?{" "}
-                <button onClick={() => setMode("signup")} className="text-primary hover:underline font-medium">
-                  Create an account
-                </button>
-              </>
-            ) : (
-              <>Already have an account?{" "}
-                <button onClick={() => setMode("signin")} className="text-primary hover:underline font-medium">
-                  Sign in
-                </button>
-              </>
-            )}
-          </div>
           {mode === "signin" && (
             <div className="mt-3 text-center">
+              <p className="text-xs text-muted-foreground mb-2">Staff accounts are created by an admin.</p>
               <Link to="/forgot-password" className="text-xs text-primary hover:underline font-medium">
                 Forgot password?
               </Link>

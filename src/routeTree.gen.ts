@@ -42,6 +42,7 @@ import { Route as AuthenticatedStaffRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedTimeclockRouteImport } from './routes/_authenticated/timeclock'
 import { Route as AuthenticatedTimeclockReportRouteImport } from './routes/_authenticated/timeclock-report'
 import { Route as OTokenRouteImport } from './routes/o.$token'
+import { Route as ApiPublicCreateStaffUserRouteImport } from './routes/api/public/create-staff-user'
 import { Route as ApiPublicDevListUsersRouteImport } from './routes/api/public/dev-list-users'
 import { Route as ApiPublicDevSetPasswordRouteImport } from './routes/api/public/dev-set-password'
 import { Route as ApiPublicMenuImagesRouteImport } from './routes/api/public/menu-images'
@@ -220,6 +221,12 @@ const OTokenRoute = OTokenRouteImport.update({
   path: '/o/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicCreateStaffUserRoute =
+  ApiPublicCreateStaffUserRouteImport.update({
+    id: '/api/public/create-staff-user',
+    path: '/api/public/create-staff-user',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicDevListUsersRoute = ApiPublicDevListUsersRouteImport.update({
   id: '/api/public/dev-list-users',
   path: '/api/public/dev-list-users',
@@ -287,6 +294,7 @@ export interface FileRoutesByFullPath {
   '/timeclock': typeof AuthenticatedTimeclockRoute
   '/timeclock-report': typeof AuthenticatedTimeclockReportRoute
   '/o/$token': typeof OTokenRoute
+  '/api/public/create-staff-user': typeof ApiPublicCreateStaffUserRoute
   '/api/public/dev-list-users': typeof ApiPublicDevListUsersRoute
   '/api/public/dev-set-password': typeof ApiPublicDevSetPasswordRoute
   '/api/public/menu-images': typeof ApiPublicMenuImagesRoute
@@ -327,6 +335,7 @@ export interface FileRoutesByTo {
   '/timeclock': typeof AuthenticatedTimeclockRoute
   '/timeclock-report': typeof AuthenticatedTimeclockReportRoute
   '/o/$token': typeof OTokenRoute
+  '/api/public/create-staff-user': typeof ApiPublicCreateStaffUserRoute
   '/api/public/dev-list-users': typeof ApiPublicDevListUsersRoute
   '/api/public/dev-set-password': typeof ApiPublicDevSetPasswordRoute
   '/api/public/menu-images': typeof ApiPublicMenuImagesRoute
@@ -369,6 +378,7 @@ export interface FileRoutesById {
   '/_authenticated/timeclock': typeof AuthenticatedTimeclockRoute
   '/_authenticated/timeclock-report': typeof AuthenticatedTimeclockReportRoute
   '/o/$token': typeof OTokenRoute
+  '/api/public/create-staff-user': typeof ApiPublicCreateStaffUserRoute
   '/api/public/dev-list-users': typeof ApiPublicDevListUsersRoute
   '/api/public/dev-set-password': typeof ApiPublicDevSetPasswordRoute
   '/api/public/menu-images': typeof ApiPublicMenuImagesRoute
@@ -411,6 +421,7 @@ export interface FileRouteTypes {
     | '/timeclock'
     | '/timeclock-report'
     | '/o/$token'
+    | '/api/public/create-staff-user'
     | '/api/public/dev-list-users'
     | '/api/public/dev-set-password'
     | '/api/public/menu-images'
@@ -451,6 +462,7 @@ export interface FileRouteTypes {
     | '/timeclock'
     | '/timeclock-report'
     | '/o/$token'
+    | '/api/public/create-staff-user'
     | '/api/public/dev-list-users'
     | '/api/public/dev-set-password'
     | '/api/public/menu-images'
@@ -492,6 +504,7 @@ export interface FileRouteTypes {
     | '/_authenticated/timeclock'
     | '/_authenticated/timeclock-report'
     | '/o/$token'
+    | '/api/public/create-staff-user'
     | '/api/public/dev-list-users'
     | '/api/public/dev-set-password'
     | '/api/public/menu-images'
@@ -508,6 +521,7 @@ export interface RootRouteChildren {
   RegisterRoute: typeof RegisterRoute
   WelcomeRoute: typeof WelcomeRoute
   OTokenRoute: typeof OTokenRoute
+  ApiPublicCreateStaffUserRoute: typeof ApiPublicCreateStaffUserRoute
   ApiPublicDevListUsersRoute: typeof ApiPublicDevListUsersRoute
   ApiPublicDevSetPasswordRoute: typeof ApiPublicDevSetPasswordRoute
   ApiPublicMenuImagesRoute: typeof ApiPublicMenuImagesRoute
@@ -749,6 +763,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/create-staff-user': {
+      id: '/api/public/create-staff-user'
+      path: '/api/public/create-staff-user'
+      fullPath: '/api/public/create-staff-user'
+      preLoaderRoute: typeof ApiPublicCreateStaffUserRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/dev-list-users': {
       id: '/api/public/dev-list-users'
       path: '/api/public/dev-list-users'
@@ -864,6 +885,7 @@ const rootRouteChildren: RootRouteChildren = {
   RegisterRoute: RegisterRoute,
   WelcomeRoute: WelcomeRoute,
   OTokenRoute: OTokenRoute,
+  ApiPublicCreateStaffUserRoute: ApiPublicCreateStaffUserRoute,
   ApiPublicDevListUsersRoute: ApiPublicDevListUsersRoute,
   ApiPublicDevSetPasswordRoute: ApiPublicDevSetPasswordRoute,
   ApiPublicMenuImagesRoute: ApiPublicMenuImagesRoute,

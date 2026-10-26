@@ -77,6 +77,8 @@ function StaffPage() {
       </p>
       <h1 className="text-4xl font-display mb-6">Staff &amp; Roles</h1>
 
+      {canManage && <CreateAccountCard isDev={hasRole("developer")} onCreated={load} />}
+
       {canManage && (
         <Card className="mb-6">
           <CardHeader><CardTitle className="text-base">Assign role by email</CardTitle></CardHeader>
@@ -102,7 +104,7 @@ function StaffPage() {
             </Button>
           </CardContent>
           <p className="px-6 pb-4 text-xs text-muted-foreground">
-            The person must have already signed up. If not, ask them to register at <code>/login</code> first.
+            For existing accounts only. To add someone new, use "Create staff account" above.
           </p>
         </Card>
       )}
@@ -148,5 +150,55 @@ function StaffPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function CreateAccountCard({ isDev, onCreated }: { isDev: boolean; onCreated: () => void | Promise<void> }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState<AppRole>("barista");
+  const [busy, setBusy] = useState(false);
+  const create = async () => {
+    setBusy(true);
+    try {
+      const { data } = await supabase.auth.getSession();
+      const res = await fetch("/api/public/create-staff-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${data.session?.access_token ?? ""}` },
+        body: JSON.stringify({ email: email.trim(), password, role }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.error ?? "Could not create account");
+      toast.success(`Account created for ${email} as ${role}`);
+      setEmail(""); setPassword("");
+      await onCreated();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not create account");
+    } finally { setBusy(false); }
+  };
+  return (
+    <Card className="mb-6">
+      <CardHeader><CardTitle className="text-base">Create staff account</CardTitle></CardHeader>
+      <CardContent className="flex flex-col sm:flex-row gap-3">
+        <Input type="email" placeholder="staff@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <Input type="text" placeholder="Temporary password (6+)" value={password} onChange={(e) => setPassword(e.target.value)} />
+        <Select value={role} onValueChange={(v) => setRole(v as AppRole)}>
+          <SelectTrigger className="sm:w-40"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="barista">Barista</SelectItem>
+            <SelectItem value="accountant">Accountant</SelectItem>
+            <SelectItem value="partner">Partner</SelectItem>
+            <SelectItem value="admin">Admin</SelectItem>
+            {isDev && <SelectItem value="developer">Developer</SelectItem>}
+          </SelectContent>
+        </Select>
+        <Button onClick={create} disabled={busy || !email.trim() || password.length < 6}>
+          {busy ? "Creating…" : "Create"}
+        </Button>
+      </CardContent>
+      <p className="px-6 pb-4 text-xs text-muted-foreground">
+        Share the email and temporary password with the staff member. They can sign in right away.
+      </p>
+    </Card>
   );
 }
