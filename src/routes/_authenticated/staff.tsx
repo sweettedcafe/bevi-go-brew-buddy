@@ -77,6 +77,8 @@ function StaffPage() {
       </p>
       <h1 className="text-4xl font-display mb-6">Staff &amp; Roles</h1>
 
+      {canManage && <CreateAccountCard isDev={hasRole("developer")} onCreated={load} />}
+
       {canManage && (
         <Card className="mb-6">
           <CardHeader><CardTitle className="text-base">Assign role by email</CardTitle></CardHeader>
