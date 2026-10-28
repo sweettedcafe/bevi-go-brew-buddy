@@ -34,6 +34,7 @@ type Row = {
   id: string; created_at: string; inventory_item_id: string; item_name: string | null;
   unit: string | null; delta: number; reason: string; user_name: string | null;
   user_email: string | null; entry_type: "Manual entry" | "Automatic entry";
+  ref_table?: string | null; ref_id?: string | null; _self?: boolean;
 };
 
 function InventoryHistoryPage() {
@@ -59,6 +60,14 @@ function InventoryHistoryPage() {
       all.push(...((res.data ?? []) as Row[]));
       if (!res.data || res.data.length < 1000) break;
     }
+    // Mark rows from customer self-orders so the User column matches the sales report.
+    const orderIds = [...new Set(all.filter((r) => r.ref_table === "orders" && r.ref_id).map((r) => r.ref_id as string))];
+    const selfIds = new Set<string>();
+    for (let i = 0; i < orderIds.length; i += 200) {
+      const { data: os } = await db.from("orders").select("id,source").in("id", orderIds.slice(i, i + 200));
+      for (const o of (os ?? []) as any[]) if (o.source === "self") selfIds.add(o.id);
+    }
+    for (const r of all) if (r.ref_id && selfIds.has(r.ref_id)) r._self = true;
     const data = all;
     if (error) toast.error(error.message.includes("inventory_history")
       ? "Run supabase_phase54_schema.sql to enable this report" : error.message);
@@ -67,7 +76,7 @@ function InventoryHistoryPage() {
   }
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, []);
 
-  const userOf = (r: Row) => r.user_name || r.user_email || (r.entry_type === "Automatic entry" ? "System" : "—");
+  const userOf = (r: Row) => r._self ? "self-order" : r.user_name || r.user_email || (r.entry_type === "Automatic entry" ? "System" : "—");
   const items = useMemo(() => [...new Set(rows.map((r) => r.item_name ?? ""))].filter(Boolean).sort(), [rows]);
   const users = useMemo(() => [...new Set(rows.map(userOf))].sort(), [rows]);
   const filtered = useMemo(() => rows.filter((r) =>
