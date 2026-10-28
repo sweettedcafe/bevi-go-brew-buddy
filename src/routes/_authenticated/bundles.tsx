@@ -61,7 +61,7 @@ function discountedUnit(
 
 function BundlesPage() {
   const { primaryRole } = useAuth();
-  const isAdmin = primaryRole === "admin" || primaryRole === "developer";
+  const isAdmin = primaryRole === "admin" || primaryRole === "developer" || primaryRole === "partner";
   const [bundles, setBundles] = useState<Bundle[]>([]);
   const [items, setItems] = useState<MenuItem[]>([]);
   const [owners, setOwners] = useState<Owner[]>([]);
